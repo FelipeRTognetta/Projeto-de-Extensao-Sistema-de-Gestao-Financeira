@@ -12,6 +12,7 @@ desktop.ini
 *.iml
 *.iws
 *.ipr
+CLAUDE.md
 
 # ================================
 # Gradle
@@ -24,7 +25,9 @@ build/
 # Kotlin / Java
 # ================================
 *.class
+*.jar
 *.log
+*.jar
 
 # ================================
 # Android
@@ -38,6 +41,8 @@ gen/
 out/
 local.properties
 captures/
+specs
+spec.md
 .claude
 .specify
 .externalNativeBuild/
