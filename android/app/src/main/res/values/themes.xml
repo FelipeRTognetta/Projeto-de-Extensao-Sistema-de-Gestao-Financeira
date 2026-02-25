@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ================================ -->
+    <!-- Material 3 Theme for Financial App -->
+    <!-- ================================ -->
+    <style name="Theme.FinancialApp" parent="android:Theme.Material.Light">
+        <!-- Primary colors -->
+        <item name="android:colorPrimary">@color/primary</item>
+        <item name="android:colorPrimaryDark">@color/primary_dark</item>
+        <item name="android:colorAccent">@color/accent</item>
+
+        <!-- Secondary colors -->
+        <item name="android:colorSecondary">@color/secondary</item>
+
+        <!-- Background color -->
+        <item name="android:colorBackground">@color/background</item>
+
+        <!-- Text colors -->
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+
+        <!-- Action bar styling -->
+        <item name="android:actionBarStyle">@style/ActionBar.FinancialApp</item>
+
+        <!-- Dialog styling -->
+        <item name="android:alertDialogStyle">@style/AlertDialog.FinancialApp</item>
+
+        <!-- Status bar styling (API 21+) -->
+        <item name="android:statusBarColor">@color/primary_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+
+        <!-- Navigation bar styling (API 21+) -->
+        <item name="android:navigationBarColor">@color/background</item>
+    </style>
+
+    <!-- ================================ -->
+    <!-- Action Bar Style -->
+    <!-- ================================ -->
+    <style name="ActionBar.FinancialApp" parent="android:Widget.Holo.Light.ActionBar">
+        <item name="android:background">@color/primary</item>
+        <item name="android:titleTextStyle">@style/ActionBarTitleStyle</item>
+    </style>
+
+    <!-- ================================ -->
+    <!-- Action Bar Title Style -->
+    <!-- ================================ -->
+    <style name="ActionBarTitleStyle" parent="android:TextAppearance.Holo.Widget.ActionBar.Title">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">18sp</item>
+    </style>
+
+    <!-- ================================ -->
+    <!-- Alert Dialog Style -->
+    <!-- ================================ -->
+    <style name="AlertDialog.FinancialApp" parent="android:Theme.Holo.Light.Dialog.Alert">
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+    </style>
+
+    <!-- ================================ -->
+    <!-- Text Styles -->
+    <!-- ================================ -->
+    <style name="TextAppearance.Display" parent="android:TextAppearance.Large">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">32sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="TextAppearance.Headline" parent="android:TextAppearance.Medium">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">24sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="TextAppearance.Title" parent="android:TextAppearance.Medium">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="TextAppearance.Subtitle" parent="android:TextAppearance.Small">
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">sans-serif</item>
+    </style>
+
+    <style name="TextAppearance.Body" parent="android:TextAppearance.Small">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:fontFamily">sans-serif</item>
+    </style>
+
+    <style name="TextAppearance.Caption" parent="android:TextAppearance.Small">
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:fontFamily">sans-serif</item>
+    </style>
+
+    <!-- ================================ -->
+    <!-- Button Styles -->
+    <!-- ================================ -->
+    <style name="Button.Primary" parent="android:Widget.Button">
+        <item name="android:background">@color/primary</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:padding">12dp</item>
+    </style>
+
+    <style name="Button.Secondary" parent="android:Widget.Button">
+        <item name="android:background">@color/secondary</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:padding">12dp</item>
+    </style>
+
+    <!-- ================================ -->
+    <!-- Edit Text Styles -->
+    <!-- ================================ -->
+    <style name="EditText.Primary" parent="android:Widget.EditText">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textColorHint">@color/text_secondary</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:padding">12dp</item>
+    </style>
+
+    <!-- ================================ -->
+    <!-- Card Styles -->
+    <!-- ================================ -->
+    <style name="Card" parent="android:Widget.FrameLayout">
+        <item name="android:background">@color/card_background</item>
+        <item name="android:elevation">4dp</item>
+    </style>
+
+</resources>
