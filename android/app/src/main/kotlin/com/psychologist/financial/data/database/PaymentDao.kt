@@ -521,6 +521,146 @@ interface PaymentDao {
     suspend fun getMinPaymentAmount(patientId: Long): BigDecimal
 
     // ========================================
+    // Global Aggregation Queries (all patients)
+    // ========================================
+
+    /**
+     * Get total amount by status (all patients)
+     *
+     * @param status Payment status (PAID or PENDING)
+     * @return Total amount with status
+     */
+    @Query("""
+        SELECT COALESCE(SUM(amount), 0) FROM payments
+        WHERE status = :status
+    """)
+    suspend fun getSumByStatus(status: String): BigDecimal
+
+    /**
+     * Get total amount by status as Flow (reactive, all patients)
+     *
+     * @param status Payment status
+     * @return Flow of total amount
+     */
+    @Query("""
+        SELECT COALESCE(SUM(amount), 0) FROM payments
+        WHERE status = :status
+    """)
+    fun getSumByStatusFlow(status: String): Flow<BigDecimal>
+
+    /**
+     * Get total amount by status and date range (all patients)
+     *
+     * @param status Payment status
+     * @param startDate Start date (inclusive)
+     * @param endDate End date (inclusive)
+     * @return Total amount matching criteria
+     */
+    @Query("""
+        SELECT COALESCE(SUM(amount), 0) FROM payments
+        WHERE status = :status
+        AND payment_date >= :startDate
+        AND payment_date <= :endDate
+    """)
+    suspend fun getSumByStatusAndDateRange(
+        status: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): BigDecimal
+
+    /**
+     * Get total amount by status and date range as Flow (reactive, all patients)
+     *
+     * @param status Payment status
+     * @param startDate Start date (inclusive)
+     * @param endDate End date (inclusive)
+     * @return Flow of total amount
+     */
+    @Query("""
+        SELECT COALESCE(SUM(amount), 0) FROM payments
+        WHERE status = :status
+        AND payment_date >= :startDate
+        AND payment_date <= :endDate
+    """)
+    fun getSumByStatusAndDateRangeFlow(
+        status: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Flow<BigDecimal>
+
+    /**
+     * Get average amount by status (all patients)
+     *
+     * @param status Payment status
+     * @return Average amount with status
+     */
+    @Query("""
+        SELECT COALESCE(AVG(amount), 0) FROM payments
+        WHERE status = :status
+    """)
+    suspend fun getAverageByStatus(status: String): BigDecimal
+
+    /**
+     * Get average amount by status and date range (all patients)
+     *
+     * @param status Payment status
+     * @param startDate Start date (inclusive)
+     * @param endDate End date (inclusive)
+     * @return Average amount matching criteria
+     */
+    @Query("""
+        SELECT COALESCE(AVG(amount), 0) FROM payments
+        WHERE status = :status
+        AND payment_date >= :startDate
+        AND payment_date <= :endDate
+    """)
+    suspend fun getAverageByStatusAndDateRange(
+        status: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): BigDecimal
+
+    /**
+     * Get average amount by status and date range as Flow (reactive, all patients)
+     *
+     * @param status Payment status
+     * @param startDate Start date (inclusive)
+     * @param endDate End date (inclusive)
+     * @return Flow of average amount
+     */
+    @Query("""
+        SELECT COALESCE(AVG(amount), 0) FROM payments
+        WHERE status = :status
+        AND payment_date >= :startDate
+        AND payment_date <= :endDate
+    """)
+    fun getAverageByStatusAndDateRangeFlow(
+        status: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Flow<BigDecimal>
+
+    /**
+     * Get count of payments by status and date range (all patients)
+     *
+     * @param status Payment status
+     * @param startDate Start date (inclusive)
+     * @param endDate End date (inclusive)
+     * @return Count of payments matching criteria
+     */
+    @Query("""
+        SELECT COUNT(*) FROM payments
+        WHERE status = :status
+        AND payment_date >= :startDate
+        AND payment_date <= :endDate
+    """)
+    suspend fun countByStatusAndDateRange(
+        status: String,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Int
+
+    // ========================================
     // Update Operations
     // ========================================
 

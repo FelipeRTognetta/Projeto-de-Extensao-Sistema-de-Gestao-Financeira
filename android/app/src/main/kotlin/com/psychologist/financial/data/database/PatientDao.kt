@@ -359,6 +359,26 @@ interface PatientDao {
     suspend fun countAllPatients(): Int
 
     /**
+     * Count patients by status
+     *
+     * @param status Patient status (ACTIVE or INACTIVE)
+     * @return Count of patients with status
+     */
+    @Query("SELECT COUNT(*) FROM patient WHERE status = :status")
+    suspend fun countByStatus(status: String): Int
+
+    /**
+     * Count patients by status as Flow (reactive)
+     *
+     * Updates automatically when patient status changes.
+     *
+     * @param status Patient status
+     * @return Flow of patient count
+     */
+    @Query("SELECT COUNT(*) FROM patient WHERE status = :status")
+    fun countByStatusFlow(status: String): Flow<Int>
+
+    /**
      * Check if phone already exists
      *
      * Used for validation before insert/update.
