@@ -18,6 +18,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -34,6 +36,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -132,6 +136,7 @@ fun PatientDetailScreen(
                     // Patient detail content
                     PatientDetailContent(
                         patient = detailState.patient,
+                        viewModel = viewModel,
                         onEdit = onEdit
                     )
                 }
@@ -164,8 +169,11 @@ fun PatientDetailScreen(
 @Composable
 private fun PatientDetailContent(
     patient: Patient,
+    viewModel: PatientViewModel,
     onEdit: () -> Unit
 ) {
+    val showStatusDialog = remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -206,9 +214,36 @@ private fun PatientDetailContent(
             ) {
                 Text("Editar Informações")
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Mark Inactive button
+            TextButton(
+                onClick = { showStatusDialog.value = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Marcar como Inativo")
+            }
+        } else {
+            // Reactivate button for inactive patients
+            Button(
+                onClick = { showStatusDialog.value = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Reativar Paciente")
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
+    }
+
+    // Status change confirmation dialog
+    if (showStatusDialog.value) {
+        StatusChangeDialog(
+            patient = patient,
+            viewModel = viewModel,
+            onDismiss = { showStatusDialog.value = false }
+        )
     }
 }
 
@@ -481,4 +516,75 @@ private fun ErrorContent(
             Text("Voltar")
         }
     }
+}
+
+/**
+ * Status change confirmation dialog
+ *
+ * Shows confirmation before marking patient active/inactive.
+ * Includes warning about consequences of status change.
+ */
+@Composable
+private fun StatusChangeDialog(
+    patient: Patient,
+    viewModel: PatientViewModel,
+    onDismiss: () -> Unit
+) {
+    val isActive = patient.isActive
+
+    AlertDialog(
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        },
+        title = {
+            Text(
+                text = if (isActive) "Marcar como Inativo?" else "Reativar Paciente?",
+                fontWeight = FontWeight.SemiBold
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = if (isActive) {
+                        "Ao marcar \"${patient.name}\" como inativo:\n\n" +
+                                "• Não será possível adicionar novos atendimentos\n" +
+                                "• Não será possível registrar novos pagamentos\n" +
+                                "• O paciente será ocultado da lista ativa\n" +
+                                "• Os dados históricos serão preservados"
+                    } else {
+                        "Ao reativar \"${patient.name}\":\n\n" +
+                                "• Será possível adicionar novos atendimentos\n" +
+                                "• Será possível registrar novos pagamentos\n" +
+                                "• O paciente aparecerá na lista ativa\n" +
+                                "• Todos os dados históricos serão mantidos"
+                    },
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        },
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (isActive) {
+                        viewModel.markPatientInactive(patient.id)
+                    } else {
+                        viewModel.reactivatePatient(patient.id)
+                    }
+                    onDismiss()
+                }
+            ) {
+                Text(if (isActive) "Marcar Inativo" else "Reativar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }
