@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.psychologist.financial.domain.models.Patient
 import com.psychologist.financial.domain.usecases.CreatePatientUseCase
 import com.psychologist.financial.domain.usecases.GetAllPatientsUseCase
+import com.psychologist.financial.domain.usecases.MarkPatientInactiveUseCase
+import com.psychologist.financial.domain.usecases.ReactivatePatientUseCase
 import com.psychologist.financial.viewmodel.PatientViewState.CreatePatientState
 import com.psychologist.financial.viewmodel.PatientViewState.DetailState
 import com.psychologist.financial.viewmodel.PatientViewState.ListState
@@ -21,52 +23,61 @@ import java.time.LocalDate
  *
  * Responsibilities:
  * - Manage patient data state (list, detail, form)
- * - Coordinate use cases (GetAllPatients, CreatePatient)
- * - Handle user interactions (load, create, update, delete)
+ * - Coordinate use cases (GetAllPatients, CreatePatient, MarkInactive, Reactivate)
+ * - Handle user interactions (load, create, update, status changes)
  * - Maintain reactive state via StateFlow
  * - Handle errors and loading states
+ * - Filter patients by status (active/inactive)
  *
  * Architecture:
  * - Extends BaseViewModel for coroutine management
  * - Uses use cases for business logic
  * - StateFlow for reactive state
  * - Separate states for list, detail, and form screens
+ * - Status filtering with includeInactivePatients flag
  *
  * State Management:
  * - patientListState: List of patients with loading/error
  * - patientDetailState: Single patient detail view
  * - createFormState: Patient creation form state
+ * - includeInactivePatients: Filter flag for patient list
  *
  * Usage:
  * ```kotlin
  * class PatientListScreen {
- *     val viewModel = PatientViewModel(getAllPatientsUseCase, createPatientUseCase)
+ *     val viewModel = PatientViewModel(
+ *         getAllPatientsUseCase,
+ *         createPatientUseCase,
+ *         markInactiveUseCase,
+ *         reactivateUseCase
+ *     )
  *
- *     // Load patient list
+ *     // Load patient list (active only by default)
  *     LaunchedEffect(Unit) {
  *         viewModel.loadPatients()
  *     }
  *
- *     // Observe state
- *     val listState = viewModel.patientListState.collectAsState().value
- *     val patients = (listState as? ListState.Success)?.patients ?: emptyList()
+ *     // Toggle to show inactive patients
+ *     Button(onClick = { viewModel.toggleInactiveFilter() })
  *
- *     LazyColumn {
- *         items(patients) { patient ->
- *             PatientListItem(patient) {
- *                 viewModel.selectPatient(patient.id)
- *             }
- *         }
- *     }
+ *     // Mark patient inactive
+ *     Button(onClick = { viewModel.markPatientInactive(patient.id) })
+ *
+ *     // Reactivate patient
+ *     Button(onClick = { viewModel.reactivatePatient(patient.id) })
  * }
  * ```
  *
  * @property getAllPatientsUseCase Use case for retrieving patients
  * @property createPatientUseCase Use case for creating patients
+ * @property markPatientInactiveUseCase Use case for marking patient inactive
+ * @property reactivatePatientUseCase Use case for reactivating patient
  */
 class PatientViewModel(
     private val getAllPatientsUseCase: GetAllPatientsUseCase,
-    private val createPatientUseCase: CreatePatientUseCase
+    private val createPatientUseCase: CreatePatientUseCase,
+    private val markPatientInactiveUseCase: MarkPatientInactiveUseCase,
+    private val reactivatePatientUseCase: ReactivatePatientUseCase
 ) : BaseViewModel() {
 
     private companion object {
@@ -313,6 +324,149 @@ class PatientViewModel(
      */
     fun clearPatientDetail() {
         _patientDetailState.value = DetailState.Idle
+    }
+
+    // ========================================
+    // Patient Status Operations
+    // ========================================
+
+    /**
+     * Mark patient as inactive (archive)
+     *
+     * Changes patient status to INACTIVE.
+     * Prevents creation of new appointments/payments.
+     * Used to archive inactive patients while preserving data.
+     *
+     * @param patientId ID of patient to mark inactive
+     *
+     * Example:
+     * ```kotlin
+     * viewModel.markPatientInactive(patientId)
+     * ```
+     *
+     * Side Effects:
+     * - Updates patient status to INACTIVE
+     * - Refreshes patient list
+     * - Updates patient detail if currently displayed
+     * - Shows success/error message
+     */
+    fun markPatientInactive(patientId: Long) {
+        Log.d(TAG, "Marking patient inactive: id=$patientId")
+        launchSafe {
+            try {
+                val inactivePatient = markPatientInactiveUseCase.execute(patientId)
+
+                if (inactivePatient != null) {
+                    Log.d(TAG, "Patient marked inactive: ${inactivePatient.name}")
+
+                    // Update detail state if patient is currently displayed
+                    val detailState = _patientDetailState.value
+                    if (detailState is DetailState.Success && detailState.patient.id == patientId) {
+                        _patientDetailState.value = DetailState.Success(inactivePatient)
+                    }
+
+                    // Refresh list to reflect status change
+                    loadPatients()
+
+                    // Show success message
+                    setError(null)  // Clear any previous errors
+                } else {
+                    Log.w(TAG, "Patient not found for inactivation: id=$patientId")
+                    setError("Paciente não encontrado")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error marking patient inactive", e)
+                setError("Erro ao arquivar paciente: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Reactivate an inactive patient
+     *
+     * Changes patient status from INACTIVE to ACTIVE.
+     * Allows creation of new appointments/payments again.
+     * Used to restore access to archived patients.
+     *
+     * @param patientId ID of patient to reactivate
+     *
+     * Example:
+     * ```kotlin
+     * viewModel.reactivatePatient(patientId)
+     * ```
+     *
+     * Side Effects:
+     * - Updates patient status to ACTIVE
+     * - Refreshes patient list
+     * - Updates patient detail if currently displayed
+     * - Shows success/error message
+     */
+    fun reactivatePatient(patientId: Long) {
+        Log.d(TAG, "Reactivating patient: id=$patientId")
+        launchSafe {
+            try {
+                val activePatient = reactivatePatientUseCase.execute(patientId)
+
+                if (activePatient != null) {
+                    Log.d(TAG, "Patient reactivated: ${activePatient.name}")
+
+                    // Update detail state if patient is currently displayed
+                    val detailState = _patientDetailState.value
+                    if (detailState is DetailState.Success && detailState.patient.id == patientId) {
+                        _patientDetailState.value = DetailState.Success(activePatient)
+                    }
+
+                    // Refresh list to reflect status change
+                    loadPatients()
+
+                    // Show success message
+                    setError(null)  // Clear any previous errors
+                } else {
+                    Log.w(TAG, "Patient not found for reactivation: id=$patientId")
+                    setError("Paciente não encontrado")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error reactivating patient", e)
+                setError("Erro ao reativar paciente: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Check if patient is read-only (inactive)
+     *
+     * Determines if patient can receive new appointments/payments.
+     * Used to disable UI elements for inactive patients.
+     *
+     * @param patient Patient to check
+     * @return true if patient is inactive (read-only)
+     */
+    fun isPatientReadOnly(patient: Patient): Boolean {
+        return patient.isInactive
+    }
+
+    /**
+     * Check if patient can be marked inactive
+     *
+     * Validates business logic before marking inactive.
+     *
+     * @param patient Patient to check
+     * @return true if patient can be marked inactive
+     */
+    fun canMarkInactive(patient: Patient): Boolean {
+        return patient.isActive
+    }
+
+    /**
+     * Check if patient can be reactivated
+     *
+     * Validates business logic before reactivation.
+     *
+     * @param patient Patient to check
+     * @return true if patient can be reactivated
+     */
+    fun canReactivate(patient: Patient): Boolean {
+        return patient.isInactive
     }
 
     // ========================================
