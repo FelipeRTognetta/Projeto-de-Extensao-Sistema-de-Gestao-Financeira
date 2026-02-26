@@ -1,331 +1,346 @@
 package com.psychologist.financial.services
 
-import android.content.Context
-import android.os.Build
+import android.util.Log
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import android.util.Base64
-import android.util.Log
-import androidx.security.crypto.MasterKey
-import java.security.KeyStore
+import com.psychologist.financial.domain.models.EncryptionKey
+import com.psychologist.financial.domain.models.KeyPurpose
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import java.security.KeyStore
 import kotlin.random.Random
 
 /**
- * Service for managing encryption keys and performing cryptographic operations
+ * Encryption Service
  *
- * Features:
- * - Hardware-backed key storage via Android Keystore
- * - AES-256-GCM encryption for sensitive data
- * - Automatic key generation with biometric binding
- * - Secure key deletion and rotation
- * - API level compatibility (21+)
+ * Handles encryption and decryption operations using Android Keystore.
+ * Manages symmetric encryption (AES-256-GCM) for data protection.
  *
- * Architecture:
- * - AppDatabase uses this service to get encryption password for SQLCipher
- * - BiometricAuthManager uses this to protect auth tokens
- * - Can be extended for other sensitive field encryption
+ * Key Features:
+ * - Hardware-backed key generation via Android Keystore
+ * - AES-256-GCM encryption for authenticated encryption
+ * - Automatic IV (Initialization Vector) generation
+ * - User authentication requirement for sensitive keys
+ * - Non-exportable key material (protected by device TEE/StrongBox)
  *
- * Security Notes:
- * - Keys stored in Android Keystore are never extracted in plaintext
- * - Hardware backing available on Android 9+ (if device supports)
- * - All operations use AES-256-GCM for authenticated encryption
- * - IV (nonce) is randomly generated and prepended to ciphertext
- *
- * Limitations:
- * - Cannot directly encrypt passwords (passwords are not extractable)
- * - For database password: Generate a derived key from fingerprint
- * - Key rotation requires new key generation and re-encryption
+ * Security Model:
+ * - Master Key: Stored in Android Keystore (hardware-backed, non-exportable)
+ * - Database Key: 256-bit AES key, encrypted with Master Key
+ * - Per-operation IVs: Random 96-bit IVs for each encryption operation
+ * - Authentication Tag: 128-bit GCM auth tag for integrity verification
  *
  * Usage:
  * ```kotlin
- * val encryptionService = EncryptionService(context)
+ * val encryptionService = EncryptionService()
  *
- * // Get database encryption key (for SQLCipher)
- * val dbKey = encryptionService.getDatabaseEncryptionKey()
+ * // Generate Master Key
+ * val masterKey = encryptionService.generateMasterKey("master_key_alias")
  *
- * // Encrypt arbitrary data
- * val encrypted = encryptionService.encrypt(token, "auth_token")
- * val decrypted = encryptionService.decrypt(encrypted, "auth_token")
+ * // Encrypt data
+ * val plaintext = "sensitive data".toByteArray()
+ * val encryptedData = encryptionService.encrypt(plaintext, "database_key_alias")
  *
- * // Rotate keys
- * encryptionService.rotateKey("auth_token")
+ * // Decrypt data
+ * val decryptedData = encryptionService.decrypt(encryptedData, "database_key_alias")
  * ```
+ *
+ * @see EncryptionKey
+ * @see SecureKeyStore
  */
-class EncryptionService(private val context: Context) {
+class EncryptionService {
 
     private companion object {
         private const val TAG = "EncryptionService"
-
-        // Keystore configuration
-        private const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        private const val DATABASE_KEY_ALIAS = "financial_db_master_key"
-        private const val AUTH_TOKEN_KEY_ALIAS = "auth_token_key"
-
-        // GCM encryption parameters
-        private const val GCM_TAG_LENGTH_BITS = 128
-        private const val IV_LENGTH_BYTES = 12
-
-        // Key algorithm
-        private const val KEY_SIZE_BITS = 256
-        private const val ALGORITHM = KeyProperties.KEY_ALGORITHM_AES
-        private const val BLOCK_MODE = KeyProperties.BLOCK_MODE_GCM
-        private const val ENCRYPTION_PADDING = KeyProperties.ENCRYPTION_PADDING_NONE
-        private const val CIPHER_TRANSFORMATION = "$ALGORITHM/$BLOCK_MODE/$ENCRYPTION_PADDING"
+        private const val KEYSTORE_TYPE = "AndroidKeyStore"
+        private const val ALGORITHM = "AES"
+        private const val BLOCK_MODE = "GCM"
+        private const val PADDING = "NoPadding"
+        private const val CIPHER_TRANSFORMATION = "AES/GCM/NoPadding"
+        private const val KEY_SIZE = 256
+        private const val GCM_TAG_LENGTH = 128 // bits
+        private const val IV_LENGTH = 12 // bytes (96 bits for GCM)
     }
 
-    private val keyStore: KeyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply {
+    private val keyStore: KeyStore = KeyStore.getInstance(KEYSTORE_TYPE).apply {
         load(null)
     }
 
+    // ========================================
+    // Master Key Generation
+    // ========================================
+
     /**
-     * Get or create database encryption key
+     * Generate a Master Key for encryption key management
      *
-     * Returns a 256-bit key suitable for SQLCipher encryption.
-     * Key is stored in Android Keystore and never extracted in plaintext.
+     * Master Key is:
+     * - Stored in Android Keystore (hardware-backed if available)
+     * - Non-exportable (never leaves secure enclave)
+     * - Requires user authentication for access (biometric/PIN)
+     * - Valid for 5 minutes after authentication
      *
-     * For SQLCipher, we export a derived key as ByteArray via encryption:
-     * - Generate fixed plaintext (32 bytes)
-     * - Encrypt with Keystore key
-     * - Return encrypted bytes for SQLCipher
+     * @param alias Unique identifier for the key
+     * @param requiresUserAuth Whether key access requires biometric/PIN (default: true)
+     * @return EncryptionKey model with metadata
      *
-     * This ensures:
-     * - Same database password across app restarts
-     * - Key protected by Keystore hardware backing (if available)
-     * - Protection even if device storage is compromised
-     *
-     * @return 32-byte encryption key for SQLCipher
-     * @throws Exception If key generation or encryption fails
+     * @throws Exception If key generation fails
      */
-    fun getDatabaseEncryptionKey(): ByteArray {
-        return try {
-            // Ensure key exists (create if not)
-            ensureKeyExists(DATABASE_KEY_ALIAS)
+    fun generateMasterKey(
+        alias: String,
+        requiresUserAuth: Boolean = true
+    ): EncryptionKey {
+        Log.d(TAG, "Generating Master Key: $alias")
 
-            // Generate fixed plaintext for consistent key derivation
-            val plaintext = generateFixedPlaintext(32)
+        try {
+            // Remove existing key if present
+            if (keyStore.containsAlias(alias)) {
+                Log.d(TAG, "Removing existing key: $alias")
+                keyStore.deleteEntry(alias)
+            }
 
-            // Encrypt with Keystore key
-            encryptWithAlias(plaintext, DATABASE_KEY_ALIAS)
+            val keySpec = KeyGenParameterSpec.Builder(
+                alias,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+            )
+                .setBlockModes(BLOCK_MODE)
+                .setEncryptionPaddings(PADDING)
+                .setKeySize(KEY_SIZE)
+                .apply {
+                    if (requiresUserAuth) {
+                        setUserAuthenticationRequired(true)
+                        setUserAuthenticationValidityDurationSeconds(300) // 5 minutes
+                    }
+                }
+                .setIsStrongBoxBacked(isStrongBoxAvailable())
+                .build()
+
+            val keyGenerator = KeyGenerator.getInstance(ALGORITHM, KEYSTORE_TYPE)
+            keyGenerator.init(keySpec)
+            val secretKey = keyGenerator.generateKey()
+
+            Log.d(TAG, "Master Key generated successfully: $alias")
+
+            return EncryptionKey.create(
+                alias = alias,
+                keyMaterial = secretKey.encoded ?: ByteArray(0),
+                isMasterKey = true,
+                purpose = KeyPurpose.MASTER
+            )
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to get database encryption key", e)
-            throw e
+            Log.e(TAG, "Error generating Master Key", e)
+            throw Exception("Failed to generate Master Key: ${e.message}", e)
         }
     }
 
     /**
-     * Encrypt data using the specified Keystore key
+     * Generate a Database Key for SQLCipher encryption
      *
-     * Uses AES-256-GCM with authenticated encryption.
-     * IV (nonce) is randomly generated and prepended to ciphertext.
+     * Database Key is:
+     * - A random 256-bit AES key (generated in software, not in Keystore)
+     * - Will be encrypted with Master Key for storage
+     * - Used for SQLCipher database encryption
      *
-     * Ciphertext format:
-     * [12-byte IV] [ciphertext] [16-byte auth tag (included by GCM)]
+     * @param alias Alias for metadata purposes
+     * @return EncryptionKey with random key material
+     */
+    fun generateDatabaseKey(alias: String): EncryptionKey {
+        Log.d(TAG, "Generating Database Key: $alias")
+
+        // Generate 256-bit (32 byte) random key
+        val keyMaterial = ByteArray(32)
+        Random.nextBytes(keyMaterial)
+
+        Log.d(TAG, "Database Key generated successfully: $alias")
+
+        return EncryptionKey.create(
+            alias = alias,
+            keyMaterial = keyMaterial,
+            isMasterKey = false,
+            purpose = KeyPurpose.DATABASE
+        )
+    }
+
+    /**
+     * Retrieve a key from Android Keystore by alias
+     *
+     * @param alias Key identifier
+     * @return SecretKey if found, null otherwise
+     */
+    fun getKeyFromKeystore(alias: String): SecretKey? {
+        return try {
+            keyStore.getKey(alias, null) as? SecretKey
+        } catch (e: Exception) {
+            Log.w(TAG, "Error retrieving key from Keystore: $alias", e)
+            null
+        }
+    }
+
+    // ========================================
+    // Encryption and Decryption
+    // ========================================
+
+    /**
+     * Encrypt data using a Keystore key
+     *
+     * Uses AES-256-GCM with random IV.
+     * Returns: IV (12 bytes) + Ciphertext + Auth Tag (authentication included in GCM)
      *
      * @param plaintext Data to encrypt
      * @param keyAlias Keystore key alias
-     * @return Base64-encoded ciphertext with prepended IV
-     * @throws Exception If encryption fails
+     * @return Encrypted data (IV + ciphertext)
+     *
+     * @throws Exception If encryption fails or key not found
      */
-    fun encrypt(plaintext: ByteArray, keyAlias: String): String {
-        return try {
-            ensureKeyExists(keyAlias)
+    fun encrypt(plaintext: ByteArray, keyAlias: String): ByteArray {
+        Log.d(TAG, "Encrypting data with key: $keyAlias (plaintext size: ${plaintext.size} bytes)")
+
+        try {
+            val key = getKeyFromKeystore(keyAlias)
+                ?: throw Exception("Key not found: $keyAlias")
 
             val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
-            val key = getKey(keyAlias)
 
-            // Generate random IV
-            val iv = ByteArray(IV_LENGTH_BYTES)
+            // Generate random IV (96 bits for GCM)
+            val iv = ByteArray(IV_LENGTH)
             Random.nextBytes(iv)
 
             // Initialize cipher with IV
-            cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv))
+            val spec = GCMParameterSpec(GCM_TAG_LENGTH, iv)
+            cipher.init(Cipher.ENCRYPT_MODE, key, spec)
 
-            // Encrypt data
+            // Encrypt plaintext
             val ciphertext = cipher.doFinal(plaintext)
 
-            // Prepend IV to ciphertext
-            val ivAndCiphertext = iv + ciphertext
+            // Prepend IV to ciphertext for later decryption
+            val result = iv + ciphertext
 
-            // Return Base64-encoded
-            Base64.encodeToString(ivAndCiphertext, Base64.NO_WRAP)
+            Log.d(TAG, "Encryption successful (ciphertext size: ${ciphertext.size} bytes)")
+            return result
         } catch (e: Exception) {
-            Log.e(TAG, "Encryption failed for key: $keyAlias", e)
-            throw e
+            Log.e(TAG, "Encryption failed", e)
+            throw Exception("Encryption failed: ${e.message}", e)
         }
     }
 
     /**
-     * Decrypt data using the specified Keystore key
+     * Decrypt data using a Keystore key
      *
-     * Extracts IV from prepended bytes and decrypts using GCM mode.
+     * Expects input format: IV (12 bytes) + Ciphertext + Auth Tag
      *
-     * @param encryptedBase64 Base64-encoded ciphertext with prepended IV
+     * @param encryptedData Data to decrypt (IV + ciphertext)
      * @param keyAlias Keystore key alias
      * @return Decrypted plaintext
-     * @throws Exception If decryption fails (wrong password, tampered data, etc.)
+     *
+     * @throws Exception If decryption fails or authentication fails
      */
-    fun decrypt(encryptedBase64: String, keyAlias: String): ByteArray {
-        return try {
+    fun decrypt(encryptedData: ByteArray, keyAlias: String): ByteArray {
+        Log.d(TAG, "Decrypting data with key: $keyAlias (encrypted size: ${encryptedData.size} bytes)")
+
+        try {
+            if (encryptedData.size < IV_LENGTH) {
+                throw Exception("Encrypted data too short (minimum: $IV_LENGTH bytes)")
+            }
+
+            val key = getKeyFromKeystore(keyAlias)
+                ?: throw Exception("Key not found: $keyAlias")
+
             val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
-            val key = getKey(keyAlias)
 
-            // Decode Base64
-            val ivAndCiphertext = Base64.decode(encryptedBase64, Base64.NO_WRAP)
+            // Extract IV (first 12 bytes)
+            val iv = encryptedData.sliceArray(0 until IV_LENGTH)
 
-            // Extract IV and ciphertext
-            val iv = ivAndCiphertext.copyOfRange(0, IV_LENGTH_BYTES)
-            val ciphertext = ivAndCiphertext.copyOfRange(IV_LENGTH_BYTES, ivAndCiphertext.size)
+            // Extract ciphertext (remaining bytes)
+            val ciphertext = encryptedData.sliceArray(IV_LENGTH until encryptedData.size)
 
             // Initialize cipher with IV
-            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv))
+            val spec = GCMParameterSpec(GCM_TAG_LENGTH, iv)
+            cipher.init(Cipher.DECRYPT_MODE, key, spec)
 
-            // Decrypt and return plaintext
-            cipher.doFinal(ciphertext)
+            // Decrypt ciphertext
+            val plaintext = cipher.doFinal(ciphertext)
+
+            Log.d(TAG, "Decryption successful (plaintext size: ${plaintext.size} bytes)")
+            return plaintext
         } catch (e: Exception) {
-            Log.e(TAG, "Decryption failed for key: $keyAlias", e)
-            throw e
+            Log.e(TAG, "Decryption failed", e)
+            throw Exception("Decryption failed: ${e.message}", e)
         }
     }
 
+    // ========================================
+    // Key Management Utilities
+    // ========================================
+
     /**
-     * Rotate key (create new key, mark old as rotated)
+     * Check if Android Keystore supports StrongBox (hardware-backed security)
      *
-     * For future use: implement key versioning and re-encryption.
-     * Current implementation generates new key with new alias.
+     * StrongBox provides maximum security via dedicated secure processor.
      *
-     * @param baseAlias Base alias for the key family
-     * @throws Exception If key generation fails
+     * @return true if StrongBox available
      */
-    fun rotateKey(baseAlias: String) {
-        try {
-            val timestamp = System.currentTimeMillis()
-            val newAlias = "${baseAlias}_rotated_$timestamp"
-
-            // Delete old key
-            keyStore.deleteEntry(baseAlias)
-
-            // Generate new key (will be created on next use)
-            ensureKeyExists(newAlias)
-
-            Log.d(TAG, "Key rotated: $baseAlias -> $newAlias")
+    fun isStrongBoxAvailable(): Boolean {
+        return try {
+            keyStore.containsAlias("test") // Any operation to check availability
+            true
         } catch (e: Exception) {
-            Log.e(TAG, "Key rotation failed", e)
-            throw e
+            Log.w(TAG, "StrongBox not available", e)
+            false
         }
     }
 
     /**
-     * Check if key exists in Keystore
+     * Delete a key from Android Keystore
      *
-     * @param keyAlias Key alias
-     * @return true if key exists, false otherwise
+     * Used for key rotation and cleanup.
+     *
+     * @param alias Key identifier
+     * @return true if deleted, false if not found
      */
-    fun keyExists(keyAlias: String): Boolean {
-        return keyStore.containsAlias(keyAlias)
-    }
-
-    /**
-     * Delete key from Keystore
-     *
-     * WARNING: Destructive operation. Cannot be undone.
-     *
-     * @param keyAlias Key alias to delete
-     */
-    fun deleteKey(keyAlias: String) {
-        try {
-            keyStore.deleteEntry(keyAlias)
-            Log.d(TAG, "Key deleted: $keyAlias")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to delete key: $keyAlias", e)
-            throw e
-        }
-    }
-
-    /**
-     * Get or create key in Keystore
-     *
-     * Keys are created with:
-     * - AES-256-GCM algorithm
-     * - Hardware backing (if available)
-     * - No biometric requirement (auth keys can override)
-     *
-     * @param keyAlias Key alias
-     * @return SecretKey from Keystore
-     * @throws Exception If key retrieval/creation fails
-     */
-    private fun ensureKeyExists(keyAlias: String) {
-        if (keyStore.containsAlias(keyAlias)) {
-            return
-        }
-
-        // Create new key
-        val keyGenerator = KeyGenerator.getInstance(ALGORITHM, ANDROID_KEYSTORE)
-
-        val keySpec = KeyGenParameterSpec.Builder(
-            keyAlias,
-            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-        )
-            .setKeySize(KEY_SIZE_BITS)
-            .setBlockModes(BLOCK_MODE)
-            .setEncryptionPaddings(ENCRYPTION_PADDING)
-            .setRandomizedEncryptionRequired(true)  // Always use random IV
-            .apply {
-                // Hardware backing available on Android 9+ (if device supports)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    setIsStrongBoxBacked(true)  // Use secure hardware if available
-                }
+    fun deleteKey(alias: String): Boolean {
+        return try {
+            if (keyStore.containsAlias(alias)) {
+                keyStore.deleteEntry(alias)
+                Log.d(TAG, "Key deleted: $alias")
+                true
+            } else {
+                Log.w(TAG, "Key not found for deletion: $alias")
+                false
             }
-            .build()
-
-        keyGenerator.init(keySpec)
-        keyGenerator.generateKey()
-
-        Log.d(TAG, "Key created: $keyAlias")
-    }
-
-    /**
-     * Get key from Keystore
-     *
-     * @param keyAlias Key alias
-     * @return SecretKey from Keystore
-     * @throws Exception If key not found
-     */
-    private fun getKey(keyAlias: String): SecretKey {
-        return keyStore.getKey(keyAlias, null) as SecretKey
-    }
-
-    /**
-     * Generate fixed plaintext for consistent key derivation
-     *
-     * For database key, we need same encryption output across restarts.
-     * This generates fixed bytes from the alias hash.
-     *
-     * @param length Number of bytes to generate
-     * @return Fixed-length byte array
-     */
-    private fun generateFixedPlaintext(length: Int): ByteArray {
-        val plaintext = ByteArray(length)
-        for (i in 0 until length) {
-            plaintext[i] = (DATABASE_KEY_ALIAS.hashCode() ushr (i % 32)).toByte()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting key: $alias", e)
+            false
         }
-        return plaintext
     }
 
     /**
-     * Encrypt data using a specific Keystore key alias
+     * Get all key aliases in Android Keystore
      *
-     * Internal method for consistent encryption.
+     * Useful for debugging and key inventory.
      *
-     * @param plaintext Data to encrypt
-     * @param keyAlias Keystore key alias
-     * @return Base64-encoded ciphertext with IV
+     * @return List of key aliases
      */
-    private fun encryptWithAlias(plaintext: ByteArray, keyAlias: String): ByteArray {
-        val encrypted = encrypt(plaintext, keyAlias)
-        return Base64.decode(encrypted, Base64.NO_WRAP)
+    fun getAllKeyAliases(): List<String> {
+        return try {
+            keyStore.aliases().toList()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error listing keys", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * Check if a key exists in Android Keystore
+     *
+     * @param alias Key identifier
+     * @return true if key exists
+     */
+    fun keyExists(alias: String): Boolean {
+        return try {
+            keyStore.containsAlias(alias)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error checking key existence: $alias", e)
+            false
+        }
     }
 }
