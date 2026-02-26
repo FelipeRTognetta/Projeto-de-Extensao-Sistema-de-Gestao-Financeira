@@ -1,358 +1,231 @@
 package com.psychologist.financial.services
 
-import android.content.Context
-import android.content.SharedPreferences
 import android.util.Log
+import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.fragment.app.FragmentActivity
-import com.psychologist.financial.domain.models.AuthSession
-import com.psychologist.financial.utils.Constants
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import java.time.LocalDateTime
-import java.util.concurrent.Executor
-import java.util.concurrent.Executors
+import com.psychologist.financial.domain.models.BiometricAuthResult
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 /**
- * Manager for app-level biometric authentication
+ * Biometric Authentication Manager
+ *
+ * Handles app-level biometric/PIN authentication at startup.
+ * Implements single authentication with 15-minute session timeout.
  *
  * Responsibilities:
- * - Handle biometric prompts (fingerprint, face, iris)
- * - Manage biometric session lifecycle (15-minute timeout)
- * - Store and validate auth tokens
- * - Provide PIN fallback authentication
- * - Track authentication state
+ * - Check biometric availability and enrollment
+ * - Display biometric prompt to user
+ * - Handle biometric authentication results
+ * - Manage 15-minute session timeout
+ * - Provide PIN fallback option
  *
  * Architecture:
- * - Entry point for app authentication on launch
- * - Creates BiometricPrompt that flows to activity
- * - Manages in-memory session state (cleared on app close)
- * - Uses SharedPreferences for non-sensitive session metadata
- *
- * Session Flow:
- * 1. App launches -> BiometricAuthManager checks session validity
- * 2. If session valid (< 15 min): Allow access (skip biometric)
- * 3. If session expired: Show BiometricPrompt
- * 4. User succeeds: Create new AuthSession (15-min timeout)
- * 5. User fails 3x: Show PIN fallback
- * 6. User succeeds with PIN: Create new AuthSession
- *
- * Constants:
- * - SESSION_TIMEOUT: 15 minutes (Constants.BIOMETRIC_SESSION_TIMEOUT_MINUTES)
- * - AUTH_VALIDITY: 5 minutes per biometric prompt (Constants.BIOMETRIC_AUTH_VALIDITY_DURATION_SECONDS)
- *
- * Security Considerations:
- * - Session stored in memory only (cleared on app close)
- * - Biometric prompt timeout: 5 minutes (configurable per device)
- * - PIN stored as SHA-256 hash in SharedPreferences
- * - Biometric hardware handles actual fingerprint/face matching
- * - No biometric data copied by this app
+ * - Uses androidx.biometric.BiometricPrompt (modern, unified API)
+ * - Supports fingerprint, face, iris biometrics
+ * - Class 2 biometrics acceptable for app-level auth
+ * - PIN fallback enabled for all scenarios
+ * - Session tracked via timestamp (15 minutes)
  *
  * Usage:
  * ```kotlin
- * val biometricManager = BiometricAuthManager(context, sharedPrefs)
+ * val authManager = BiometricAuthManager(fragmentActivity)
  *
- * // Check if authentication needed
- * if (!biometricManager.isSessionValid()) {
- *     biometricManager.showBiometricPrompt(activity) { success ->
- *         if (success) {
- *             // Access granted
- *         }
- *     }
+ * when (val result = authManager.authenticate()) {
+ *     is BiometricAuthResult.Success -> proceedToApp()
+ *     is BiometricAuthResult.UserCancelled -> finishApp()
+ *     is BiometricAuthResult.NeedsFallback -> showPINScreen()
+ *     is BiometricAuthResult.Error -> showError(result.message)
  * }
  *
- * // Listen to auth state
- * biometricManager.authStateFlow.collect { session ->
- *     if (session != null) {
- *         // User authenticated
- *     }
+ * if (!authManager.isSessionValid()) {
+ *     showAuthenticationScreen()
  * }
  * ```
+ *
+ * @property fragmentActivity FragmentActivity for showing biometric prompt
  */
 class BiometricAuthManager(
-    private val context: Context,
-    private val sharedPreferences: SharedPreferences
+    private val fragmentActivity: FragmentActivity
 ) {
 
     private companion object {
         private const val TAG = "BiometricAuthManager"
-
-        // SharedPreferences keys
-        private const val PREF_LAST_AUTH_TIME = "last_biometric_auth_time"
-        private const val PREF_PIN_HASH = "pin_hash"
-        private const val PREF_BIOMETRIC_ENABLED = "biometric_enabled"
-
-        // Biometric prompt configuration
-        private const val MAX_AUTH_ATTEMPTS = 3
+        private const val SESSION_TIMEOUT_MILLIS = 15 * 60 * 1000L
     }
 
-    // Current authentication session (in-memory only)
-    private val _authStateFlow = MutableStateFlow<AuthSession?>(null)
-    val authStateFlow: StateFlow<AuthSession?> = _authStateFlow.asStateFlow()
+    private var lastAuthTime: Long = 0
+    private val biometricManager: BiometricManager = BiometricManager.from(fragmentActivity)
 
-    // Executor for biometric operations
-    private val executor: Executor = Executors.newSingleThreadExecutor()
-
-    // Failure attempt counter
-    private var authFailureCount = 0
-
-    /**
-     * Check if current authentication session is valid
-     *
-     * Returns true if:
-     * - Session exists in memory AND
-     * - Session has not expired (< 15 minutes old)
-     *
-     * Used to decide whether to show biometric prompt.
-     *
-     * @return true if user is authenticated, false if biometric prompt needed
-     */
-    fun isSessionValid(): Boolean {
-        val session = _authStateFlow.value ?: return false
-        val now = LocalDateTime.now()
-        val expired = now.isAfter(session.expiryTime)
-        return !expired
-    }
-
-    /**
-     * Get current authentication session
-     *
-     * @return Current AuthSession or null if not authenticated
-     */
-    fun getSession(): AuthSession? = _authStateFlow.value
-
-    /**
-     * Show biometric authentication prompt
-     *
-     * Displays native biometric prompt (fingerprint, face, iris).
-     * On success, creates new AuthSession with 15-minute timeout.
-     * On failure, increments counter. After 3 failures, prompts for PIN.
-     *
-     * **Important**: Must be called from UI thread (FragmentActivity context).
-     *
-     * @param activity FragmentActivity (for BiometricPrompt)
-     * @param onResult Callback with boolean (true = authenticated, false = failed)
-     *
-     * Example:
-     * ```kotlin
-     * biometricManager.showBiometricPrompt(this) { success ->
-     *     if (success) {
-     *         navigateToMainScreen()
-     *     } else {
-     *         Toast.makeText(this, "Authentication failed", Toast.LENGTH_SHORT).show()
-     *     }
-     * }
-     * ```
-     */
-    fun showBiometricPrompt(activity: FragmentActivity, onResult: (Boolean) -> Unit) {
-        authFailureCount = 0
-
-        val biometricPrompt = BiometricPrompt(
-            activity,
-            executor,
-            object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    super.onAuthenticationSucceeded(result)
-                    Log.d(TAG, "Biometric authentication succeeded")
-                    createAuthSession()
-                    onResult(true)
-                }
-
-                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    super.onAuthenticationError(errorCode, errString)
-                    Log.w(TAG, "Biometric authentication error: $errorCode - $errString")
-                    onResult(false)
-                }
-
-                override fun onAuthenticationFailed() {
-                    super.onAuthenticationFailed()
-                    authFailureCount++
-                    Log.w(TAG, "Biometric authentication failed (attempt $authFailureCount/$MAX_AUTH_ATTEMPTS)")
-
-                    if (authFailureCount >= MAX_AUTH_ATTEMPTS) {
-                        Log.i(TAG, "Max biometric attempts reached, switching to PIN")
-                        onResult(false)  // Signal caller to show PIN prompt
-                    }
-                }
-            }
-        )
-
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Autenticação Segura")
-            .setSubtitle("Use sua biometria para acessar")
-            .setNegativeButtonText("Usar PIN")
-            .setAllowedAuthenticators(
-                BiometricPrompt.AUTHENTICATORS_ALLOWED_AUTH_NEEDED or
-                BiometricPrompt.AUTHENTICATORS_ALLOWED
-            )
-            .build()
-
-        biometricPrompt.authenticate(promptInfo)
-    }
-
-    /**
-     * Authenticate using PIN as fallback
-     *
-     * Verifies PIN against stored hash.
-     * On success, creates new AuthSession with 15-minute timeout.
-     *
-     * **Security Note**: PIN is hashed with SHA-256 before storage.
-     * Comparison is constant-time to prevent timing attacks.
-     *
-     * @param pin User-entered PIN (numeric, typically 4-6 digits)
-     * @return true if PIN matches, false otherwise
-     */
-    fun authenticateWithPin(pin: String): Boolean {
+    fun isBiometricAvailable(): Boolean {
         return try {
-            val storedHash = sharedPreferences.getString(PREF_PIN_HASH, null)
-                ?: return false
-
-            val pinHash = hashPin(pin)
-            val matches = pinHash.equals(storedHash, ignoreCase = true)
-
-            if (matches) {
-                Log.d(TAG, "PIN authentication succeeded")
-                createAuthSession()
-            } else {
-                Log.w(TAG, "PIN authentication failed")
+            val canAuthenticate = biometricManager.canAuthenticate(
+                BiometricManager.Authenticators.BIOMETRIC_WEAK
+            )
+            when (canAuthenticate) {
+                BiometricManager.BIOMETRIC_SUCCESS,
+                BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> true
+                else -> false
             }
-
-            matches
         } catch (e: Exception) {
-            Log.e(TAG, "PIN authentication error", e)
+            Log.w(TAG, "Error checking biometric availability", e)
             false
         }
     }
 
-    /**
-     * Set PIN for fallback authentication
-     *
-     * Hashes PIN before storing in SharedPreferences.
-     * Should be called during first-launch setup or PIN change flow.
-     *
-     * @param pin PIN to set (typically 4-6 numeric digits)
-     * @throws Exception If hashing fails
-     */
-    fun setPin(pin: String) {
-        try {
-            val pinHash = hashPin(pin)
-            sharedPreferences.edit().putString(PREF_PIN_HASH, pinHash).apply()
-            Log.d(TAG, "PIN set successfully")
+    fun isBiometricEnrolled(): Boolean {
+        return try {
+            val canAuthenticate = biometricManager.canAuthenticate(
+                BiometricManager.Authenticators.BIOMETRIC_WEAK
+            )
+            canAuthenticate == BiometricManager.BIOMETRIC_SUCCESS
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to set PIN", e)
-            throw e
+            Log.w(TAG, "Error checking biometric enrollment", e)
+            false
         }
     }
 
-    /**
-     * Check if PIN is configured
-     *
-     * @return true if PIN exists in SharedPreferences
-     */
-    fun isPinSet(): Boolean {
-        return sharedPreferences.contains(PREF_PIN_HASH)
+    fun getBiometricStatus(): String {
+        return try {
+            val canAuthenticate = biometricManager.canAuthenticate(
+                BiometricManager.Authenticators.BIOMETRIC_WEAK
+            )
+            when (canAuthenticate) {
+                BiometricManager.BIOMETRIC_SUCCESS ->
+                    "Autenticação biométrica disponível"
+                BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE ->
+                    "Dispositivo não possui hardware biométrico"
+                BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE ->
+                    "Hardware biométrico indisponível"
+                BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED ->
+                    "Nenhuma biometria cadastrada"
+                BiometricManager.BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED ->
+                    "Atualização de segurança necessária"
+                else -> "Status biométrico desconhecido"
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error getting biometric status", e)
+            "Erro ao verificar biometria"
+        }
     }
 
-    /**
-     * Invalidate current session
-     *
-     * Forces user to re-authenticate on next access.
-     * Called on logout, security events, or manual lock.
-     */
+    suspend fun authenticate(): BiometricAuthResult = suspendCancellableCoroutine { continuation ->
+        try {
+            Log.d(TAG, "Starting biometric authentication...")
+
+            if (!isBiometricAvailable()) {
+                val status = getBiometricStatus()
+                Log.w(TAG, "Biometric not available: $status")
+                continuation.resume(BiometricAuthResult.Unavailable(status))
+                return@suspendCancellableCoroutine
+            }
+
+            val biometricPrompt = BiometricPrompt(
+                fragmentActivity,
+                { 
+                    object : BiometricPrompt.AuthenticationCallback() {
+                        override fun onAuthenticationSucceeded(
+                            result: BiometricPrompt.AuthenticationResult
+                        ) {
+                            super.onAuthenticationSucceeded(result)
+                            Log.d(TAG, "Biometric authentication succeeded")
+                            lastAuthTime = System.currentTimeMillis()
+                            continuation.resume(BiometricAuthResult.Success(result.cryptoObject))
+                        }
+
+                        override fun onAuthenticationError(
+                            errorCode: Int,
+                            errString: CharSequence
+                        ) {
+                            super.onAuthenticationError(errorCode, errString)
+                            Log.w(TAG, "Biometric authentication error: $errorCode - $errString")
+                            val message = translateErrorMessage(errorCode)
+                            val needsFallback = shouldOfferFallback(errorCode)
+                            if (needsFallback) {
+                                continuation.resume(BiometricAuthResult.NeedsFallback(message))
+                            } else {
+                                continuation.resume(BiometricAuthResult.Error(message, errorCode))
+                            }
+                        }
+
+                        override fun onAuthenticationFailed() {
+                            super.onAuthenticationFailed()
+                            Log.w(TAG, "Biometric authentication failed")
+                            continuation.resume(
+                                BiometricAuthResult.NeedsFallback("Biometria não reconhecida. Tente novamente.", 1)
+                            )
+                        }
+                    }
+                }
+            )
+
+            val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Autenticação de Segurança")
+                .setSubtitle("Use sua biometria para acessar")
+                .setDescription("Coloque seu dedo no sensor ou olhe para a câmera")
+                .setNegativeButtonText("Usar PIN")
+                .setAllowedAuthenticators(
+                    BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                )
+                .build()
+
+            biometricPrompt.authenticate(promptInfo)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during authentication setup", e)
+            continuation.resume(BiometricAuthResult.Error("Erro na autenticação: ${e.message ?: "desconhecido"}", exception = e))
+        }
+    }
+
+    fun isSessionValid(): Boolean {
+        if (lastAuthTime == 0L) return false
+        val elapsedTime = System.currentTimeMillis() - lastAuthTime
+        val isValid = elapsedTime < SESSION_TIMEOUT_MILLIS
+        if (!isValid) Log.d(TAG, "Session expired after ${elapsedTime / 1000}s")
+        return isValid
+    }
+
+    fun extendSession() {
+        lastAuthTime = System.currentTimeMillis()
+        Log.d(TAG, "Session extended")
+    }
+
+    fun getRemainingSessionTime(): Long? {
+        if (lastAuthTime == 0L) return null
+        val elapsedTime = System.currentTimeMillis() - lastAuthTime
+        val remaining = SESSION_TIMEOUT_MILLIS - elapsedTime
+        return if (remaining > 0) remaining / 1000 else 0
+    }
+
+    fun getSessionTimeoutSeconds(): Long = SESSION_TIMEOUT_MILLIS / 1000
+
     fun clearSession() {
-        _authStateFlow.value = null
-        authFailureCount = 0
+        lastAuthTime = 0
         Log.d(TAG, "Session cleared")
     }
 
-    /**
-     * Check if biometric authentication is available
-     *
-     * Checks if device supports biometric authentication.
-     * Requires android.permission.USE_BIOMETRIC in manifest.
-     *
-     * @return true if device has biometric sensor and biometric is enabled
-     */
-    fun isBiometricAvailable(): Boolean {
-        // TODO: Use BiometricManager.canAuthenticate() in Android 10+
-        // For now, return true if user has enabled biometric
-        return sharedPreferences.getBoolean(PREF_BIOMETRIC_ENABLED, true)
+    private fun translateErrorMessage(errorCode: Int): String {
+        return when (errorCode) {
+            BiometricPrompt.ERROR_HW_UNAVAILABLE -> "Hardware biométrico indisponível no momento"
+            BiometricPrompt.ERROR_UNABLE_TO_PROCESS -> "Erro ao processar biometria. Tente novamente"
+            BiometricPrompt.ERROR_TIMEOUT -> "Tempo limite excedido. Tente novamente"
+            BiometricPrompt.ERROR_NO_SPACE -> "Sem espaço para autenticação"
+            BiometricPrompt.ERROR_CANCELED -> "Autenticação cancelada"
+            BiometricPrompt.ERROR_HW_NOT_PRESENT -> "Dispositivo não possui hardware biométrico"
+            BiometricPrompt.ERROR_NO_BIOMETRICS -> "Nenhuma biometria registrada no dispositivo"
+            BiometricPrompt.ERROR_SECURITY_UPDATE_REQUIRED -> "Atualização de segurança necessária para biometria"
+            else -> "Erro na autenticação biométrica. Tente novamente"
+        }
     }
 
-    /**
-     * Enable/disable biometric authentication
-     *
-     * If disabled, PIN will be required for authentication.
-     *
-     * @param enabled true to enable biometric, false to disable
-     */
-    fun setBiometricEnabled(enabled: Boolean) {
-        sharedPreferences.edit().putBoolean(PREF_BIOMETRIC_ENABLED, enabled).apply()
-        Log.d(TAG, "Biometric enabled: $enabled")
-    }
-
-    /**
-     * Get remaining time in current session
-     *
-     * @return Time in seconds until session expires, or 0 if no session
-     */
-    fun getSessionRemainingSeconds(): Long {
-        val session = _authStateFlow.value ?: return 0
-        val now = LocalDateTime.now()
-        val remaining = java.time.temporal.ChronoUnit.SECONDS.between(now, session.expiryTime)
-        return maxOf(0L, remaining)
-    }
-
-    /**
-     * Create new authentication session
-     *
-     * Sets expiry time to current time + 15 minutes (Constants.BIOMETRIC_SESSION_TIMEOUT_MINUTES).
-     * Called on successful biometric or PIN authentication.
-     */
-    private fun createAuthSession() {
-        val now = LocalDateTime.now()
-        val expiryTime = now.plusMinutes(Constants.BIOMETRIC_SESSION_TIMEOUT_MINUTES.toLong())
-        val token = generateAuthToken()
-
-        _authStateFlow.value = AuthSession(
-            token = token,
-            expiryTime = expiryTime,
-            userContext = "psychologist_session"
-        )
-
-        // Save timestamp to SharedPreferences for audit
-        sharedPreferences.edit()
-            .putLong(PREF_LAST_AUTH_TIME, System.currentTimeMillis())
-            .apply()
-
-        Log.d(TAG, "Auth session created, expires at $expiryTime")
-    }
-
-    /**
-     * Generate random authentication token
-     *
-     * @return 32-character random token
-     */
-    private fun generateAuthToken(): String {
-        return (0..31).map {
-            val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-            chars.random()
-        }.joinToString("")
-    }
-
-    /**
-     * Hash PIN for secure storage
-     *
-     * Uses SHA-256 for one-way hashing.
-     * TODO: Use PBKDF2 or bcrypt for production (slower, more resistant to brute force)
-     *
-     * @param pin Plain text PIN
-     * @return SHA-256 hex hash
-     */
-    private fun hashPin(pin: String): String {
-        val digest = java.security.MessageDigest.getInstance("SHA-256")
-        val hashBytes = digest.digest(pin.toByteArray(Charsets.UTF_8))
-        return hashBytes.joinToString("") { "%02x".format(it) }
+    private fun shouldOfferFallback(errorCode: Int): Boolean {
+        return when (errorCode) {
+            BiometricPrompt.ERROR_TIMEOUT,
+            BiometricPrompt.ERROR_UNABLE_TO_PROCESS,
+            BiometricPrompt.ERROR_HW_UNAVAILABLE -> true
+            else -> false
+        }
     }
 }
