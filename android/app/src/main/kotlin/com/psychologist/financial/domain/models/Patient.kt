@@ -347,13 +347,3 @@ data class Patient(
     }
 }
 
-/**
- * Patient status enum
- *
- * ACTIVE: Patient receiving treatment
- * INACTIVE: Archived/inactive patient
- */
-enum class PatientStatus {
-    ACTIVE,
-    INACTIVE
-}
