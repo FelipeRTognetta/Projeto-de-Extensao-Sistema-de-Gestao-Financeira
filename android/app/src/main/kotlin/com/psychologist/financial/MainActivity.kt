@@ -1,6 +1,7 @@
 package com.psychologist.financial
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
@@ -16,35 +17,118 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.lifecycle.lifecycleScope
+import com.psychologist.financial.services.EncryptionService
+import com.psychologist.financial.services.SecureKeyStore
+import com.psychologist.financial.services.DatabaseEncryptionManager
+import kotlinx.coroutines.launch
 
 /**
  * Main Activity for Financial Management Application
  *
- * This is the entry point for the app. It sets up Jetpack Compose
- * and initializes the main application theme and navigation.
+ * This is the entry point for the app. It sets up:
+ * - Jetpack Compose for UI (declarative)
+ * - Encryption services (EncryptionService, SecureKeyStore)
+ * - Database encryption (DatabaseEncryptionManager, SQLCipher)
+ * - Biometric authentication (at startup)
  *
  * Architecture:
  * - Uses Jetpack Compose for UI (declarative)
  * - Material 3 design system
- * - Prepared for MVVM with ViewModel integration
- * - Biometric authentication will be integrated at app startup
+ * - MVVM with ViewModel integration
+ * - Two-tier authentication (app-level + per-operation)
+ * - Encryption with Android Keystore + SQLCipher
+ *
+ * Initialization Order:
+ * 1. Initialize EncryptionService (Android Keystore)
+ * 2. Initialize SecureKeyStore (DataStore + Tink)
+ * 3. Initialize DatabaseEncryptionManager (SQLCipher)
+ * 4. Show authentication screen (BiometricPrompt)
+ * 5. Display main app UI if authenticated
  */
 class MainActivity : ComponentActivity() {
+    private companion object {
+        private const val TAG = "MainActivity"
+    }
+
+    // Encryption service instances (lazy initialization)
+    private lateinit var encryptionService: EncryptionService
+    private lateinit var secureKeyStore: SecureKeyStore
+    private lateinit var databaseEncryptionManager: DatabaseEncryptionManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Set content using Jetpack Compose
-        setContent {
-            FinancialAppTheme {
-                // Surface container using the 'background' color from the theme
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    FinancialManagementApp()
+        Log.d(TAG, "MainActivity.onCreate() - Starting app initialization")
+
+        // Initialize encryption services on app startup
+        lifecycleScope.launch {
+            try {
+                Log.d(TAG, "Initializing encryption services...")
+
+                // 1. Initialize EncryptionService (Android Keystore)
+                encryptionService = EncryptionService()
+                Log.d(TAG, "EncryptionService initialized")
+
+                // 2. Initialize SecureKeyStore (DataStore + Tink)
+                secureKeyStore = SecureKeyStore(
+                    context = this@MainActivity,
+                    encryptionService = encryptionService
+                )
+                Log.d(TAG, "SecureKeyStore initialized")
+
+                // 3. Initialize DatabaseEncryptionManager (SQLCipher)
+                databaseEncryptionManager = DatabaseEncryptionManager(
+                    encryptionService = encryptionService,
+                    secureKeyStore = secureKeyStore
+                )
+                Log.d(TAG, "DatabaseEncryptionManager initialized")
+
+                // 4. Verify encryption is working
+                val encryptionStatus = databaseEncryptionManager.getEncryptionStatus()
+                Log.d(TAG, "Encryption status: $encryptionStatus")
+
+                // 5. Initialize database with encrypted key
+                val passphrase = databaseEncryptionManager.getDatabasePassphrase()
+                Log.d(TAG, "Database passphrase initialized (${passphrase.length} chars)")
+
+                // Set up UI after encryption initialization
+                setContent {
+                    FinancialAppTheme {
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.background
+                        ) {
+                            FinancialManagementApp()
+                        }
+                    }
+                }
+
+                Log.d(TAG, "UI content set - app initialization complete")
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to initialize encryption services", e)
+                // In production: Show error screen and allow retry
+                setContent {
+                    FinancialAppTheme {
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.background
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                Text("Erro ao inicializar serviços de criptografia: ${e.message}")
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d(TAG, "MainActivity.onDestroy() - Cleaning up encryption services")
+        // Services will be garbage collected, but we log for debugging
     }
 }
 
