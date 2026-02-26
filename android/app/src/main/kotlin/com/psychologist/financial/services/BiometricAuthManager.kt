@@ -1,6 +1,6 @@
 package com.psychologist.financial.services
 
-import android.util.Log
+import com.psychologist.financial.utils.AppLogger
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.fragment.app.FragmentActivity
@@ -69,7 +69,7 @@ class BiometricAuthManager(
                 else -> false
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Error checking biometric availability", e)
+            AppLogger.w(TAG, "Error checking biometric availability", e)
             false
         }
     }
@@ -81,7 +81,7 @@ class BiometricAuthManager(
             )
             canAuthenticate == BiometricManager.BIOMETRIC_SUCCESS
         } catch (e: Exception) {
-            Log.w(TAG, "Error checking biometric enrollment", e)
+            AppLogger.w(TAG, "Error checking biometric enrollment", e)
             false
         }
     }
@@ -105,18 +105,18 @@ class BiometricAuthManager(
                 else -> "Status biométrico desconhecido"
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Error getting biometric status", e)
+            AppLogger.w(TAG, "Error getting biometric status", e)
             "Erro ao verificar biometria"
         }
     }
 
     suspend fun authenticate(): BiometricAuthResult = suspendCancellableCoroutine { continuation ->
         try {
-            Log.d(TAG, "Starting biometric authentication...")
+            AppLogger.d(TAG, "Starting biometric authentication...")
 
             if (!isBiometricAvailable()) {
                 val status = getBiometricStatus()
-                Log.w(TAG, "Biometric not available: $status")
+                AppLogger.w(TAG, "Biometric not available: $status")
                 continuation.resume(BiometricAuthResult.Unavailable(status))
                 return@suspendCancellableCoroutine
             }
@@ -129,7 +129,7 @@ class BiometricAuthManager(
                             result: BiometricPrompt.AuthenticationResult
                         ) {
                             super.onAuthenticationSucceeded(result)
-                            Log.d(TAG, "Biometric authentication succeeded")
+                            AppLogger.d(TAG, "Biometric authentication succeeded")
                             lastAuthTime = System.currentTimeMillis()
                             continuation.resume(BiometricAuthResult.Success(result.cryptoObject))
                         }
@@ -139,7 +139,7 @@ class BiometricAuthManager(
                             errString: CharSequence
                         ) {
                             super.onAuthenticationError(errorCode, errString)
-                            Log.w(TAG, "Biometric authentication error: $errorCode - $errString")
+                            AppLogger.w(TAG, "Biometric authentication error: $errorCode - $errString")
                             val message = translateErrorMessage(errorCode)
                             val needsFallback = shouldOfferFallback(errorCode)
                             if (needsFallback) {
@@ -151,7 +151,7 @@ class BiometricAuthManager(
 
                         override fun onAuthenticationFailed() {
                             super.onAuthenticationFailed()
-                            Log.w(TAG, "Biometric authentication failed")
+                            AppLogger.w(TAG, "Biometric authentication failed")
                             continuation.resume(
                                 BiometricAuthResult.NeedsFallback("Biometria não reconhecida. Tente novamente.", 1)
                             )
@@ -174,7 +174,7 @@ class BiometricAuthManager(
             biometricPrompt.authenticate(promptInfo)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error during authentication setup", e)
+            AppLogger.e(TAG, "Error during authentication setup", e)
             continuation.resume(BiometricAuthResult.Error("Erro na autenticação: ${e.message ?: "desconhecido"}", exception = e))
         }
     }
@@ -183,13 +183,13 @@ class BiometricAuthManager(
         if (lastAuthTime == 0L) return false
         val elapsedTime = System.currentTimeMillis() - lastAuthTime
         val isValid = elapsedTime < SESSION_TIMEOUT_MILLIS
-        if (!isValid) Log.d(TAG, "Session expired after ${elapsedTime / 1000}s")
+        if (!isValid) AppLogger.d(TAG, "Session expired after ${elapsedTime / 1000}s")
         return isValid
     }
 
     fun extendSession() {
         lastAuthTime = System.currentTimeMillis()
-        Log.d(TAG, "Session extended")
+        AppLogger.d(TAG, "Session extended")
     }
 
     fun getRemainingSessionTime(): Long? {
@@ -203,7 +203,7 @@ class BiometricAuthManager(
 
     fun clearSession() {
         lastAuthTime = 0
-        Log.d(TAG, "Session cleared")
+        AppLogger.d(TAG, "Session cleared")
     }
 
     private fun translateErrorMessage(errorCode: Int): String {

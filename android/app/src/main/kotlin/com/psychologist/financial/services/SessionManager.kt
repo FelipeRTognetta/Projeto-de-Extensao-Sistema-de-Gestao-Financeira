@@ -1,6 +1,6 @@
 package com.psychologist.financial.services
 
-import android.util.Log
+import com.psychologist.financial.utils.AppLogger
 import com.psychologist.financial.domain.models.OperationType
 import com.psychologist.financial.domain.models.SessionState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -80,7 +80,7 @@ class SessionManager {
     private var sessionStartTime: LocalDateTime? = null
 
     init {
-        Log.d(TAG, "SessionManager initialized")
+        AppLogger.d(TAG, "SessionManager initialized")
     }
 
     // ========================================
@@ -94,7 +94,7 @@ class SessionManager {
      * Initializes 15-minute timeout window.
      */
     fun startSession() {
-        Log.d(TAG, "Starting new session...")
+        AppLogger.d(TAG, "Starting new session...")
         val now = LocalDateTime.now()
         sessionStartTime = now
         lastActivityTime = now
@@ -106,7 +106,7 @@ class SessionManager {
             remainingSeconds = SESSION_TIMEOUT_SECONDS
         )
 
-        Log.d(TAG, "Session started. Expires at: $expiresAt")
+        AppLogger.d(TAG, "Session started. Expires at: $expiresAt")
     }
 
     /**
@@ -120,12 +120,12 @@ class SessionManager {
     fun extendSession(): Boolean {
         val currentState = _sessionState.value
         if (currentState !is SessionState.Authenticated) {
-            Log.w(TAG, "Cannot extend inactive session")
+            AppLogger.w(TAG, "Cannot extend inactive session")
             return false
         }
 
         if (!isSessionValid()) {
-            Log.w(TAG, "Session already expired, cannot extend")
+            AppLogger.w(TAG, "Session already expired, cannot extend")
             return false
         }
 
@@ -138,7 +138,7 @@ class SessionManager {
             remainingSeconds = SESSION_TIMEOUT_SECONDS
         )
 
-        Log.d(TAG, "Session extended. New expiration: $expiresAt")
+        AppLogger.d(TAG, "Session extended. New expiration: $expiresAt")
         return true
     }
 
@@ -151,7 +151,7 @@ class SessionManager {
      * @param reason Reason for expiration (for logging and user messaging)
      */
     fun expireSession(reason: String = "Sessão expirada por inatividade") {
-        Log.d(TAG, "Expiring session: $reason")
+        AppLogger.d(TAG, "Expiring session: $reason")
         _sessionState.value = SessionState.Expired(
             expiredAt = LocalDateTime.now(),
             reason = reason
@@ -167,7 +167,7 @@ class SessionManager {
      * Called when user explicitly logs out.
      */
     fun clearSession() {
-        Log.d(TAG, "Clearing session (user logout)")
+        AppLogger.d(TAG, "Clearing session (user logout)")
         _sessionState.value = SessionState.Unauthenticated
         lastActivityTime = null
         sessionStartTime = null
@@ -191,7 +191,7 @@ class SessionManager {
         val remainingSeconds = getRemainingSessionTime()
         val isValid = remainingSeconds > 0
 
-        Log.d(TAG, "Session validity check: isValid=$isValid, remaining=${remainingSeconds}s")
+        AppLogger.d(TAG, "Session validity check: isValid=$isValid, remaining=${remainingSeconds}s")
         return isValid
     }
 
@@ -258,11 +258,11 @@ class SessionManager {
         reason: String = "Operação requer autenticação adicional"
     ): Boolean {
         if (!isSessionValid()) {
-            Log.w(TAG, "Cannot require biometric: session not valid")
+            AppLogger.w(TAG, "Cannot require biometric: session not valid")
             return false
         }
 
-        Log.d(TAG, "Requiring biometric for operation: ${operationType.name}")
+        AppLogger.d(TAG, "Requiring biometric for operation: ${operationType.name}")
         _sessionState.value = SessionState.BiometricRequired(
             operation = operationType,
             reason = reason,
@@ -281,11 +281,11 @@ class SessionManager {
     fun completeBiometricAuthentication() {
         val currentState = _sessionState.value
         if (currentState !is SessionState.BiometricRequired) {
-            Log.w(TAG, "No pending biometric authentication to complete")
+            AppLogger.w(TAG, "No pending biometric authentication to complete")
             return
         }
 
-        Log.d(TAG, "Completing biometric authentication for ${currentState.operation.name}")
+        AppLogger.d(TAG, "Completing biometric authentication for ${currentState.operation.name}")
 
         // Restore to Authenticated state with updated expiration
         extendSession()
@@ -300,11 +300,11 @@ class SessionManager {
     fun cancelBiometricAuthentication() {
         val currentState = _sessionState.value
         if (currentState !is SessionState.BiometricRequired) {
-            Log.w(TAG, "No pending biometric authentication to cancel")
+            AppLogger.w(TAG, "No pending biometric authentication to cancel")
             return
         }
 
-        Log.d(TAG, "Cancelling biometric authentication")
+        AppLogger.d(TAG, "Cancelling biometric authentication")
 
         // Restore to Authenticated state if session still valid
         if (isSessionValid()) {

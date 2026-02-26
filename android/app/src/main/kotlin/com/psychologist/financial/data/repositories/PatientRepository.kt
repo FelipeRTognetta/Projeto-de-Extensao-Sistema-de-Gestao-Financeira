@@ -1,11 +1,11 @@
 package com.psychologist.financial.data.repositories
 
-import android.util.Log
 import com.psychologist.financial.data.database.AppDatabase
 import com.psychologist.financial.data.database.PatientDao
 import com.psychologist.financial.data.entities.PatientEntity
 import com.psychologist.financial.domain.models.Patient
 import com.psychologist.financial.domain.models.PatientStatus
+import com.psychologist.financial.utils.AppLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
@@ -113,7 +113,7 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
             // Convert domain model to entity and insert
             val entity = patient.toEntity()
             val generatedId = patientDao.insert(entity)
-            Log.d(TAG, "Patient created: id=$generatedId, name=${patient.name}")
+            AppLogger.d(TAG, "Patient created: id=$generatedId, name=${patient.name}")
             generatedId
         }
     }
@@ -382,7 +382,7 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
 
             val entity = patient.toEntity()
             patientDao.update(entity)
-            Log.d(TAG, "Patient updated: id=${patient.id}, name=${patient.name}")
+            AppLogger.d(TAG, "Patient updated: id=${patient.id}, name=${patient.name}")
         }
     }
 
@@ -402,7 +402,7 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
     suspend fun markAsInactive(patientId: Long) {
         return withWrite {
             patientDao.markAsInactive(patientId)
-            Log.d(TAG, "Patient marked inactive: id=$patientId")
+            AppLogger.d(TAG, "Patient marked inactive: id=$patientId")
         }
     }
 
@@ -421,7 +421,7 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
     suspend fun markAsActive(patientId: Long) {
         return withWrite {
             patientDao.markAsActive(patientId)
-            Log.d(TAG, "Patient marked active: id=$patientId")
+            AppLogger.d(TAG, "Patient marked active: id=$patientId")
         }
     }
 
@@ -487,7 +487,7 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
             val patient = patientDao.getPatient(patientId)
             if (patient != null) {
                 patientDao.delete(patient)
-                Log.w(TAG, "Patient permanently deleted: id=$patientId")
+                AppLogger.w(TAG, "Patient permanently deleted: id=$patientId")
             }
         }
     }

@@ -1,6 +1,6 @@
 package com.psychologist.financial.services
 
-import android.util.Log
+import com.psychologist.financial.utils.AppLogger
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import com.psychologist.financial.domain.models.EncryptionKey
@@ -90,12 +90,12 @@ class EncryptionService {
         alias: String,
         requiresUserAuth: Boolean = true
     ): EncryptionKey {
-        Log.d(TAG, "Generating Master Key: $alias")
+        AppLogger.security(TAG, "Generating Master Key: $alias")
 
         try {
             // Remove existing key if present
             if (keyStore.containsAlias(alias)) {
-                Log.d(TAG, "Removing existing key: $alias")
+                AppLogger.security(TAG, "Removing existing key: $alias")
                 keyStore.deleteEntry(alias)
             }
 
@@ -119,7 +119,7 @@ class EncryptionService {
             keyGenerator.init(keySpec)
             val secretKey = keyGenerator.generateKey()
 
-            Log.d(TAG, "Master Key generated successfully: $alias")
+            AppLogger.security(TAG, "Master Key generated successfully: $alias")
 
             return EncryptionKey.create(
                 alias = alias,
@@ -128,7 +128,7 @@ class EncryptionService {
                 purpose = KeyPurpose.MASTER
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Error generating Master Key", e)
+            AppLogger.e(TAG, "Error generating Master Key", e)
             throw Exception("Failed to generate Master Key: ${e.message}", e)
         }
     }
@@ -145,13 +145,13 @@ class EncryptionService {
      * @return EncryptionKey with random key material
      */
     fun generateDatabaseKey(alias: String): EncryptionKey {
-        Log.d(TAG, "Generating Database Key: $alias")
+        AppLogger.security(TAG, "Generating Database Key: $alias")
 
         // Generate 256-bit (32 byte) random key
         val keyMaterial = ByteArray(32)
         Random.nextBytes(keyMaterial)
 
-        Log.d(TAG, "Database Key generated successfully: $alias")
+        AppLogger.security(TAG, "Database Key generated successfully: $alias")
 
         return EncryptionKey.create(
             alias = alias,
@@ -171,7 +171,7 @@ class EncryptionService {
         return try {
             keyStore.getKey(alias, null) as? SecretKey
         } catch (e: Exception) {
-            Log.w(TAG, "Error retrieving key from Keystore: $alias", e)
+            AppLogger.w(TAG, "Error retrieving key from Keystore: $alias", e)
             null
         }
     }
@@ -193,7 +193,7 @@ class EncryptionService {
      * @throws Exception If encryption fails or key not found
      */
     fun encrypt(plaintext: ByteArray, keyAlias: String): ByteArray {
-        Log.d(TAG, "Encrypting data with key: $keyAlias (plaintext size: ${plaintext.size} bytes)")
+        AppLogger.security(TAG, "Encrypting data with key: $keyAlias (plaintext size: ${plaintext.size} bytes)")
 
         try {
             val key = getKeyFromKeystore(keyAlias)
@@ -215,10 +215,10 @@ class EncryptionService {
             // Prepend IV to ciphertext for later decryption
             val result = iv + ciphertext
 
-            Log.d(TAG, "Encryption successful (ciphertext size: ${ciphertext.size} bytes)")
+            AppLogger.security(TAG, "Encryption successful (ciphertext size: ${ciphertext.size} bytes)")
             return result
         } catch (e: Exception) {
-            Log.e(TAG, "Encryption failed", e)
+            AppLogger.e(TAG, "Encryption failed", e)
             throw Exception("Encryption failed: ${e.message}", e)
         }
     }
@@ -235,7 +235,7 @@ class EncryptionService {
      * @throws Exception If decryption fails or authentication fails
      */
     fun decrypt(encryptedData: ByteArray, keyAlias: String): ByteArray {
-        Log.d(TAG, "Decrypting data with key: $keyAlias (encrypted size: ${encryptedData.size} bytes)")
+        AppLogger.security(TAG, "Decrypting data with key: $keyAlias (encrypted size: ${encryptedData.size} bytes)")
 
         try {
             if (encryptedData.size < IV_LENGTH) {
@@ -260,10 +260,10 @@ class EncryptionService {
             // Decrypt ciphertext
             val plaintext = cipher.doFinal(ciphertext)
 
-            Log.d(TAG, "Decryption successful (plaintext size: ${plaintext.size} bytes)")
+            AppLogger.security(TAG, "Decryption successful (plaintext size: ${plaintext.size} bytes)")
             return plaintext
         } catch (e: Exception) {
-            Log.e(TAG, "Decryption failed", e)
+            AppLogger.e(TAG, "Decryption failed", e)
             throw Exception("Decryption failed: ${e.message}", e)
         }
     }
@@ -284,7 +284,7 @@ class EncryptionService {
             keyStore.containsAlias("test") // Any operation to check availability
             true
         } catch (e: Exception) {
-            Log.w(TAG, "StrongBox not available", e)
+            AppLogger.w(TAG, "StrongBox not available", e)
             false
         }
     }
@@ -301,14 +301,14 @@ class EncryptionService {
         return try {
             if (keyStore.containsAlias(alias)) {
                 keyStore.deleteEntry(alias)
-                Log.d(TAG, "Key deleted: $alias")
+                AppLogger.security(TAG, "Key deleted: $alias")
                 true
             } else {
-                Log.w(TAG, "Key not found for deletion: $alias")
+                AppLogger.w(TAG, "Key not found for deletion: $alias")
                 false
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error deleting key: $alias", e)
+            AppLogger.e(TAG, "Error deleting key: $alias", e)
             false
         }
     }
@@ -324,7 +324,7 @@ class EncryptionService {
         return try {
             keyStore.aliases().toList()
         } catch (e: Exception) {
-            Log.e(TAG, "Error listing keys", e)
+            AppLogger.e(TAG, "Error listing keys", e)
             emptyList()
         }
     }
@@ -339,7 +339,7 @@ class EncryptionService {
         return try {
             keyStore.containsAlias(alias)
         } catch (e: Exception) {
-            Log.w(TAG, "Error checking key existence: $alias", e)
+            AppLogger.w(TAG, "Error checking key existence: $alias", e)
             false
         }
     }

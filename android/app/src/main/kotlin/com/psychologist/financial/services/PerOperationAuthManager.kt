@@ -1,6 +1,6 @@
 package com.psychologist.financial.services
 
-import android.util.Log
+import com.psychologist.financial.utils.AppLogger
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.fragment.app.FragmentActivity
@@ -101,7 +101,7 @@ class PerOperationAuthManager(
             )
             canAuthenticate == BiometricManager.BIOMETRIC_SUCCESS
         } catch (e: Exception) {
-            Log.w(TAG, "Error checking Class 3 biometric availability", e)
+            AppLogger.w(TAG, "Error checking Class 3 biometric availability", e)
             false
         }
     }
@@ -130,7 +130,7 @@ class PerOperationAuthManager(
                 else -> "Biometria não disponível para operações"
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Error getting biometric status", e)
+            AppLogger.w(TAG, "Error getting biometric status", e)
             "Erro ao verificar biometria"
         }
     }
@@ -153,10 +153,10 @@ class PerOperationAuthManager(
             // - AndroidKeystore key generation
             // - Cipher initialization for payment binding
             // - Currently stub for authentication flow
-            Log.d(TAG, "Creating CryptoObject for payment")
+            AppLogger.d(TAG, "Creating CryptoObject for payment")
             null // Would be real CryptoObject in production
         } catch (e: Exception) {
-            Log.w(TAG, "Error creating payment CryptoObject", e)
+            AppLogger.w(TAG, "Error creating payment CryptoObject", e)
             null
         }
     }
@@ -174,11 +174,11 @@ class PerOperationAuthManager(
         cryptoObject: BiometricPrompt.CryptoObject? = null
     ): BiometricAuthResult = suspendCancellableCoroutine { continuation ->
         try {
-            Log.d(TAG, "Starting payment authentication...")
+            AppLogger.d(TAG, "Starting payment authentication...")
 
             if (!isClass3BiometricAvailable()) {
                 val status = getOperationBiometricStatus()
-                Log.w(TAG, "Class 3 biometric not available: $status")
+                AppLogger.w(TAG, "Class 3 biometric not available: $status")
                 continuation.resume(
                     BiometricAuthResult.Unavailable(status, canUseFallback = false)
                 )
@@ -193,13 +193,13 @@ class PerOperationAuthManager(
                             result: BiometricPrompt.AuthenticationResult
                         ) {
                             super.onAuthenticationSucceeded(result)
-                            Log.d(TAG, "Payment authentication succeeded")
+                            AppLogger.d(TAG, "Payment authentication succeeded")
                             continuation.resume(BiometricAuthResult.Success(result.cryptoObject))
                         }
 
                         override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                             super.onAuthenticationError(errorCode, errString)
-                            Log.w(TAG, "Payment authentication error: $errorCode")
+                            AppLogger.w(TAG, "Payment authentication error: $errorCode")
                             val message = translatePaymentErrorMessage(errorCode)
                             continuation.resume(
                                 BiometricAuthResult.Error(message, errorCode)
@@ -208,7 +208,7 @@ class PerOperationAuthManager(
 
                         override fun onAuthenticationFailed() {
                             super.onAuthenticationFailed()
-                            Log.w(TAG, "Payment authentication failed")
+                            AppLogger.w(TAG, "Payment authentication failed")
                             continuation.resume(
                                 BiometricAuthResult.Error("Biometria não reconhecida para pagamento")
                             )
@@ -228,7 +228,7 @@ class PerOperationAuthManager(
             biometricPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(createPaymentCryptoObject()?.cipher ?: return@suspendCancellableCoroutine))
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error during payment authentication", e)
+            AppLogger.e(TAG, "Error during payment authentication", e)
             continuation.resume(
                 BiometricAuthResult.Error("Erro ao autenticar pagamento", exception = e)
             )
@@ -249,10 +249,10 @@ class PerOperationAuthManager(
      */
     fun createExportCryptoObject(): BiometricPrompt.CryptoObject? {
         return try {
-            Log.d(TAG, "Creating CryptoObject for export")
+            AppLogger.d(TAG, "Creating CryptoObject for export")
             null // Would be real CryptoObject in production
         } catch (e: Exception) {
-            Log.w(TAG, "Error creating export CryptoObject", e)
+            AppLogger.w(TAG, "Error creating export CryptoObject", e)
             null
         }
     }
@@ -270,11 +270,11 @@ class PerOperationAuthManager(
         cryptoObject: BiometricPrompt.CryptoObject? = null
     ): BiometricAuthResult = suspendCancellableCoroutine { continuation ->
         try {
-            Log.d(TAG, "Starting export authentication...")
+            AppLogger.d(TAG, "Starting export authentication...")
 
             if (!isClass3BiometricAvailable()) {
                 val status = getOperationBiometricStatus()
-                Log.w(TAG, "Class 3 biometric not available: $status")
+                AppLogger.w(TAG, "Class 3 biometric not available: $status")
                 continuation.resume(
                     BiometricAuthResult.Unavailable(status, canUseFallback = false)
                 )
@@ -289,13 +289,13 @@ class PerOperationAuthManager(
                             result: BiometricPrompt.AuthenticationResult
                         ) {
                             super.onAuthenticationSucceeded(result)
-                            Log.d(TAG, "Export authentication succeeded")
+                            AppLogger.d(TAG, "Export authentication succeeded")
                             continuation.resume(BiometricAuthResult.Success(result.cryptoObject))
                         }
 
                         override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                             super.onAuthenticationError(errorCode, errString)
-                            Log.w(TAG, "Export authentication error: $errorCode")
+                            AppLogger.w(TAG, "Export authentication error: $errorCode")
                             val message = translateExportErrorMessage(errorCode)
                             continuation.resume(
                                 BiometricAuthResult.Error(message, errorCode)
@@ -304,7 +304,7 @@ class PerOperationAuthManager(
 
                         override fun onAuthenticationFailed() {
                             super.onAuthenticationFailed()
-                            Log.w(TAG, "Export authentication failed")
+                            AppLogger.w(TAG, "Export authentication failed")
                             continuation.resume(
                                 BiometricAuthResult.Error("Biometria não reconhecida para exportação")
                             )
@@ -324,7 +324,7 @@ class PerOperationAuthManager(
             biometricPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(createExportCryptoObject()?.cipher ?: return@suspendCancellableCoroutine))
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error during export authentication", e)
+            AppLogger.e(TAG, "Error during export authentication", e)
             continuation.resume(
                 BiometricAuthResult.Error("Erro ao autenticar exportação", exception = e)
             )

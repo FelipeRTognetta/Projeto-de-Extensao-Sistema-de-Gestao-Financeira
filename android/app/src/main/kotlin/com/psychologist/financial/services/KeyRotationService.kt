@@ -1,6 +1,6 @@
 package com.psychologist.financial.services
 
-import android.util.Log
+import com.psychologist.financial.utils.AppLogger
 import com.psychologist.financial.domain.models.EncryptionKey
 import com.psychologist.financial.domain.models.KeyPurpose
 import com.psychologist.financial.domain.models.KeyRotationPolicy
@@ -93,8 +93,8 @@ class KeyRotationService(
     val rotationFailureCount: StateFlow<Int> = _rotationFailureCount.asStateFlow()
 
     init {
-        Log.d(TAG, "KeyRotationService initialized")
-        Log.d(TAG, policy.getSummary())
+        AppLogger.security(TAG, "KeyRotationService initialized")
+        AppLogger.security(TAG, policy.getSummary())
     }
 
     // ========================================
@@ -112,7 +112,7 @@ class KeyRotationService(
      * @return true if rotation should be performed
      */
     suspend fun isRotationDue(): Boolean {
-        Log.d(TAG, "Checking if rotation is due")
+        AppLogger.security(TAG, "Checking if rotation is due")
 
         return try {
             val currentKey = secureKeyStore.getDatabaseKey()
@@ -120,7 +120,7 @@ class KeyRotationService(
 
             policy.isRotationDue(currentKey)
         } catch (e: Exception) {
-            Log.w(TAG, "Error checking rotation due", e)
+            AppLogger.w(TAG, "Error checking rotation due", e)
             false
         }
     }
@@ -140,7 +140,7 @@ class KeyRotationService(
                 nextRotation
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Error getting next rotation time", e)
+            AppLogger.w(TAG, "Error getting next rotation time", e)
             null
         }
     }
@@ -155,7 +155,7 @@ class KeyRotationService(
             val currentKey = secureKeyStore.getDatabaseKey() ?: return false
             policy.shouldShowWarning(currentKey)
         } catch (e: Exception) {
-            Log.w(TAG, "Error checking rotation warning", e)
+            AppLogger.w(TAG, "Error checking rotation warning", e)
             false
         }
     }
@@ -178,7 +178,7 @@ class KeyRotationService(
      * @return true if rotation successful
      */
     suspend fun performRotation(): Boolean {
-        Log.w(TAG, "Starting automated key rotation")
+        AppLogger.w(TAG, "Starting automated key rotation")
         _rotationStatus.value = RotationStatus.InProgress("Iniciando rotação de chaves...")
 
         return try {
@@ -186,12 +186,12 @@ class KeyRotationService(
             val oldKey = secureKeyStore.getDatabaseKey()
                 ?: throw Exception("No current key found for rotation")
 
-            Log.d(TAG, "Current key: ${oldKey.alias}, expires: ${oldKey.expiresAt}")
+            AppLogger.security(TAG, "Current key: ${oldKey.alias}, expires: ${oldKey.expiresAt}")
 
             // Step 2: Generate new key
             _rotationStatus.value = RotationStatus.InProgress("Gerando nova chave de criptografia...")
             val newKey = encryptionService.generateDatabaseKey("database_key_${System.currentTimeMillis()}")
-            Log.d(TAG, "New key generated: ${newKey.alias}")
+            AppLogger.security(TAG, "New key generated: ${newKey.alias}")
 
             // Step 3: Store new key
             _rotationStatus.value = RotationStatus.InProgress("Armazenando nova chave...")
@@ -209,20 +209,20 @@ class KeyRotationService(
             // Step 5: Retain old key for grace period
             _rotationStatus.value = RotationStatus.InProgress("Configurando período de graça...")
             val gracePeriodDays = policy.getGracePeriodDaysRemaining(oldKey)
-            Log.d(TAG, "Old key retained for $gracePeriodDays days")
+            AppLogger.security(TAG, "Old key retained for $gracePeriodDays days")
 
             // Step 6: Log rotation event
             _rotationStatus.value = RotationStatus.InProgress("Registrando evento de rotação...")
             _lastRotationTime.value = LocalDateTime.now()
             _rotationFailureCount.value = 0
 
-            Log.w(TAG, "Key rotation completed successfully")
+            AppLogger.w(TAG, "Key rotation completed successfully")
             _rotationStatus.value = RotationStatus.Success(
                 "Rotação de chaves concluída com sucesso"
             )
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Key rotation failed", e)
+            AppLogger.e(TAG, "Key rotation failed", e)
             _rotationFailureCount.value++
 
             val isAutoRotationDisabled = _rotationFailureCount.value >= policy.maxConsecutiveFailures
@@ -248,7 +248,7 @@ class KeyRotationService(
      * @return true if rotation successful
      */
     suspend fun forceRotation(): Boolean {
-        Log.w(TAG, "Force rotation requested (ignoring time windows)")
+        AppLogger.w(TAG, "Force rotation requested (ignoring time windows)")
         return performRotation()
     }
 
@@ -264,16 +264,16 @@ class KeyRotationService(
      * @return true if scheduling successful
      */
     suspend fun scheduleAutomaticRotation(): Boolean {
-        Log.d(TAG, "Scheduling automatic key rotation")
+        AppLogger.security(TAG, "Scheduling automatic key rotation")
 
         return try {
             if (!policy.enableAutomaticRotation) {
-                Log.d(TAG, "Automatic rotation disabled by policy")
+                AppLogger.security(TAG, "Automatic rotation disabled by policy")
                 return false
             }
 
             val minutesUntil = policy.getMinutesUntilNextRotationWindow()
-            Log.d(TAG, "Next rotation window in $minutesUntil minutes")
+            AppLogger.security(TAG, "Next rotation window in $minutesUntil minutes")
 
             // In production: use WorkManager to schedule task
             // WorkManager.getInstance(context).enqueueUniquePeriodicWork(
@@ -289,7 +289,7 @@ class KeyRotationService(
             )
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error scheduling automatic rotation", e)
+            AppLogger.e(TAG, "Error scheduling automatic rotation", e)
             false
         }
     }
@@ -312,7 +312,7 @@ class KeyRotationService(
      * @return Number of records migrated
      */
     suspend fun migrateDataToNewKey(): Long {
-        Log.d(TAG, "Starting data migration to new key")
+        AppLogger.security(TAG, "Starting data migration to new key")
         _rotationStatus.value = RotationStatus.InProgress("Migrando dados para nova chave...")
 
         return try {
@@ -329,10 +329,10 @@ class KeyRotationService(
             // 5. Batch operations for performance
 
             val recordsMigrated = 0L
-            Log.d(TAG, "Data migration completed: $recordsMigrated records")
+            AppLogger.security(TAG, "Data migration completed: $recordsMigrated records")
             recordsMigrated
         } catch (e: Exception) {
-            Log.e(TAG, "Error migrating data", e)
+            AppLogger.e(TAG, "Error migrating data", e)
             throw Exception("Data migration failed: ${e.message}", e)
         }
     }
@@ -363,7 +363,7 @@ class KeyRotationService(
 
             policy.shouldRetainOldKey(oldKey, newKey)
         } catch (e: Exception) {
-            Log.w(TAG, "Error checking grace period", e)
+            AppLogger.w(TAG, "Error checking grace period", e)
             false
         }
     }
@@ -378,7 +378,7 @@ class KeyRotationService(
             val oldKey = secureKeyStore.getDatabaseKey() ?: return 0
             policy.getGracePeriodDaysRemaining(oldKey)
         } catch (e: Exception) {
-            Log.w(TAG, "Error getting grace period days", e)
+            AppLogger.w(TAG, "Error getting grace period days", e)
             0
         }
     }
@@ -392,7 +392,7 @@ class KeyRotationService(
      * @return true if cleanup successful
      */
     suspend fun cleanupExpiredKeys(): Boolean {
-        Log.d(TAG, "Cleaning up expired keys")
+        AppLogger.security(TAG, "Cleaning up expired keys")
         _rotationStatus.value = RotationStatus.InProgress("Limpando chaves antigas...")
 
         return try {
@@ -409,15 +409,15 @@ class KeyRotationService(
                 // Delete old key
                 if (encryptionService.deleteKey(alias)) {
                     cleanedCount++
-                    Log.d(TAG, "Deleted old key: $alias")
+                    AppLogger.security(TAG, "Deleted old key: $alias")
                 }
             }
 
-            Log.d(TAG, "Cleanup completed: $cleanedCount old keys deleted")
+            AppLogger.security(TAG, "Cleanup completed: $cleanedCount old keys deleted")
             _rotationStatus.value = RotationStatus.Success("Limpeza de chaves concluída")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error cleaning up old keys", e)
+            AppLogger.e(TAG, "Error cleaning up old keys", e)
             _rotationStatus.value = RotationStatus.Failed("Erro ao limpar chaves antigas: ${e.message}")
             false
         }
@@ -453,7 +453,7 @@ class KeyRotationService(
                 "keyMetadata" to (currentKey?.getMetadata() ?: emptyMap<String, Any>())
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting rotation status", e)
+            AppLogger.e(TAG, "Error getting rotation status", e)
             mapOf("error" to (e.message ?: "Unknown error"))
         }
     }

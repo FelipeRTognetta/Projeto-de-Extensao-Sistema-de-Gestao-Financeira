@@ -1,8 +1,8 @@
 package com.psychologist.financial.data.repositories
 
-import android.util.Log
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.psychologist.financial.data.database.AppDatabase
+import com.psychologist.financial.utils.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -67,7 +67,7 @@ abstract class BaseRepository(protected val database: AppDatabase) {
                     block()
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Transaction failed", e)
+                AppLogger.e(TAG, "Transaction failed", e)
                 throw e
             }
         }
@@ -97,7 +97,7 @@ abstract class BaseRepository(protected val database: AppDatabase) {
             try {
                 block()
             } catch (e: Exception) {
-                Log.e(TAG, "Query failed", e)
+                AppLogger.e(TAG, "Query failed", e)
                 throw e
             }
         }

@@ -3,6 +3,7 @@ package com.psychologist.financial
 import android.app.Application
 import android.util.Log
 import com.psychologist.financial.di.AppModule
+import com.psychologist.financial.utils.AppLogger
 
 /**
  * FinancialApp — Application class
@@ -38,12 +39,15 @@ class FinancialApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "FinancialApp.onCreate() — Initializing application")
+
+        // Initialize logger first (before any other logging)
+        AppLogger.initLogging(debugMode = android.os.Build.TYPE != "user")
+        AppLogger.d(TAG, "FinancialApp.onCreate() — Initializing application")
 
         // Phase 1: Initialize service locator with application context.
         // Encryption services use lazy initialization and won't be created here.
         AppModule.initialize(this)
 
-        Log.d(TAG, "AppModule initialized — app ready for Activity creation")
+        AppLogger.d(TAG, "AppModule initialized — app ready for Activity creation")
     }
 }

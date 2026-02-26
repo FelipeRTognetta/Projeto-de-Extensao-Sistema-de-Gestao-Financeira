@@ -1,7 +1,7 @@
 package com.psychologist.financial.services
 
 import android.content.Context
-import android.util.Log
+import com.psychologist.financial.utils.AppLogger
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.byteArrayPreferences
@@ -79,7 +79,7 @@ class SecureKeyStore(
     private val backupKeyCreatedAtKey = stringPreferences("backup_key_created_at")
 
     init {
-        Log.d(TAG, "SecureKeyStore initialized")
+        AppLogger.d(TAG, "SecureKeyStore initialized")
     }
 
     // ========================================
@@ -96,7 +96,7 @@ class SecureKeyStore(
      * @return true if stored successfully
      */
     suspend fun storeDatabaseKey(key: EncryptionKey): Boolean {
-        Log.d(TAG, "Storing Database Key: ${key.alias}")
+        AppLogger.d(TAG, "Storing Database Key: ${key.alias}")
 
         return try {
             // Encrypt key material with Master Key
@@ -116,10 +116,10 @@ class SecureKeyStore(
                     .set(dbKeyCreatedAtKey, key.createdAt.toString())
             }
 
-            Log.d(TAG, "Database Key stored successfully")
+            AppLogger.d(TAG, "Database Key stored successfully")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error storing Database Key", e)
+            AppLogger.e(TAG, "Error storing Database Key", e)
             false
         }
     }
@@ -132,7 +132,7 @@ class SecureKeyStore(
      * @return EncryptionKey if found, null otherwise
      */
     suspend fun getDatabaseKey(): EncryptionKey? {
-        Log.d(TAG, "Retrieving Database Key")
+        AppLogger.d(TAG, "Retrieving Database Key")
 
         return try {
             val prefs = dataStore.data.first()
@@ -164,10 +164,10 @@ class SecureKeyStore(
                 purpose = KeyPurpose.DATABASE
             )
 
-            Log.d(TAG, "Database Key retrieved successfully")
+            AppLogger.d(TAG, "Database Key retrieved successfully")
             key
         } catch (e: Exception) {
-            Log.w(TAG, "Error retrieving Database Key", e)
+            AppLogger.w(TAG, "Error retrieving Database Key", e)
             null
         }
     }
@@ -182,7 +182,7 @@ class SecureKeyStore(
             val prefs = dataStore.data.first()
             prefs[dbKeyStoredKey] != null
         } catch (e: Exception) {
-            Log.w(TAG, "Error checking Database Key existence", e)
+            AppLogger.w(TAG, "Error checking Database Key existence", e)
             false
         }
     }
@@ -193,7 +193,7 @@ class SecureKeyStore(
      * @return true if deleted successfully
      */
     suspend fun deleteDatabaseKey(): Boolean {
-        Log.d(TAG, "Deleting Database Key")
+        AppLogger.d(TAG, "Deleting Database Key")
 
         return try {
             dataStore.updateData { prefs ->
@@ -203,10 +203,10 @@ class SecureKeyStore(
                     .remove(dbKeyCreatedAtKey)
             }
 
-            Log.d(TAG, "Database Key deleted successfully")
+            AppLogger.d(TAG, "Database Key deleted successfully")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error deleting Database Key", e)
+            AppLogger.e(TAG, "Error deleting Database Key", e)
             false
         }
     }
@@ -225,7 +225,7 @@ class SecureKeyStore(
      * @return true if stored successfully
      */
     suspend fun storeBackupKey(key: EncryptionKey): Boolean {
-        Log.d(TAG, "Storing Backup Key: ${key.alias}")
+        AppLogger.d(TAG, "Storing Backup Key: ${key.alias}")
 
         return try {
             // Encrypt key material with Master Key
@@ -242,10 +242,10 @@ class SecureKeyStore(
                     .set(backupKeyCreatedAtKey, key.createdAt.toString())
             }
 
-            Log.d(TAG, "Backup Key stored successfully")
+            AppLogger.d(TAG, "Backup Key stored successfully")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error storing Backup Key", e)
+            AppLogger.e(TAG, "Error storing Backup Key", e)
             false
         }
     }
@@ -256,7 +256,7 @@ class SecureKeyStore(
      * @return EncryptionKey if found, null otherwise
      */
     suspend fun getBackupKey(): EncryptionKey? {
-        Log.d(TAG, "Retrieving Backup Key")
+        AppLogger.d(TAG, "Retrieving Backup Key")
 
         return try {
             val prefs = dataStore.data.first()
@@ -288,10 +288,10 @@ class SecureKeyStore(
                 purpose = KeyPurpose.BACKUP
             )
 
-            Log.d(TAG, "Backup Key retrieved successfully")
+            AppLogger.d(TAG, "Backup Key retrieved successfully")
             key
         } catch (e: Exception) {
-            Log.w(TAG, "Error retrieving Backup Key", e)
+            AppLogger.w(TAG, "Error retrieving Backup Key", e)
             null
         }
     }
@@ -306,7 +306,7 @@ class SecureKeyStore(
             val prefs = dataStore.data.first()
             prefs[backupKeyStoredKey] != null
         } catch (e: Exception) {
-            Log.w(TAG, "Error checking Backup Key existence", e)
+            AppLogger.w(TAG, "Error checking Backup Key existence", e)
             false
         }
     }
@@ -317,7 +317,7 @@ class SecureKeyStore(
      * @return true if deleted successfully
      */
     suspend fun deleteBackupKey(): Boolean {
-        Log.d(TAG, "Deleting Backup Key")
+        AppLogger.d(TAG, "Deleting Backup Key")
 
         return try {
             dataStore.updateData { prefs ->
@@ -327,10 +327,10 @@ class SecureKeyStore(
                     .remove(backupKeyCreatedAtKey)
             }
 
-            Log.d(TAG, "Backup Key deleted successfully")
+            AppLogger.d(TAG, "Backup Key deleted successfully")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error deleting Backup Key", e)
+            AppLogger.e(TAG, "Error deleting Backup Key", e)
             false
         }
     }
@@ -369,7 +369,7 @@ class SecureKeyStore(
      * @return true if all keys deleted
      */
     suspend fun clearAllKeys(): Boolean {
-        Log.w(TAG, "CLEARING ALL KEYS - Emergency reset initiated!")
+        AppLogger.w(TAG, "CLEARING ALL KEYS - Emergency reset initiated!")
 
         return try {
             deleteDatabaseKey()
@@ -380,10 +380,10 @@ class SecureKeyStore(
                 encryptionService.deleteKey(alias)
             }
 
-            Log.w(TAG, "All keys cleared successfully")
+            AppLogger.w(TAG, "All keys cleared successfully")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error clearing all keys", e)
+            AppLogger.e(TAG, "Error clearing all keys", e)
             false
         }
     }

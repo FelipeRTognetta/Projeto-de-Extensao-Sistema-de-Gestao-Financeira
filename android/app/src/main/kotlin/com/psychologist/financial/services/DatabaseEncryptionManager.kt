@@ -1,6 +1,6 @@
 package com.psychologist.financial.services
 
-import android.util.Log
+import com.psychologist.financial.utils.AppLogger
 import net.zetetic.database.sqlcipher.SQLiteOpenHelper
 import androidx.room.RoomDatabase
 import com.psychologist.financial.domain.models.EncryptionKey
@@ -88,28 +88,28 @@ class DatabaseEncryptionManager(
      * @throws Exception If initialization fails
      */
     suspend fun initializeDatabaseKey(): EncryptionKey {
-        Log.d(TAG, "Initializing Database Key")
+        AppLogger.security(TAG, "Initializing Database Key")
 
         try {
             // Check if key exists
             val existingKey = secureKeyStore.getDatabaseKey()
 
             if (existingKey != null) {
-                Log.d(TAG, "Database Key found in storage")
+                AppLogger.security(TAG, "Database Key found in storage")
 
                 // Check if rotation needed
                 if (existingKey.isExpired()) {
-                    Log.w(TAG, "Database Key expired, rotation required")
+                    AppLogger.w(TAG, "Database Key expired, rotation required")
                     return rotateKey(existingKey)
                 } else if (existingKey.isAboutToExpire()) {
-                    Log.w(TAG, "Database Key expiring soon (${existingKey.getDaysUntilExpiration()} days)")
+                    AppLogger.w(TAG, "Database Key expiring soon (${existingKey.getDaysUntilExpiration()} days)")
                 }
 
                 return existingKey
             }
 
             // Key doesn't exist, create new one
-            Log.d(TAG, "Database Key not found, generating new key")
+            AppLogger.security(TAG, "Database Key not found, generating new key")
 
             // Ensure Master Key exists
             ensureMasterKeyExists()
@@ -123,10 +123,10 @@ class DatabaseEncryptionManager(
                 throw Exception("Failed to store Database Key")
             }
 
-            Log.d(TAG, "Database Key initialized successfully")
+            AppLogger.security(TAG, "Database Key initialized successfully")
             return newKey
         } catch (e: Exception) {
-            Log.e(TAG, "Error initializing Database Key", e)
+            AppLogger.e(TAG, "Error initializing Database Key", e)
             throw Exception("Database Key initialization failed: ${e.message}", e)
         }
     }
@@ -141,7 +141,7 @@ class DatabaseEncryptionManager(
      * @throws Exception If key cannot be retrieved
      */
     suspend fun getDatabasePassphrase(): String {
-        Log.d(TAG, "Getting database passphrase")
+        AppLogger.security(TAG, "Getting database passphrase")
 
         try {
             val key = initializeDatabaseKey()
@@ -151,10 +151,10 @@ class DatabaseEncryptionManager(
                 "%02x".format(it)
             }
 
-            Log.d(TAG, "Passphrase generated (length: ${hexPassphrase.length})")
+            AppLogger.security(TAG, "Passphrase generated (length: ${hexPassphrase.length})")
             return "x'$hexPassphrase'"
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting database passphrase", e)
+            AppLogger.e(TAG, "Error getting database passphrase", e)
             throw Exception("Failed to get database passphrase: ${e.message}", e)
         }
     }
@@ -170,20 +170,20 @@ class DatabaseEncryptionManager(
      * @return true if database is properly encrypted and accessible
      */
     suspend fun verifyDatabaseEncryption(): Boolean {
-        Log.d(TAG, "Verifying database encryption")
+        AppLogger.security(TAG, "Verifying database encryption")
 
         return try {
             // Check if Database Key is available and valid
             val key = secureKeyStore.getDatabaseKey()
             if (key == null || !key.isActive || key.isExpired()) {
-                Log.w(TAG, "Database Key invalid or expired")
+                AppLogger.w(TAG, "Database Key invalid or expired")
                 return false
             }
 
-            Log.d(TAG, "Database encryption verification successful")
+            AppLogger.security(TAG, "Database encryption verification successful")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Database encryption verification failed", e)
+            AppLogger.e(TAG, "Database encryption verification failed", e)
             false
         }
     }
@@ -210,7 +210,7 @@ class DatabaseEncryptionManager(
      * @return New EncryptionKey after rotation
      */
     suspend fun rotateKey(oldKey: EncryptionKey): EncryptionKey {
-        Log.w(TAG, "Rotating database encryption key")
+        AppLogger.w(TAG, "Rotating database encryption key")
 
         try {
             // Ensure Master Key exists
@@ -230,10 +230,10 @@ class DatabaseEncryptionManager(
             secureKeyStore.deleteDatabaseKey()
             secureKeyStore.storeDatabaseKey(newKey)
 
-            Log.w(TAG, "Database encryption key rotated successfully")
+            AppLogger.w(TAG, "Database encryption key rotated successfully")
             return newKey
         } catch (e: Exception) {
-            Log.e(TAG, "Error rotating database key", e)
+            AppLogger.e(TAG, "Error rotating database key", e)
             throw Exception("Key rotation failed: ${e.message}", e)
         }
     }
@@ -251,13 +251,13 @@ class DatabaseEncryptionManager(
      * @return EncryptionKey for backup operations
      */
     suspend fun initializeBackupKey(): EncryptionKey {
-        Log.d(TAG, "Initializing Backup Key")
+        AppLogger.security(TAG, "Initializing Backup Key")
 
         try {
             // Check if key exists
             val existingKey = secureKeyStore.getBackupKey()
             if (existingKey != null && !existingKey.isExpired()) {
-                Log.d(TAG, "Backup Key found in storage")
+                AppLogger.security(TAG, "Backup Key found in storage")
                 return existingKey
             }
 
@@ -271,10 +271,10 @@ class DatabaseEncryptionManager(
             // Store in SecureKeyStore
             secureKeyStore.storeBackupKey(newKey)
 
-            Log.d(TAG, "Backup Key initialized successfully")
+            AppLogger.security(TAG, "Backup Key initialized successfully")
             return newKey
         } catch (e: Exception) {
-            Log.e(TAG, "Error initializing Backup Key", e)
+            AppLogger.e(TAG, "Error initializing Backup Key", e)
             throw Exception("Backup Key initialization failed: ${e.message}", e)
         }
     }
@@ -301,20 +301,20 @@ class DatabaseEncryptionManager(
      * @return true if Master Key exists or created successfully
      */
     private fun ensureMasterKeyExists(): Boolean {
-        Log.d(TAG, "Ensuring Master Key exists")
+        AppLogger.security(TAG, "Ensuring Master Key exists")
 
         return try {
             if (encryptionService.keyExists(MASTER_KEY_ALIAS)) {
-                Log.d(TAG, "Master Key already exists")
+                AppLogger.security(TAG, "Master Key already exists")
                 return true
             }
 
             // Generate Master Key
             encryptionService.generateMasterKey(MASTER_KEY_ALIAS)
-            Log.d(TAG, "Master Key created successfully")
+            AppLogger.security(TAG, "Master Key created successfully")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error ensuring Master Key exists", e)
+            AppLogger.e(TAG, "Error ensuring Master Key exists", e)
             false
         }
     }
@@ -353,7 +353,7 @@ class DatabaseEncryptionManager(
                 "strongBoxAvailable" to encryptionService.isStrongBoxAvailable()
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting encryption status", e)
+            AppLogger.e(TAG, "Error getting encryption status", e)
             mapOf("error" to (e.message ?: "Unknown error"))
         }
     }
