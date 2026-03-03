@@ -65,6 +65,7 @@ class SecureKeyStore(
         private const val KEY_DB_ALIAS = "key_db"
         private const val KEY_BACKUP_ALIAS = "key_backup"
         private const val KEY_METADATA_PREFIX = "metadata_"
+        private const val MASTER_KEY_ALIAS = "master_encryption_key"
     }
 
     private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(DATASTORE_NAME)
@@ -95,32 +96,26 @@ class SecureKeyStore(
      * @param key EncryptionKey to store (purpose must be DATABASE)
      * @return true if stored successfully
      */
-    suspend fun storeDatabaseKey(key: EncryptionKey): Boolean {
+    suspend fun storeDatabaseKey(key: EncryptionKey) {
         AppLogger.d(TAG, "Storing Database Key: ${key.alias}")
 
-        return try {
-            // Encrypt key material with Master Key
-            val encryptedKeyMaterial = encryptionService.encrypt(
-                key.keyMaterial,
-                key.alias
-            )
+        // Encrypt key material with Master Key
+        val encryptedKeyMaterial = encryptionService.encrypt(
+            key.keyMaterial,
+            MASTER_KEY_ALIAS
+        )
 
-            // Encode to Base64 for DataStore storage (DataStore 1.0.0 supports String only)
-            val encodedKey = Base64.getEncoder().encodeToString(encryptedKeyMaterial)
+        // Encode to Base64 for DataStore storage (DataStore 1.0.0 supports String only)
+        val encodedKey = Base64.getEncoder().encodeToString(encryptedKeyMaterial)
 
-            // Store in DataStore
-            dataStore.edit { prefs ->
-                prefs[dbKeyStoredKey] = encodedKey
-                prefs[dbKeyAliasKey] = key.alias
-                prefs[dbKeyCreatedAtKey] = key.createdAt.toString()
-            }
-
-            AppLogger.d(TAG, "Database Key stored successfully")
-            true
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "Error storing Database Key", e)
-            false
+        // Store in DataStore
+        dataStore.edit { prefs ->
+            prefs[dbKeyStoredKey] = encodedKey
+            prefs[dbKeyAliasKey] = key.alias
+            prefs[dbKeyCreatedAtKey] = key.createdAt.toString()
         }
+
+        AppLogger.d(TAG, "Database Key stored successfully")
     }
 
     /**
@@ -148,7 +143,7 @@ class SecureKeyStore(
             // Decrypt key material with Master Key
             val decryptedKeyMaterial = encryptionService.decrypt(
                 encryptedKeyMaterial,
-                alias
+                MASTER_KEY_ALIAS
             )
 
             val createdAt = LocalDateTime.parse(createdAtStr)
@@ -223,29 +218,23 @@ class SecureKeyStore(
      * @param key EncryptionKey for backup purposes
      * @return true if stored successfully
      */
-    suspend fun storeBackupKey(key: EncryptionKey): Boolean {
+    suspend fun storeBackupKey(key: EncryptionKey) {
         AppLogger.d(TAG, "Storing Backup Key: ${key.alias}")
 
-        return try {
-            // Encrypt key material with Master Key
-            val encryptedKeyMaterial = encryptionService.encrypt(
-                key.keyMaterial,
-                key.alias
-            )
+        // Encrypt key material with Master Key
+        val encryptedKeyMaterial = encryptionService.encrypt(
+            key.keyMaterial,
+            MASTER_KEY_ALIAS
+        )
 
-            // Store in DataStore (ByteArray encoded as Base64 string)
-            dataStore.edit { prefs ->
-                prefs[backupKeyStoredKey] = Base64.getEncoder().encodeToString(encryptedKeyMaterial)
-                prefs[backupKeyAliasKey] = key.alias
-                prefs[backupKeyCreatedAtKey] = key.createdAt.toString()
-            }
-
-            AppLogger.d(TAG, "Backup Key stored successfully")
-            true
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "Error storing Backup Key", e)
-            false
+        // Store in DataStore (ByteArray encoded as Base64 string)
+        dataStore.edit { prefs ->
+            prefs[backupKeyStoredKey] = Base64.getEncoder().encodeToString(encryptedKeyMaterial)
+            prefs[backupKeyAliasKey] = key.alias
+            prefs[backupKeyCreatedAtKey] = key.createdAt.toString()
         }
+
+        AppLogger.d(TAG, "Backup Key stored successfully")
     }
 
     /**
@@ -271,7 +260,7 @@ class SecureKeyStore(
             // Decrypt key material
             val decryptedKeyMaterial = encryptionService.decrypt(
                 encryptedKeyMaterial,
-                alias
+                MASTER_KEY_ALIAS
             )
 
             val createdAt = LocalDateTime.parse(createdAtStr)

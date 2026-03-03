@@ -118,10 +118,7 @@ class DatabaseEncryptionManager(
             val newKey = encryptionService.generateDatabaseKey(DATABASE_KEY_ALIAS)
 
             // Store in SecureKeyStore (encrypted with Master Key)
-            val stored = secureKeyStore.storeDatabaseKey(newKey)
-            if (!stored) {
-                throw Exception("Failed to store Database Key")
-            }
+            secureKeyStore.storeDatabaseKey(newKey)
 
             AppLogger.security(TAG, "Database Key initialized successfully")
             return newKey
@@ -300,23 +297,20 @@ class DatabaseEncryptionManager(
      *
      * @return true if Master Key exists or created successfully
      */
-    private fun ensureMasterKeyExists(): Boolean {
+    private fun ensureMasterKeyExists() {
         AppLogger.security(TAG, "Ensuring Master Key exists")
 
-        return try {
-            if (encryptionService.keyExists(MASTER_KEY_ALIAS)) {
-                AppLogger.security(TAG, "Master Key already exists")
-                return true
-            }
-
-            // Generate Master Key
-            encryptionService.generateMasterKey(MASTER_KEY_ALIAS)
-            AppLogger.security(TAG, "Master Key created successfully")
-            true
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "Error ensuring Master Key exists", e)
-            false
+        if (encryptionService.keyExists(MASTER_KEY_ALIAS)) {
+            AppLogger.security(TAG, "Master Key already exists")
+            return
         }
+
+        // Generate Master Key without Keystore-level user auth requirement.
+        // Auth is enforced at app level via BiometricAuthManager; requiring it
+        // at the Keystore key level causes UserNotAuthenticatedException on first
+        // launch before any auth UI is shown (deadlock on physical devices).
+        encryptionService.generateMasterKey(MASTER_KEY_ALIAS, requiresUserAuth = false)
+        AppLogger.security(TAG, "Master Key created successfully")
     }
 
     /**

@@ -99,25 +99,9 @@ class EncryptionService {
                 keyStore.deleteEntry(alias)
             }
 
-            val keySpec = KeyGenParameterSpec.Builder(
-                alias,
-                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-            )
-                .setBlockModes(BLOCK_MODE)
-                .setEncryptionPaddings(PADDING)
-                .setKeySize(KEY_SIZE)
-                .apply {
-                    if (requiresUserAuth) {
-                        setUserAuthenticationRequired(true)
-                        setUserAuthenticationValidityDurationSeconds(300) // 5 minutes
-                    }
-                }
-                .setIsStrongBoxBacked(isStrongBoxAvailable())
-                .build()
-
-            val keyGenerator = KeyGenerator.getInstance(ALGORITHM, KEYSTORE_TYPE)
-            keyGenerator.init(keySpec)
-            val secretKey = keyGenerator.generateKey()
+            val secretKey = tryGenerateKey(alias, requiresUserAuth, useStrongBox = true)
+                ?: tryGenerateKey(alias, requiresUserAuth, useStrongBox = false)
+                ?: throw Exception("Key generation failed (StrongBox and TEE both unavailable)")
 
             AppLogger.security(TAG, "Master Key generated successfully: $alias")
 
@@ -130,6 +114,49 @@ class EncryptionService {
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error generating Master Key", e)
             throw Exception("Failed to generate Master Key: ${e.message}", e)
+        }
+    }
+
+    private fun tryGenerateKey(
+        alias: String,
+        requiresUserAuth: Boolean,
+        useStrongBox: Boolean
+    ): SecretKey? {
+        return try {
+            val keySpec = KeyGenParameterSpec.Builder(
+                alias,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+            )
+                .setBlockModes(BLOCK_MODE)
+                .setEncryptionPaddings(PADDING)
+                .setKeySize(KEY_SIZE)
+                .apply {
+                    if (requiresUserAuth) {
+                        setUserAuthenticationRequired(true)
+                        setUserAuthenticationValidityDurationSeconds(300)
+                    }
+                    if (useStrongBox) {
+                        setIsStrongBoxBacked(true)
+                    }
+                }
+                .build()
+
+            val keyGenerator = KeyGenerator.getInstance(ALGORITHM, KEYSTORE_TYPE)
+            keyGenerator.init(keySpec)
+            keyGenerator.generateKey().also {
+                if (useStrongBox) {
+                    AppLogger.security(TAG, "Master Key generated with StrongBox: $alias")
+                } else {
+                    AppLogger.security(TAG, "Master Key generated with TEE (no StrongBox): $alias")
+                }
+            }
+        } catch (e: Exception) {
+            if (useStrongBox) {
+                AppLogger.w(TAG, "StrongBox unavailable for $alias, will retry with TEE: ${e.message}")
+            } else {
+                AppLogger.e(TAG, "TEE key generation also failed for $alias", e)
+            }
+            null
         }
     }
 
@@ -201,13 +228,12 @@ class EncryptionService {
 
             val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
 
-            // Generate random IV (96 bits for GCM)
-            val iv = ByteArray(IV_LENGTH)
-            Random.nextBytes(iv)
+            // Android Keystore does not allow caller-provided IVs (randomized encryption
+            // is required by default). Let the Keystore generate the IV internally.
+            cipher.init(Cipher.ENCRYPT_MODE, key)
 
-            // Initialize cipher with IV
-            val spec = GCMParameterSpec(GCM_TAG_LENGTH, iv)
-            cipher.init(Cipher.ENCRYPT_MODE, key, spec)
+            // Retrieve the Keystore-generated IV
+            val iv = cipher.iv
 
             // Encrypt plaintext
             val ciphertext = cipher.doFinal(plaintext)
@@ -280,11 +306,26 @@ class EncryptionService {
      * @return true if StrongBox available
      */
     fun isStrongBoxAvailable(): Boolean {
+        // Probe StrongBox by attempting to generate a test key with StrongBox backing.
+        // keyStore.containsAlias() never throws, so it cannot be used as a probe.
         return try {
-            keyStore.containsAlias("test") // Any operation to check availability
+            val testAlias = "__strongbox_probe__"
+            val keySpec = KeyGenParameterSpec.Builder(
+                testAlias,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+            )
+                .setBlockModes(BLOCK_MODE)
+                .setEncryptionPaddings(PADDING)
+                .setKeySize(KEY_SIZE)
+                .setIsStrongBoxBacked(true)
+                .build()
+            val kg = KeyGenerator.getInstance(ALGORITHM, KEYSTORE_TYPE)
+            kg.init(keySpec)
+            kg.generateKey()
+            keyStore.deleteEntry(testAlias)
             true
         } catch (e: Exception) {
-            AppLogger.w(TAG, "StrongBox not available", e)
+            AppLogger.w(TAG, "StrongBox not available: ${e.message}")
             false
         }
     }

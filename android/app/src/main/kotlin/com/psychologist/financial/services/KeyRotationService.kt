@@ -195,10 +195,7 @@ class KeyRotationService(
 
             // Step 3: Store new key
             _rotationStatus.value = RotationStatus.InProgress("Armazenando nova chave...")
-            val stored = secureKeyStore.storeDatabaseKey(newKey)
-            if (!stored) {
-                throw Exception("Failed to store new encryption key")
-            }
+            secureKeyStore.storeDatabaseKey(newKey)
 
             // Step 4: Verify new key is in use
             val verifyKey = secureKeyStore.getDatabaseKey()
