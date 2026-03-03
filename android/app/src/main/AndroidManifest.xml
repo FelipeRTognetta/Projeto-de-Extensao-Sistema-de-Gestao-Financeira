@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.psychologist.financial">
+
+    <!-- ================================ -->
+    <!-- Biometric Authentication Permission -->
+    <!-- ================================ -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
+    <!-- ================================ -->
+    <!-- File Access Permissions -->
+    <!-- ================================ -->
+    <!-- Read external storage for importing data -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <!-- Write external storage for exporting CSV data -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <!-- Manage files permission for API 30+ -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+    <!-- ================================ -->
+    <!-- Internet Permission (Future Use) -->
+    <!-- Not used in v1.0 (local-only app) but included for future cloud features -->
+    <!-- ================================ -->
+    <!-- <uses-permission android:name="android.permission.INTERNET" /> -->
+
+    <application
+        android:name=".FinancialApp"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.FinancialApp"
+        android:usesCleartextTraffic="false">
+
+        <!-- ================================ -->
+        <!-- Main Activity -->
+        <!-- ================================ -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.FinancialApp"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>

@@ -1,0 +1,78 @@
+# ================================
+# Sistema Operacional
+# ================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ================================
+# IntelliJ / Android Studio
+# ================================
+.idea/
+*.iml
+*.iws
+*.ipr
+CLAUDE.md
+
+# ================================
+# Gradle
+# ================================
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# ================================
+# Kotlin / Java
+# ================================
+*.class
+*.jar
+*.log
+*.jar
+
+# ================================
+# Android
+# ================================
+*.apk
+*.aab
+*.ap_
+*.dex
+bin/
+gen/
+out/
+local.properties
+captures/
+specs
+spec.md
+.claude
+.specify
+.externalNativeBuild/
+.cxx/
+
+# ================================
+# Keystore (NUNCA versionar)
+# ================================
+*.jks
+*.keystore
+
+# ================================
+# Arquivos temporários
+# ================================
+*.swp
+*.swo
+*~
+*.tmp
+
+# ================================
+# Cache
+# ================================
+.cache/
+
+# ================================
+# Testes e Coverage
+# ================================
+coverage/
+
+# ================================
+# Ktlint / Detekt
+# ================================
+build/reports/

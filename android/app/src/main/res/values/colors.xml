@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ================================ -->
+    <!-- Material 3 Color Palette -->
+    <!-- ================================ -->
+    <!-- Primary Brand Color: Purple -->
+    <!-- Used for main actions, highlights, and primary UI elements -->
+    <color name="primary">#6200EE</color>
+    <color name="primary_dark">#3700B3</color>
+    <color name="primary_light">#BB86FC</color>
+
+    <!-- Secondary Brand Color: Teal -->
+    <!-- Used for secondary actions and accents -->
+    <color name="secondary">#03DAC6</color>
+    <color name="secondary_dark">#018786</color>
+    <color name="secondary_light">#66FFF9</color>
+
+    <!-- Tertiary Color: Orange -->
+    <!-- Used for supplementary actions -->
+    <color name="tertiary">#FF6B6B</color>
+    <color name="tertiary_dark">#FF4444</color>
+    <color name="tertiary_light">#FF9999</color>
+
+    <!-- Accent Color: Light Blue -->
+    <!-- Used for highlights and emphasis -->
+    <color name="accent">#2196F3</color>
+    <color name="accent_dark">#1976D2</color>
+    <color name="accent_light">#64B5F6</color>
+
+    <!-- ================================ -->
+    <!-- Background & Surface Colors -->
+    <!-- ================================ -->
+    <color name="background">#FFFFFF</color>
+    <color name="surface">#F5F5F5</color>
+    <color name="card_background">#FFFFFF</color>
+    <color name="overlay_background">#000000</color>
+    <color name="overlay_alpha_20">#33000000</color>
+    <color name="overlay_alpha_40">#66000000</color>
+
+    <!-- ================================ -->
+    <!-- Text Colors -->
+    <!-- ================================ -->
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_tertiary">#BDBDBD</color>
+    <color name="text_white">#FFFFFF</color>
+
+    <!-- ================================ -->
+    <!-- Status Colors -->
+    <!-- ================================ -->
+    <color name="status_success">#4CAF50</color>
+    <color name="status_success_light">#81C784</color>
+    <color name="status_error">#F44336</color>
+    <color name="status_error_light">#EF9A9A</color>
+    <color name="status_warning">#FF9800</color>
+    <color name="status_warning_light">#FFB74D</color>
+    <color name="status_info">#2196F3</color>
+    <color name="status_info_light">#64B5F6</color>
+
+    <!-- ================================ -->
+    <!-- Financial Status Colors -->
+    <!-- ================================ -->
+    <!-- Green: Money received, positive -->
+    <color name="financial_positive">#4CAF50</color>
+    <color name="financial_positive_light">#A5D6A7</color>
+
+    <!-- Orange: Pending, caution -->
+    <color name="financial_pending">#FF9800</color>
+    <color name="financial_pending_light">#FFB74D</color>
+
+    <!-- Red: Outstanding, due -->
+    <color name="financial_negative">#F44336</color>
+    <color name="financial_negative_light">#EF9A9A</color>
+
+    <!-- ================================ -->
+    <!-- Divider & Border Colors -->
+    <!-- ================================ -->
+    <color name="divider">#BDBDBD</color>
+    <color name="divider_dark">#9E9E9E</color>
+    <color name="border">#E0E0E0</color>
+    <color name="border_dark">#BDBDBD</color>
+
+    <!-- ================================ -->
+    <!-- Chart & Graph Colors -->
+    <!-- ================================ -->
+    <color name="chart_primary">#6200EE</color>
+    <color name="chart_secondary">#03DAC6</color>
+    <color name="chart_tertiary">#FF6B6B</color>
+    <color name="chart_quaternary">#2196F3</color>
+    <color name="chart_quinary">#FFC107</color>
+
+    <!-- ================================ -->
+    <!-- Light Mode Specific -->
+    <!-- ================================ -->
+    <color name="scrim">#00000033</color>
+
+    <!-- ================================ -->
+    <!-- Inactive / Disabled Colors -->
+    <!-- ================================ -->
+    <color name="disabled">#9E9E9E</color>
+    <color name="disabled_light">#BDBDBD</color>
+
+    <!-- ================================ -->
+    <!-- Transparency variations -->
+    <!-- ================================ -->
+    <color name="primary_alpha_20">#1F6200EE</color>
+    <color name="primary_alpha_40">#666200EE</color>
+    <color name="secondary_alpha_20">#1F03DAC6</color>
+    <color name="secondary_alpha_40">#6603DAC6</color>
+
+    <!-- ================================ -->
+    <!-- Patient Status Colors -->
+    <!-- ================================ -->
+    <color name="patient_active">#4CAF50</color>
+    <color name="patient_inactive">#9E9E9E</color>
+
+</resources>
