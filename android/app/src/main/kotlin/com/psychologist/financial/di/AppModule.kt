@@ -10,6 +10,7 @@ import com.psychologist.financial.data.repositories.ExportRepository
 import com.psychologist.financial.data.repositories.PatientRepository
 import com.psychologist.financial.data.repositories.PaymentRepository
 import com.psychologist.financial.domain.usecases.CreateAppointmentUseCase
+import com.psychologist.financial.domain.usecases.UpdateAppointmentUseCase
 import com.psychologist.financial.domain.usecases.CreatePatientUseCase
 import com.psychologist.financial.domain.usecases.CreatePaymentUseCase
 import com.psychologist.financial.domain.usecases.ExportDataUseCase
@@ -19,6 +20,7 @@ import com.psychologist.financial.domain.usecases.GetPatientAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientPaymentsUseCase
 import com.psychologist.financial.domain.usecases.MarkPatientInactiveUseCase
 import com.psychologist.financial.domain.usecases.ReactivatePatientUseCase
+import com.psychologist.financial.domain.usecases.UpdatePatientUseCase
 import com.psychologist.financial.domain.validation.PatientValidator
 import com.psychologist.financial.domain.validation.PaymentValidator
 import com.psychologist.financial.services.BiometricAuthManager
@@ -192,12 +194,20 @@ object AppModule {
         ReactivatePatientUseCase(patientRepository)
     }
 
+    val updatePatientUseCase: UpdatePatientUseCase by lazy {
+        UpdatePatientUseCase(patientRepository)
+    }
+
     val getPatientAppointmentsUseCase: GetPatientAppointmentsUseCase by lazy {
         GetPatientAppointmentsUseCase(appointmentRepository)
     }
 
     val createAppointmentUseCase: CreateAppointmentUseCase by lazy {
         CreateAppointmentUseCase(appointmentRepository)
+    }
+
+    val updateAppointmentUseCase: UpdateAppointmentUseCase by lazy {
+        UpdateAppointmentUseCase(appointmentRepository)
     }
 
     val getPatientPaymentsUseCase: GetPatientPaymentsUseCase by lazy {
@@ -229,13 +239,15 @@ object AppModule {
         getAllPatientsUseCase = getAllPatientsUseCase,
         createPatientUseCase = createPatientUseCase,
         markPatientInactiveUseCase = markPatientInactiveUseCase,
-        reactivatePatientUseCase = reactivatePatientUseCase
+        reactivatePatientUseCase = reactivatePatientUseCase,
+        updatePatientUseCase = updatePatientUseCase
     )
 
     fun provideAppointmentViewModel(): AppointmentViewModel = AppointmentViewModel(
         repository = appointmentRepository,
         getPatientAppointmentsUseCase = getPatientAppointmentsUseCase,
-        createAppointmentUseCase = createAppointmentUseCase
+        createAppointmentUseCase = createAppointmentUseCase,
+        updateAppointmentUseCase = updateAppointmentUseCase
     )
 
     fun providePaymentViewModel(): PaymentViewModel = PaymentViewModel(

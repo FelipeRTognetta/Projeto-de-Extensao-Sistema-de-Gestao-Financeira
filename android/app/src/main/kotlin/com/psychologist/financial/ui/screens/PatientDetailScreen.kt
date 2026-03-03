@@ -84,7 +84,9 @@ fun PatientDetailScreen(
     viewModel: PatientViewModel,
     patientId: Long,
     onBack: () -> Unit,
-    onEdit: () -> Unit
+    onEdit: (Long) -> Unit,
+    onNavigateToAppointments: (patientId: Long, patientName: String) -> Unit = { _, _ -> },
+    onNavigateToPayments: (patientId: Long, patientName: String) -> Unit = { _, _ -> }
 ) {
     val detailState = viewModel.patientDetailState.collectAsState().value
 
@@ -104,7 +106,7 @@ fun PatientDetailScreen(
                 },
                 actions = {
                     if (detailState is DetailState.Success && detailState.isActive()) {
-                        IconButton(onClick = onEdit) {
+                        IconButton(onClick = { onEdit(patientId) }) {
                             Icon(Icons.Default.Edit, "Editar")
                         }
                     }
@@ -137,7 +139,13 @@ fun PatientDetailScreen(
                     PatientDetailContent(
                         patient = detailState.patient,
                         viewModel = viewModel,
-                        onEdit = onEdit
+                        onEdit = { onEdit(patientId) },
+                        onNavigateToAppointments = {
+                            onNavigateToAppointments(detailState.patient.id, detailState.patient.name)
+                        },
+                        onNavigateToPayments = {
+                            onNavigateToPayments(detailState.patient.id, detailState.patient.name)
+                        }
                     )
                 }
 
@@ -170,7 +178,9 @@ fun PatientDetailScreen(
 private fun PatientDetailContent(
     patient: Patient,
     viewModel: PatientViewModel,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
+    onNavigateToAppointments: () -> Unit = {},
+    onNavigateToPayments: () -> Unit = {}
 ) {
     val showStatusDialog = remember { mutableStateOf(false) }
 
@@ -190,19 +200,24 @@ private fun PatientDetailContent(
         // Status and dates
         StatusCard(patient)
 
-        // Appointment summary (placeholder)
-        SummaryCard(
-            title = "Consultas",
-            value = patient.appointmentCount?.toString() ?: "—",
-            subtitle = "sessões agendadas"
-        )
-
-        // Payment summary (placeholder)
-        SummaryCard(
-            title = "Pagamento",
-            value = patient.amountDueNow?.toString() ?: "—",
-            subtitle = "a receber"
-        )
+        // Navigation buttons — Appointments and Payments
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Button(
+                onClick = onNavigateToAppointments,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Consultas")
+            }
+            Button(
+                onClick = onNavigateToPayments,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Pagamentos")
+            }
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -217,7 +232,6 @@ private fun PatientDetailContent(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Mark Inactive button
             TextButton(
                 onClick = { showStatusDialog.value = true },
                 modifier = Modifier.fillMaxWidth()
@@ -225,7 +239,6 @@ private fun PatientDetailContent(
                 Text("Marcar como Inativo")
             }
         } else {
-            // Reactivate button for inactive patients
             Button(
                 onClick = { showStatusDialog.value = true },
                 modifier = Modifier.fillMaxWidth()

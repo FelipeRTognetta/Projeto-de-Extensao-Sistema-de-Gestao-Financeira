@@ -7,6 +7,7 @@ import com.psychologist.financial.domain.models.Appointment
 import com.psychologist.financial.domain.models.BillableHoursSummary
 import com.psychologist.financial.domain.usecases.CreateAppointmentUseCase
 import com.psychologist.financial.domain.usecases.GetPatientAppointmentsUseCase
+import com.psychologist.financial.domain.usecases.UpdateAppointmentUseCase
 import com.psychologist.financial.services.BillableHoursCalculator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,6 +69,7 @@ class AppointmentViewModel(
     private val repository: AppointmentRepository,
     private val getPatientAppointmentsUseCase: GetPatientAppointmentsUseCase,
     private val createAppointmentUseCase: CreateAppointmentUseCase,
+    private val updateAppointmentUseCase: UpdateAppointmentUseCase,
     private val billableHoursCalculator: BillableHoursCalculator = BillableHoursCalculator()
 ) : ViewModel() {
 
@@ -295,6 +297,8 @@ class AppointmentViewModel(
      */
     fun setFormDate(date: LocalDate) {
         _formDate.value = date
+        // Clear the date error so the form unlocks after the user picks a valid date
+        _createFormState.update { it.copy(fieldErrors = it.fieldErrors - "date") }
     }
 
     /**
@@ -304,6 +308,7 @@ class AppointmentViewModel(
      */
     fun setFormTime(time: LocalTime) {
         _formTime.value = time
+        _createFormState.update { it.copy(fieldErrors = it.fieldErrors - "time") }
     }
 
     /**
@@ -313,6 +318,7 @@ class AppointmentViewModel(
      */
     fun setFormDuration(minutes: Int) {
         _formDuration.value = minutes
+        _createFormState.update { it.copy(fieldErrors = it.fieldErrors - "duration" - "durationMinutes") }
     }
 
     /**
@@ -446,6 +452,71 @@ class AppointmentViewModel(
     fun clearSubmissionResult() {
         _createFormState.update { state ->
             state.copy(submissionResult = null)
+        }
+    }
+
+    /**
+     * Pre-fill form with an existing appointment for editing.
+     */
+    fun prepareEditForm(appointment: Appointment) {
+        _formDate.value = appointment.date
+        _formTime.value = appointment.timeStart
+        _formDuration.value = appointment.durationMinutes
+        _formNotes.value = appointment.notes ?: ""
+        _createFormState.value = AppointmentViewState.CreateAppointmentState()
+    }
+
+    /**
+     * Submit the edit form to update an existing appointment.
+     *
+     * @param appointmentId ID of the appointment to update
+     * @param patientId Patient ID (used to refresh the list after update)
+     */
+    fun submitEditAppointmentForm(appointmentId: Long, patientId: Long) {
+        _createFormState.update { it.copy(isSubmitting = true) }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = updateAppointmentUseCase.execute(
+                appointmentId = appointmentId,
+                date = _formDate.value,
+                timeStart = _formTime.value,
+                durationMinutes = _formDuration.value,
+                notes = _formNotes.value
+            )
+
+            when (result) {
+                is UpdateAppointmentUseCase.UpdateAppointmentResult.Success -> {
+                    _createFormState.update { state ->
+                        state.copy(
+                            isSubmitting = false,
+                            submissionResult = CreateAppointmentUseCase.CreateAppointmentResult.Success(
+                                appointmentId = appointmentId
+                            )
+                        )
+                    }
+                    loadPatientAppointments(patientId)
+                }
+
+                is UpdateAppointmentUseCase.UpdateAppointmentResult.ValidationError -> {
+                    _createFormState.update { state ->
+                        state.copy(
+                            isSubmitting = false,
+                            fieldErrors = mapOf(result.field to result.message)
+                        )
+                    }
+                }
+
+                is UpdateAppointmentUseCase.UpdateAppointmentResult.Error -> {
+                    _createFormState.update { state ->
+                        state.copy(
+                            isSubmitting = false,
+                            submissionResult = CreateAppointmentUseCase.CreateAppointmentResult.Error(
+                                message = result.message
+                            )
+                        )
+                    }
+                }
+            }
         }
     }
 

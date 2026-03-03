@@ -7,6 +7,7 @@ import com.psychologist.financial.domain.usecases.CreatePatientUseCase
 import com.psychologist.financial.domain.usecases.GetAllPatientsUseCase
 import com.psychologist.financial.domain.usecases.MarkPatientInactiveUseCase
 import com.psychologist.financial.domain.usecases.ReactivatePatientUseCase
+import com.psychologist.financial.domain.usecases.UpdatePatientUseCase
 import com.psychologist.financial.viewmodel.PatientViewState.CreatePatientState
 import com.psychologist.financial.viewmodel.PatientViewState.DetailState
 import com.psychologist.financial.viewmodel.PatientViewState.ListState
@@ -77,7 +78,8 @@ class PatientViewModel(
     private val getAllPatientsUseCase: GetAllPatientsUseCase,
     private val createPatientUseCase: CreatePatientUseCase,
     private val markPatientInactiveUseCase: MarkPatientInactiveUseCase,
-    private val reactivatePatientUseCase: ReactivatePatientUseCase
+    private val reactivatePatientUseCase: ReactivatePatientUseCase,
+    private val updatePatientUseCase: UpdatePatientUseCase
 ) : BaseViewModel() {
 
     private companion object {
@@ -304,14 +306,15 @@ class PatientViewModel(
         Log.d(TAG, "Selecting patient: id=$patientId")
         launchSafe {
             _patientDetailState.value = DetailState.Loading
-            val patient = getAllPatientsUseCase.execute()
+            // Include inactive so the detail screen works for all patients
+            val patient = getAllPatientsUseCase.execute(includeInactive = true)
                 .firstOrNull { it.id == patientId }
 
             if (patient != null) {
                 _patientDetailState.value = DetailState.Success(patient)
             } else {
-                setError("Patient not found")
-                _patientDetailState.value = DetailState.Error("Patient not found")
+                setError("Paciente não encontrado")
+                _patientDetailState.value = DetailState.Error("Paciente não encontrado")
             }
         }
     }
@@ -630,6 +633,71 @@ class PatientViewModel(
         _createFormState.value = _createFormState.value.copy(
             submissionResult = null
         )
+    }
+
+    /**
+     * Pre-fill form fields from an existing patient for editing.
+     *
+     * Called when navigating to the edit form.
+     */
+    fun prepareEditForm(patient: Patient) {
+        _formName.value = patient.name
+        _formPhone.value = patient.phone ?: ""
+        _formEmail.value = patient.email ?: ""
+        _formInitialConsultDate.value = patient.initialConsultDate
+        _createFormState.value = CreatePatientState()
+        clearError()
+    }
+
+    /**
+     * Submit the edit form to update an existing patient.
+     *
+     * @param patientId ID of the patient to update
+     */
+    fun submitEditPatientForm(patientId: Long) {
+        Log.d(TAG, "Submitting patient edit form for id=$patientId")
+        launchSafe {
+            _createFormState.value = _createFormState.value.copy(isSubmitting = true)
+
+            val result = updatePatientUseCase.execute(
+                patientId = patientId,
+                name = _formName.value,
+                phone = _formPhone.value.ifBlank { null },
+                email = _formEmail.value.ifBlank { null },
+                initialConsultDate = _formInitialConsultDate.value
+            )
+
+            when (result) {
+                is UpdatePatientUseCase.UpdatePatientResult.Success -> {
+                    Log.d(TAG, "Patient updated: id=$patientId")
+                    _createFormState.value = _createFormState.value.copy(
+                        isSubmitting = false,
+                        submissionResult = CreatePatientState.SubmissionResult.Success(patientId)
+                    )
+                    // Refresh detail and list
+                    _patientDetailState.value = PatientViewState.DetailState.Success(result.patient)
+                    loadPatients()
+                }
+
+                is UpdatePatientUseCase.UpdatePatientResult.ValidationError -> {
+                    Log.w(TAG, "Validation error on edit: ${result.message}")
+                    _createFormState.value = _createFormState.value.copy(
+                        isSubmitting = false,
+                        submissionResult = CreatePatientState.SubmissionResult.Error(result.message)
+                    )
+                    setError(result.message)
+                }
+
+                is UpdatePatientUseCase.UpdatePatientResult.Error -> {
+                    Log.e(TAG, "Error updating patient: ${result.message}")
+                    _createFormState.value = _createFormState.value.copy(
+                        isSubmitting = false,
+                        submissionResult = CreatePatientState.SubmissionResult.Error(result.message)
+                    )
+                    setError(result.message)
+                }
+            }
+        }
     }
 
     // ========================================
