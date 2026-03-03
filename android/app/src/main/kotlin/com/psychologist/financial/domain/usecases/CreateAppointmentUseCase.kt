@@ -2,6 +2,7 @@ package com.psychologist.financial.domain.usecases
 
 import com.psychologist.financial.data.repositories.AppointmentRepository
 import com.psychologist.financial.domain.models.Appointment
+import com.psychologist.financial.domain.validation.AppointmentValidator
 import com.psychologist.financial.domain.validation.ValidationError
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -217,56 +218,6 @@ class CreateAppointmentUseCase(
          * @param message Error description
          */
         data class Error(val message: String) : CreateAppointmentResult()
-    }
-}
-
-/**
- * Appointment validator
- *
- * Placeholder for potential reusable appointment validation.
- * Could extract common validation logic here.
- */
-class AppointmentValidator {
-
-    /**
-     * Validate appointment duration
-     *
-     * @param minutes Duration in minutes
-     * @return Error message or null if valid
-     */
-    fun validateDuration(minutes: Int): String? {
-        return when {
-            minutes < 5 -> "Duração mínima é 5 minutos"
-            minutes > 480 -> "Duração máxima é 8 horas"
-            else -> null
-        }
-    }
-
-    /**
-     * Validate appointment date
-     *
-     * @param date Appointment date
-     * @return Error message or null if valid
-     */
-    fun validateDate(date: LocalDate): String? {
-        return when {
-            date.isAfter(LocalDate.now()) -> "Data não pode ser no futuro"
-            else -> null
-        }
-    }
-
-    /**
-     * Validate appointment time
-     *
-     * @param time Appointment time
-     * @return Error message or null if valid
-     */
-    fun validateTime(time: LocalTime): String? {
-        return when {
-            time.isBefore(LocalTime.of(6, 0)) -> "Horário muito cedo (antes das 06:00)"
-            time.isAfter(LocalTime.of(22, 0)) -> "Horário muito tarde (após 22:00)"
-            else -> null
-        }
     }
 }
 

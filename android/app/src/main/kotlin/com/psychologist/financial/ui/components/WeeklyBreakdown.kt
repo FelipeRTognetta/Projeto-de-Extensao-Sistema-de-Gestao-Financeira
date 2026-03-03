@@ -261,7 +261,7 @@ private fun getWeekBarColor(
     maxRevenue: BigDecimal
 ): Color {
     if (maxRevenue == BigDecimal.ZERO) {
-        return MaterialTheme.colorScheme.primary
+        return Color(0xFF6200EE)
     }
 
     val percentage = (revenue / maxRevenue * BigDecimal("100")).toFloat()

@@ -1,6 +1,6 @@
 package com.psychologist.financial.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkMode
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -169,7 +169,7 @@ private val DarkColorScheme = darkColorScheme(
  */
 @Composable
 fun PatientTheme(
-    darkTheme: Boolean = isSystemInDarkMode(),
+    darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
@@ -235,7 +235,7 @@ val InfoColor = Color(0xFF2196F3)
  */
 @Composable
 fun getCurrentColorScheme(): ColorScheme {
-    return if (isSystemInDarkMode()) DarkColorScheme else LightColorScheme
+    return if (isSystemInDarkTheme()) DarkColorScheme else LightColorScheme
 }
 
 /**
@@ -244,4 +244,4 @@ fun getCurrentColorScheme(): ColorScheme {
  * @return true if dark theme is active
  */
 @Composable
-fun isDarkTheme(): Boolean = isSystemInDarkMode()
+fun isDarkTheme(): Boolean = isSystemInDarkTheme()

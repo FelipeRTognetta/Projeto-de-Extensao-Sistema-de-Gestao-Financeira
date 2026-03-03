@@ -1,5 +1,6 @@
 package com.psychologist.financial.data.repositories
 
+import com.psychologist.financial.data.database.AppDatabase
 import com.psychologist.financial.data.database.AppointmentDao
 import com.psychologist.financial.data.database.AppointmentStats
 import com.psychologist.financial.data.entities.AppointmentEntity
@@ -61,8 +62,9 @@ import java.time.LocalDate
  * ```
  */
 class AppointmentRepository(
+    database: AppDatabase,
     private val appointmentDao: AppointmentDao
-) : BaseRepository() {
+) : BaseRepository(database) {
 
     // ========================================
     // Create Operations

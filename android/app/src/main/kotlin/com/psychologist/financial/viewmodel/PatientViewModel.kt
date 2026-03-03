@@ -369,7 +369,7 @@ class PatientViewModel(
                     loadPatients()
 
                     // Show success message
-                    setError(null)  // Clear any previous errors
+                    clearError()  // Clear any previous errors
                 } else {
                     Log.w(TAG, "Patient not found for inactivation: id=$patientId")
                     setError("Paciente não encontrado")
@@ -420,7 +420,7 @@ class PatientViewModel(
                     loadPatients()
 
                     // Show success message
-                    setError(null)  // Clear any previous errors
+                    clearError()  // Clear any previous errors
                 } else {
                     Log.w(TAG, "Patient not found for reactivation: id=$patientId")
                     setError("Paciente não encontrado")

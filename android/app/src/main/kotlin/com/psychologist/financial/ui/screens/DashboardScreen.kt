@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachMoney
@@ -266,20 +267,12 @@ private fun MetricsGrid(
  */
 @Composable
 private fun GridMetricsCard(
-    icon: androidx.compose.material.icons.Icons,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     value: String,
     backgroundColor: Color,
     modifier: Modifier = Modifier
 ) {
-    val iconDrawable = when (icon) {
-        Icons.Default.AttachMoney -> Icons.Default.AttachMoney
-        Icons.Default.Group -> Icons.Default.Group
-        Icons.Default.TrendingUp -> Icons.Default.TrendingUp
-        Icons.Default.Warning -> Icons.Default.Warning
-        else -> Icons.Default.AttachMoney
-    }
-
     androidx.compose.material3.Card(
         modifier = modifier.padding(4.dp),
         colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = backgroundColor),
@@ -293,7 +286,7 @@ private fun GridMetricsCard(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             androidx.compose.material3.Icon(
-                imageVector = iconDrawable,
+                imageVector = icon,
                 contentDescription = label,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)

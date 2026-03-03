@@ -1,5 +1,6 @@
 package com.psychologist.financial.data.repositories
 
+import com.psychologist.financial.data.database.AppDatabase
 import com.psychologist.financial.data.database.PatientDao
 import com.psychologist.financial.data.database.PaymentDao
 import com.psychologist.financial.domain.models.DashboardMetrics
@@ -57,9 +58,10 @@ import java.time.YearMonth
  * ```
  */
 class DashboardRepository(
+    database: AppDatabase,
     private val paymentDao: PaymentDao,
     private val patientDao: PatientDao
-) : BaseRepository() {
+) : BaseRepository(database) {
 
     // ========================================
     // Metrics by Month - Synchronous
@@ -85,7 +87,7 @@ class DashboardRepository(
         )
 
         // Get active patient count
-        val activePatients = patientDao.countByStatus(PatientStatus.ACTIVE)
+        val activePatients = patientDao.countByStatus(PatientStatus.ACTIVE.name)
 
         // Get average fee (average of paid payments)
         val averageFee = paymentDao.getAverageByStatusAndDateRange(
@@ -198,7 +200,7 @@ class DashboardRepository(
         // Combine multiple flows for automatic updates
         return combine(
             paymentDao.getSumByStatusAndDateRangeFlow("PAID", startDate, endDate),
-            patientDao.countByStatusFlow(PatientStatus.ACTIVE),
+            patientDao.countByStatusFlow(PatientStatus.ACTIVE.name),
             paymentDao.getAverageByStatusAndDateRangeFlow("PAID", startDate, endDate),
             paymentDao.getSumByStatusFlow("PENDING"),
             paymentDao.countByDateRangeFlow(startDate, endDate)
@@ -325,7 +327,7 @@ class DashboardRepository(
      * @return Number of active patients
      */
     suspend fun getActivePatientCount(): Int {
-        return patientDao.countByStatus(PatientStatus.ACTIVE)
+        return patientDao.countByStatus(PatientStatus.ACTIVE.name)
     }
 
     /**
@@ -336,7 +338,7 @@ class DashboardRepository(
      * @return Flow of active patient count
      */
     fun getActivePatientCountFlow(): Flow<Int> {
-        return patientDao.countByStatusFlow(PatientStatus.ACTIVE)
+        return patientDao.countByStatusFlow(PatientStatus.ACTIVE.name)
     }
 
     /**
@@ -345,7 +347,7 @@ class DashboardRepository(
      * @return Number of inactive patients
      */
     suspend fun getInactivePatientCount(): Int {
-        return patientDao.countByStatus(PatientStatus.INACTIVE)
+        return patientDao.countByStatus(PatientStatus.INACTIVE.name)
     }
 
     /**
@@ -354,7 +356,7 @@ class DashboardRepository(
      * @return Total number of patients
      */
     suspend fun getTotalPatientCount(): Int {
-        return patientDao.count()
+        return patientDao.countAllPatients()
     }
 
     // ========================================

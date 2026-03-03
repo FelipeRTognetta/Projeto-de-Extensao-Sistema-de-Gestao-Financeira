@@ -3,6 +3,7 @@ package com.psychologist.financial.services
 import com.psychologist.financial.utils.AppLogger
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.psychologist.financial.domain.models.BiometricAuthResult
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -185,36 +186,36 @@ class PerOperationAuthManager(
                 return@suspendCancellableCoroutine
             }
 
+            val paymentCallback = object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(
+                    result: BiometricPrompt.AuthenticationResult
+                ) {
+                    super.onAuthenticationSucceeded(result)
+                    AppLogger.d(TAG, "Payment authentication succeeded")
+                    continuation.resume(BiometricAuthResult.Success(result.cryptoObject))
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    AppLogger.w(TAG, "Payment authentication error: $errorCode")
+                    val message = translatePaymentErrorMessage(errorCode)
+                    continuation.resume(
+                        BiometricAuthResult.Error(message, errorCode)
+                    )
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    AppLogger.w(TAG, "Payment authentication failed")
+                    continuation.resume(
+                        BiometricAuthResult.Error("Biometria não reconhecida para pagamento")
+                    )
+                }
+            }
             val biometricPrompt = BiometricPrompt(
                 fragmentActivity,
-                { 
-                    object : BiometricPrompt.AuthenticationCallback() {
-                        override fun onAuthenticationSucceeded(
-                            result: BiometricPrompt.AuthenticationResult
-                        ) {
-                            super.onAuthenticationSucceeded(result)
-                            AppLogger.d(TAG, "Payment authentication succeeded")
-                            continuation.resume(BiometricAuthResult.Success(result.cryptoObject))
-                        }
-
-                        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                            super.onAuthenticationError(errorCode, errString)
-                            AppLogger.w(TAG, "Payment authentication error: $errorCode")
-                            val message = translatePaymentErrorMessage(errorCode)
-                            continuation.resume(
-                                BiometricAuthResult.Error(message, errorCode)
-                            )
-                        }
-
-                        override fun onAuthenticationFailed() {
-                            super.onAuthenticationFailed()
-                            AppLogger.w(TAG, "Payment authentication failed")
-                            continuation.resume(
-                                BiometricAuthResult.Error("Biometria não reconhecida para pagamento")
-                            )
-                        }
-                    }
-                }
+                ContextCompat.getMainExecutor(fragmentActivity),
+                paymentCallback
             )
 
             val promptInfo = BiometricPrompt.PromptInfo.Builder()
@@ -225,7 +226,7 @@ class PerOperationAuthManager(
                 .setNegativeButtonText("Cancelar")
                 .build()
 
-            biometricPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(createPaymentCryptoObject()?.cipher ?: return@suspendCancellableCoroutine))
+            biometricPrompt.authenticate(promptInfo)
 
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error during payment authentication", e)
@@ -281,36 +282,36 @@ class PerOperationAuthManager(
                 return@suspendCancellableCoroutine
             }
 
+            val exportCallback = object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(
+                    result: BiometricPrompt.AuthenticationResult
+                ) {
+                    super.onAuthenticationSucceeded(result)
+                    AppLogger.d(TAG, "Export authentication succeeded")
+                    continuation.resume(BiometricAuthResult.Success(result.cryptoObject))
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    AppLogger.w(TAG, "Export authentication error: $errorCode")
+                    val message = translateExportErrorMessage(errorCode)
+                    continuation.resume(
+                        BiometricAuthResult.Error(message, errorCode)
+                    )
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    AppLogger.w(TAG, "Export authentication failed")
+                    continuation.resume(
+                        BiometricAuthResult.Error("Biometria não reconhecida para exportação")
+                    )
+                }
+            }
             val biometricPrompt = BiometricPrompt(
                 fragmentActivity,
-                { 
-                    object : BiometricPrompt.AuthenticationCallback() {
-                        override fun onAuthenticationSucceeded(
-                            result: BiometricPrompt.AuthenticationResult
-                        ) {
-                            super.onAuthenticationSucceeded(result)
-                            AppLogger.d(TAG, "Export authentication succeeded")
-                            continuation.resume(BiometricAuthResult.Success(result.cryptoObject))
-                        }
-
-                        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                            super.onAuthenticationError(errorCode, errString)
-                            AppLogger.w(TAG, "Export authentication error: $errorCode")
-                            val message = translateExportErrorMessage(errorCode)
-                            continuation.resume(
-                                BiometricAuthResult.Error(message, errorCode)
-                            )
-                        }
-
-                        override fun onAuthenticationFailed() {
-                            super.onAuthenticationFailed()
-                            AppLogger.w(TAG, "Export authentication failed")
-                            continuation.resume(
-                                BiometricAuthResult.Error("Biometria não reconhecida para exportação")
-                            )
-                        }
-                    }
-                }
+                ContextCompat.getMainExecutor(fragmentActivity),
+                exportCallback
             )
 
             val promptInfo = BiometricPrompt.PromptInfo.Builder()
@@ -321,7 +322,7 @@ class PerOperationAuthManager(
                 .setNegativeButtonText("Cancelar")
                 .build()
 
-            biometricPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(createExportCryptoObject()?.cipher ?: return@suspendCancellableCoroutine))
+            biometricPrompt.authenticate(promptInfo)
 
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error during export authentication", e)

@@ -1,7 +1,7 @@
 package com.psychologist.financial.services
 
 import com.psychologist.financial.utils.AppLogger
-import net.zetetic.database.sqlcipher.SQLiteOpenHelper
+import net.sqlcipher.database.SQLiteOpenHelper
 import androidx.room.RoomDatabase
 import com.psychologist.financial.domain.models.EncryptionKey
 import com.psychologist.financial.domain.models.KeyPurpose

@@ -4,8 +4,11 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import net.zetetic.database.sqlcipher.SupportFactory
+import net.sqlcipher.database.SupportFactory
 import androidx.room.Room
+import com.psychologist.financial.data.entities.AppointmentEntity
+import com.psychologist.financial.data.entities.PatientEntity
+import com.psychologist.financial.data.entities.PaymentEntity
 import com.psychologist.financial.utils.Constants
 import android.util.Log
 import com.psychologist.financial.services.DatabaseEncryptionManager
@@ -40,27 +43,19 @@ import com.psychologist.financial.services.SecureKeyStore
  */
 @Database(
     entities = [
-        // TODO: Add entity classes when created
-        // PatientEntity::class,
-        // AppointmentEntity::class,
-        // PaymentEntity::class,
+        PatientEntity::class,
+        AppointmentEntity::class,
+        PaymentEntity::class,
     ],
     version = Constants.DATABASE_VERSION,
-    exportSchema = false // TODO: Set to true and create schema/ directory for migrations
+    exportSchema = false
 )
-@TypeConverters(
-    // TODO: Add type converters when created
-    // DateTimeConverters::class,
-    // CurrencyConverters::class,
-)
+@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
 
-    // ================================
-    // DAO Properties (to be added)
-    // ================================
-    // abstract fun patientDao(): PatientDao
-    // abstract fun appointmentDao(): AppointmentDao
-    // abstract fun paymentDao(): PaymentDao
+    abstract fun patientDao(): PatientDao
+    abstract fun appointmentDao(): AppointmentDao
+    abstract fun paymentDao(): PaymentDao
 
     companion object {
         private const val TAG = "AppDatabase"
@@ -86,20 +81,18 @@ abstract class AppDatabase : RoomDatabase() {
          * @return Singleton AppDatabase instance
          * @throws Exception If encryption key initialization fails
          */
-        fun getInstance(
+        suspend fun getInstance(
             context: Context,
             encryptionService: EncryptionService,
             secureKeyStore: SecureKeyStore,
             databaseEncryptionManager: DatabaseEncryptionManager
         ): AppDatabase {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: buildDatabase(
-                    context,
-                    encryptionService,
-                    secureKeyStore,
-                    databaseEncryptionManager
-                ).also { INSTANCE = it }
-            }
+            return INSTANCE ?: buildDatabase(
+                context,
+                encryptionService,
+                secureKeyStore,
+                databaseEncryptionManager
+            ).also { INSTANCE = it }
         }
 
         /**
@@ -137,7 +130,7 @@ abstract class AppDatabase : RoomDatabase() {
          * @return AppDatabase instance
          * @throws Exception If encryption key initialization fails
          */
-        private fun buildDatabase(
+        private suspend fun buildDatabase(
             context: Context,
             encryptionService: EncryptionService,
             secureKeyStore: SecureKeyStore,
@@ -178,7 +171,6 @@ abstract class AppDatabase : RoomDatabase() {
                 .build()
                 .also {
                     Log.d(TAG, "Database instance created successfully with encrypted key")
-                    Log.d(TAG, "Encryption status: ${databaseEncryptionManager.getEncryptionStatus()}")
                 }
         }
 

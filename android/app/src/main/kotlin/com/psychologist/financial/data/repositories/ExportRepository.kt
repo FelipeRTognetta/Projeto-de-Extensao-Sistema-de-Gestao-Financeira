@@ -112,7 +112,7 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
     suspend fun getActivePatients(): List<Patient> {
         return try {
             AppLogger.d(TAG, "Querying active patients...")
-            val entities = patientDao.getPatientsByStatus("ACTIVE")
+            val entities = patientDao.getAllActivePatients()
             entities.map { it.toPatient() }
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error retrieving active patients", e)
@@ -130,7 +130,7 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
     suspend fun getInactivePatients(): List<Patient> {
         return try {
             AppLogger.d(TAG, "Querying inactive patients...")
-            val entities = patientDao.getPatientsByStatus("INACTIVE")
+            val entities = patientDao.getAllInactivePatients()
             entities.map { it.toPatient() }
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error retrieving inactive patients", e)
@@ -153,7 +153,7 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
     suspend fun getAllAppointments(): List<Appointment> {
         return try {
             AppLogger.d(TAG, "Querying all appointments for export...")
-            val entities = appointmentDao.getAllAppointments()
+            val entities = appointmentDao.getAll()
             AppLogger.d(TAG, "Retrieved ${entities.size} appointments")
             entities.map { it.toAppointment() }
         } catch (e: Exception) {
@@ -169,7 +169,7 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
      */
     suspend fun countAllAppointments(): Int {
         return try {
-            appointmentDao.countAllAppointments()
+            appointmentDao.count()
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error counting appointments", e)
             0
@@ -191,7 +191,7 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
     ): List<Appointment> {
         return try {
             AppLogger.d(TAG, "Querying appointments from $startDate to $endDate...")
-            val entities = appointmentDao.getAppointmentsByDateRange(startDate, endDate)
+            val entities = appointmentDao.getByDateRange(startDate, endDate)
             entities.map { it.toAppointment() }
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error retrieving appointments by date range", e)
@@ -214,7 +214,7 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
     suspend fun getAllPayments(): List<Payment> {
         return try {
             AppLogger.d(TAG, "Querying all payments for export...")
-            val entities = paymentDao.getAllPayments()
+            val entities = paymentDao.getAll()
             AppLogger.d(TAG, "Retrieved ${entities.size} payments")
             entities.map { it.toPayment() }
         } catch (e: Exception) {
@@ -230,7 +230,7 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
      */
     suspend fun countAllPayments(): Int {
         return try {
-            paymentDao.countAllPayments()
+            paymentDao.count()
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error counting payments", e)
             0
@@ -249,7 +249,7 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
     suspend fun getPaymentsByStatus(status: String): List<Payment> {
         return try {
             AppLogger.d(TAG, "Querying payments with status $status...")
-            val entities = paymentDao.getPaymentsByStatus(status)
+            val entities = paymentDao.getByStatus(status)
             entities.map { it.toPayment() }
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error retrieving payments by status", e)
@@ -270,7 +270,7 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
     ): List<Payment> {
         return try {
             AppLogger.d(TAG, "Querying payments from $startDate to $endDate...")
-            val entities = paymentDao.getPaymentsByDateRange(startDate, endDate)
+            val entities = paymentDao.getByDateRange(startDate, endDate)
             entities.map { it.toPayment() }
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error retrieving payments by date range", e)
@@ -347,7 +347,7 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
             id = this.id,
             patientId = this.patientId,
             date = this.date,
-            timeStart = this.time,
+            timeStart = this.timeStart,
             durationMinutes = this.durationMinutes,
             notes = this.notes,
             createdDate = this.createdDate
@@ -361,9 +361,9 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
             appointmentId = this.appointmentId,
             amount = this.amount,
             status = this.status,
-            paymentMethod = this.method,
+            paymentMethod = this.paymentMethod,
             paymentDate = this.paymentDate,
-            createdDate = this.recordedDate
+            createdDate = this.createdDate
         )
     }
 }

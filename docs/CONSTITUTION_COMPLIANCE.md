@@ -150,7 +150,6 @@
 
 | Document | Status | Quality |
 |----------|--------|---------|
-| `CLAUDE.md` | Complete, current | Comprehensive tech stack, architecture, code style |
 | `docs/ARCHITECTURE.md` | Complete | MVVM diagrams, data flow, dependency graph, encryption layers |
 | `docs/API.md` | Complete | 21+ repository methods, use cases, services documented |
 | `docs/TESTING.md` | Complete | Test pyramid, coverage targets, patterns, directory structure |

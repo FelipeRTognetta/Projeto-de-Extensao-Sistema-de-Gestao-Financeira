@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.psychologist.financial.data.repositories.PaymentRepository
 import com.psychologist.financial.domain.models.Payment
 import com.psychologist.financial.domain.models.PatientBalance
+import com.psychologist.financial.domain.usecases.CreatePaymentResult
 import com.psychologist.financial.domain.usecases.CreatePaymentUseCase
 import com.psychologist.financial.domain.usecases.GetPatientPaymentsUseCase
 import com.psychologist.financial.services.BalanceCalculator
@@ -120,8 +121,8 @@ class PaymentViewModel(
     private val _createFormState = MutableStateFlow(PaymentViewState.CreatePaymentState())
     val createFormState: StateFlow<PaymentViewState.CreatePaymentState> = _createFormState.asStateFlow()
 
-    private val _formAmount = MutableStateFlow(BigDecimal.ZERO)
-    val formAmount: StateFlow<BigDecimal> = _formAmount.asStateFlow()
+    private val _formAmount = MutableStateFlow("")
+    val formAmount: StateFlow<String> = _formAmount.asStateFlow()
 
     private val _formStatus = MutableStateFlow(Payment.STATUS_PAID)
     val formStatus: StateFlow<String> = _formStatus.asStateFlow()
@@ -348,12 +349,19 @@ class PaymentViewModel(
     // ========================================
 
     /**
-     * Set payment amount
+     * Set payment amount (as text, converted to BigDecimal on submit)
      *
-     * @param amount Payment amount
+     * @param amount Payment amount as string (e.g. "150.00")
      */
-    fun setFormAmount(amount: BigDecimal) {
+    fun setFormAmount(amount: String) {
         _formAmount.value = amount
+    }
+
+    /**
+     * Clear submission result after handling
+     */
+    fun clearSubmissionResult() {
+        _createFormState.update { it.copy(submissionResult = null) }
     }
 
     /**
@@ -396,7 +404,7 @@ class PaymentViewModel(
      * Reset form to initial state
      */
     fun resetForm() {
-        _formAmount.value = BigDecimal.ZERO
+        _formAmount.value = ""
         _formStatus.value = Payment.STATUS_PAID
         _formMethod.value = Payment.METHOD_TRANSFER
         _formDate.value = LocalDate.now()
@@ -417,7 +425,7 @@ class PaymentViewModel(
         viewModelScope.launch(Dispatchers.Default) {
             val errors = createPaymentUseCase.validate(
                 patientId = patientId,
-                amount = _formAmount.value,
+                amount = _formAmount.value.toBigDecimalOrNull() ?: BigDecimal.ZERO,
                 status = _formStatus.value,
                 paymentMethod = _formMethod.value,
                 paymentDate = _formDate.value
@@ -425,7 +433,7 @@ class PaymentViewModel(
 
             _createFormState.update { state ->
                 state.copy(
-                    fieldErrors = errors.associateBy { it.field }
+                    fieldErrors = errors.associate { it.field to it.message }
                 )
             }
         }
@@ -445,7 +453,7 @@ class PaymentViewModel(
                 val result = createPaymentUseCase.execute(
                     patientId = patientId,
                     appointmentId = _formAppointmentId.value,
-                    amount = _formAmount.value,
+                    amount = _formAmount.value.toBigDecimalOrNull() ?: BigDecimal.ZERO,
                     status = _formStatus.value,
                     paymentMethod = _formMethod.value,
                     paymentDate = _formDate.value
@@ -456,8 +464,8 @@ class PaymentViewModel(
                         isSubmitting = false,
                         submissionResult = result,
                         fieldErrors = when (result) {
-                            is CreatePaymentUseCase.CreatePaymentResult.ValidationError -> {
-                                result.errors.associateBy { it.field }
+                            is CreatePaymentResult.ValidationError -> {
+                                result.errors.associate { it.field to it.message }
                             }
                             else -> emptyMap()
                         }
@@ -465,7 +473,7 @@ class PaymentViewModel(
                 }
 
                 // If successful, reload payments and reset form
-                if (result is CreatePaymentUseCase.CreatePaymentResult.Success) {
+                if (result is CreatePaymentResult.Success) {
                     resetForm()
                     refreshPatientPayments()
                 }

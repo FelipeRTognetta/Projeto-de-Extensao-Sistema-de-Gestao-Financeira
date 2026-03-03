@@ -1,6 +1,7 @@
 package com.psychologist.financial.services
 
 import com.psychologist.financial.domain.models.Appointment
+import com.psychologist.financial.domain.models.BillableHoursSummary
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -454,66 +455,6 @@ class BillableHoursCalculator {
             .map { month ->
                 month to calculateMonthlyBillableHours(appointments, month)
             }
-    }
-}
-
-/**
- * Billable hours summary data class
- *
- * Contains comprehensive billable metrics.
- */
-data class BillableHoursSummary(
-    val totalSessions: Int,
-    val totalBillableHours: Double,
-    val averageSessionHours: Double,
-    val minSessionHours: Double,
-    val maxSessionHours: Double,
-    val upcomingSessions: Int = 0,
-    val upcomingBillableHours: Double = 0.0
-) {
-    /**
-     * Get total sessions (completed + upcoming)
-     */
-    val allSessions: Int
-        get() = totalSessions + upcomingSessions
-
-    /**
-     * Get total billable hours (completed + upcoming)
-     */
-    val allBillableHours: Double
-        get() = totalBillableHours + upcomingBillableHours
-
-    /**
-     * Get formatted total hours string
-     *
-     * Format: "15h 30min"
-     */
-    fun getFormattedTotalHours(): String {
-        val hours = totalBillableHours.toInt()
-        val minutes = ((totalBillableHours - hours) * 60).toInt()
-
-        return when {
-            hours > 0 && minutes > 0 -> "${hours}h ${minutes}min"
-            hours > 0 -> "${hours}h"
-            else -> "${minutes}min"
-        }
-    }
-
-    /**
-     * Get formatted average session duration
-     *
-     * Format: "45min" or "1h 15min"
-     */
-    fun getFormattedAverageSessionHours(): String {
-        val minutes = (averageSessionHours * 60).toInt()
-        return when {
-            minutes >= 60 -> {
-                val hours = minutes / 60
-                val mins = minutes % 60
-                if (mins > 0) "${hours}h ${mins}min" else "${hours}h"
-            }
-            else -> "${minutes}min"
-        }
     }
 }
 

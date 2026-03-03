@@ -239,7 +239,7 @@ abstract class BaseViewModel : ViewModel() {
      *
      * Dismisses error dialog if visible.
      */
-    protected fun clearError() {
+    open fun clearError() {
         _error.value = null
     }
 

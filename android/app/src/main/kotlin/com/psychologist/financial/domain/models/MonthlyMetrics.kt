@@ -309,7 +309,7 @@ data class MonthlyMetrics(
         return totalRevenue >= BigDecimal.ZERO &&
                 weekCount <= 5 &&
                 weeklyBreakdown.values.all { it.isValid() } &&
-                weeklyRevenuesInOrder.sum() <= totalRevenue + BigDecimal("0.01")  // Allow for rounding
+                weeklyRevenuesInOrder.fold(BigDecimal.ZERO) { acc, v -> acc + v } <= totalRevenue + BigDecimal("0.01")  // Allow for rounding
     }
 
     // ========================================

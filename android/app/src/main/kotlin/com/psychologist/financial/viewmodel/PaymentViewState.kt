@@ -2,6 +2,7 @@ package com.psychologist.financial.viewmodel
 
 import com.psychologist.financial.domain.models.Payment
 import com.psychologist.financial.domain.models.PatientBalance
+import com.psychologist.financial.domain.usecases.CreatePaymentResult
 import com.psychologist.financial.domain.usecases.CreatePaymentUseCase
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -226,7 +227,7 @@ object PaymentViewState {
     data class CreatePaymentState(
         val fieldErrors: Map<String, String> = emptyMap(),
         val isSubmitting: Boolean = false,
-        val submissionResult: CreatePaymentUseCase.CreatePaymentResult? = null
+        val submissionResult: CreatePaymentResult? = null
     ) {
         // ========================================
         // Error Helpers
@@ -330,7 +331,7 @@ object PaymentViewState {
          * @return true if submission succeeded
          */
         fun isSuccess(): Boolean {
-            return submissionResult is CreatePaymentUseCase.CreatePaymentResult.Success
+            return submissionResult is CreatePaymentResult.Success
         }
 
         /**
@@ -339,7 +340,7 @@ object PaymentViewState {
          * @return true if validation failed during submission
          */
         fun hasSubmissionValidationErrors(): Boolean {
-            return submissionResult is CreatePaymentUseCase.CreatePaymentResult.ValidationError
+            return submissionResult is CreatePaymentResult.ValidationError
         }
 
         /**
@@ -349,7 +350,7 @@ object PaymentViewState {
          */
         fun getSuccessMessage(): String? {
             return if (isSuccess()) {
-                val paymentId = (submissionResult as CreatePaymentUseCase.CreatePaymentResult.Success).paymentId
+                val paymentId = (submissionResult as CreatePaymentResult.Success).paymentId
                 "Pagamento #$paymentId criado com sucesso"
             } else {
                 null
@@ -363,7 +364,7 @@ object PaymentViewState {
          */
         fun getSubmissionValidationErrors(): List<com.psychologist.financial.domain.validation.ValidationError> {
             return when (val result = submissionResult) {
-                is CreatePaymentUseCase.CreatePaymentResult.ValidationError -> result.errors
+                is CreatePaymentResult.ValidationError -> result.errors
                 else -> emptyList()
             }
         }

@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.psychologist.financial.ui.theme.WarningColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.psychologist.financial.domain.models.Payment
@@ -106,7 +107,7 @@ fun PaymentListItem(
                     color = when {
                         payment.isPaid -> MaterialTheme.colorScheme.tertiary
                         payment.isPastDue -> MaterialTheme.colorScheme.error
-                        else -> MaterialTheme.colorScheme.warning
+                        else -> WarningColor
                     },
                     contentColor = when {
                         payment.isPaid -> MaterialTheme.colorScheme.onTertiary
@@ -224,7 +225,7 @@ fun CompactPaymentListItem(
             color = when {
                 payment.isPaid -> MaterialTheme.colorScheme.tertiary
                 payment.isPastDue -> MaterialTheme.colorScheme.error
-                else -> MaterialTheme.colorScheme.warning
+                else -> WarningColor
             }
         ) {
             Text(

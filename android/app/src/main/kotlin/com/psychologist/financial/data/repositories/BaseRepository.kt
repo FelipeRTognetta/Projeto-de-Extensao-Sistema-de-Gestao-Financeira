@@ -1,5 +1,6 @@
 package com.psychologist.financial.data.repositories
 
+import androidx.room.withTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.psychologist.financial.data.database.AppDatabase
 import com.psychologist.financial.utils.AppLogger

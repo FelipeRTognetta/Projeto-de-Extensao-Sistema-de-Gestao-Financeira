@@ -130,9 +130,9 @@ class CreatePaymentUseCase(
             // Validate payment data
             val validationErrors = paymentValidator.validateNewPayment(
                 amount = amount,
-                status = status,
-                paymentMethod = paymentMethod,
-                paymentDate = paymentDate
+                paymentDate = paymentDate,
+                method = paymentMethod,
+                status = status
             )
 
             if (validationErrors.isNotEmpty()) {
@@ -141,7 +141,7 @@ class CreatePaymentUseCase(
             }
 
             // Validate patient exists
-            val patient = patientRepository.getById(patientId)
+            val patient = patientRepository.getPatient(patientId)
             if (patient == null) {
                 Log.w(TAG, "Patient not found: $patientId")
                 val error = ValidationError(
@@ -289,14 +289,14 @@ class CreatePaymentUseCase(
         errors.addAll(
             paymentValidator.validateNewPayment(
                 amount = amount,
-                status = status,
-                paymentMethod = paymentMethod,
-                paymentDate = paymentDate
+                paymentDate = paymentDate,
+                method = paymentMethod,
+                status = status
             )
         )
 
         // Validate patient exists
-        val patient = patientRepository.getById(patientId)
+        val patient = patientRepository.getPatient(patientId)
         if (patient == null) {
             errors.add(
                 ValidationError(

@@ -161,6 +161,12 @@ interface PaymentDao {
     """)
     suspend fun countByDateRange(startDate: LocalDate, endDate: LocalDate): Int
 
+    @Query("""
+        SELECT COUNT(*) FROM payments
+        WHERE payment_date >= :startDate AND payment_date <= :endDate
+    """)
+    fun countByDateRangeFlow(startDate: LocalDate, endDate: LocalDate): Flow<Int>
+
     // ========================================
     // Read Operations - Lists
     // ========================================

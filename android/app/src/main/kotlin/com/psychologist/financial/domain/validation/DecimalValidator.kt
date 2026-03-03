@@ -100,15 +100,6 @@ class DecimalValidator {
             return errors
         }
 
-        // NaN/Infinity check
-        if (amount.isNaN() || amount.isInfinite()) {
-            errors.add(ValidationError(
-                field = "amount",
-                message = "Valor inválido"
-            ))
-            return errors
-        }
-
         // Non-negative check (unless explicitly allowed)
         if (!allowNegative && amount < BigDecimal.ZERO) {
             errors.add(ValidationError(
@@ -176,15 +167,6 @@ class DecimalValidator {
             return errors
         }
 
-        // NaN/Infinity check
-        if (percentage.isNaN() || percentage.isInfinite()) {
-            errors.add(ValidationError(
-                field = "percentage",
-                message = "Percentual inválido"
-            ))
-            return errors
-        }
-
         // Range check (0-100)
         if (percentage < BigDecimal(PERCENTAGE_MIN)) {
             errors.add(ValidationError(
@@ -237,15 +219,6 @@ class DecimalValidator {
             return errors
         }
 
-        // NaN/Infinity check
-        if (quantity.isNaN() || quantity.isInfinite()) {
-            errors.add(ValidationError(
-                field = "quantity",
-                message = "Quantidade inválida"
-            ))
-            return errors
-        }
-
         // Non-negative check
         if (quantity < BigDecimal.ZERO) {
             errors.add(ValidationError(
@@ -294,15 +267,6 @@ class DecimalValidator {
             errors.add(ValidationError(
                 field = "balance",
                 message = "Saldo não pode ser vazio"
-            ))
-            return errors
-        }
-
-        // NaN/Infinity check
-        if (balance.isNaN() || balance.isInfinite()) {
-            errors.add(ValidationError(
-                field = "balance",
-                message = "Saldo inválido"
             ))
             return errors
         }
@@ -396,7 +360,6 @@ class DecimalValidator {
  */
 fun isValidCurrencyAmount(amount: BigDecimal?): Boolean {
     if (amount == null) return false
-    if (amount.isNaN() || amount.isInfinite()) return false
     return amount >= BigDecimal.ZERO && amount.scale() <= 2
 }
 
@@ -408,7 +371,6 @@ fun isValidCurrencyAmount(amount: BigDecimal?): Boolean {
  */
 fun isValidPercentage(percentage: BigDecimal?): Boolean {
     if (percentage == null) return false
-    if (percentage.isNaN() || percentage.isInfinite()) return false
     return percentage >= BigDecimal.ZERO &&
             percentage <= BigDecimal("100") &&
             percentage.scale() <= 2
@@ -422,7 +384,6 @@ fun isValidPercentage(percentage: BigDecimal?): Boolean {
  */
 fun isValidQuantity(quantity: BigDecimal?): Boolean {
     if (quantity == null) return false
-    if (quantity.isNaN() || quantity.isInfinite()) return false
     return quantity >= BigDecimal.ZERO &&
             quantity.scale() <= 0 &&
             quantity == quantity.setScale(0, RoundingMode.DOWN)
@@ -436,7 +397,6 @@ fun isValidQuantity(quantity: BigDecimal?): Boolean {
  */
 fun isValidBalance(balance: BigDecimal?): Boolean {
     if (balance == null) return false
-    if (balance.isNaN() || balance.isInfinite()) return false
     val min = BigDecimal("-999999999.99")
     val max = BigDecimal("999999999.99")
     return balance >= min && balance <= max && balance.scale() <= 2
@@ -469,7 +429,7 @@ fun sumBigDecimals(amounts: List<BigDecimal?>): BigDecimal {
     var sum = BigDecimal.ZERO
 
     for (amount in amounts) {
-        if (amount != null && !amount.isNaN() && !amount.isInfinite()) {
+        if (amount != null) {
             sum += amount
         }
     }
@@ -487,7 +447,7 @@ fun sumBigDecimals(amounts: List<BigDecimal?>): BigDecimal {
  * @return Average with 2 decimal places, or zero if empty
  */
 fun averageBigDecimals(amounts: List<BigDecimal?>): BigDecimal {
-    val validAmounts = amounts.filter { it != null && !it.isNaN() && !it.isInfinite() }
+    val validAmounts = amounts.filter { it != null }
 
     if (validAmounts.isEmpty()) {
         return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)

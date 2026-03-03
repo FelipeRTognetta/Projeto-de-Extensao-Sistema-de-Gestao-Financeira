@@ -95,7 +95,7 @@ import java.time.LocalDateTime
 data class PaymentEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "id")
-    val id: Long = 0L,
+    override val id: Long = 0L,
 
     @ColumnInfo(name = "patient_id")
     val patientId: Long,
@@ -116,8 +116,8 @@ data class PaymentEntity(
     val paymentDate: LocalDate,
 
     @ColumnInfo(name = "created_date")
-    val createdDate: LocalDateTime = LocalDateTime.now()
-) : BaseEntity(id = id, createdDate = createdDate) {
+    override val createdDate: LocalDateTime = LocalDateTime.now()
+) : BaseEntity() {
 
     /**
      * Check if payment is fully paid

@@ -162,9 +162,9 @@ class ExportDataUseCase(
 
             val exportDir = storageManager.getTimestampedExportDirectory()
 
-            var patientFile = null
-            var appointmentFile = null
-            var paymentFile = null
+            var patientFile: java.io.File? = null
+            var appointmentFile: java.io.File? = null
+            var paymentFile: java.io.File? = null
             var patientCount = 0
             var appointmentCount = 0
             var paymentCount = 0

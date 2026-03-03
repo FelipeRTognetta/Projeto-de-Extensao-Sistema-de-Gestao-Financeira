@@ -310,9 +310,7 @@ private fun FilterChip(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
                     tint = textColor,
-                    modifier = Modifier
-                        .padding(end = 4.dp)
-                        .fontSize(16.sp)
+                    modifier = Modifier.padding(end = 4.dp)
                 )
             }
             Text(

@@ -3,6 +3,7 @@ package com.psychologist.financial.services
 import com.psychologist.financial.utils.AppLogger
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.psychologist.financial.domain.models.BiometricAuthResult
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -121,43 +122,43 @@ class BiometricAuthManager(
                 return@suspendCancellableCoroutine
             }
 
-            val biometricPrompt = BiometricPrompt(
-                fragmentActivity,
-                { 
-                    object : BiometricPrompt.AuthenticationCallback() {
-                        override fun onAuthenticationSucceeded(
-                            result: BiometricPrompt.AuthenticationResult
-                        ) {
-                            super.onAuthenticationSucceeded(result)
-                            AppLogger.d(TAG, "Biometric authentication succeeded")
-                            lastAuthTime = System.currentTimeMillis()
-                            continuation.resume(BiometricAuthResult.Success(result.cryptoObject))
-                        }
+            val callback = object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(
+                    result: BiometricPrompt.AuthenticationResult
+                ) {
+                    super.onAuthenticationSucceeded(result)
+                    AppLogger.d(TAG, "Biometric authentication succeeded")
+                    lastAuthTime = System.currentTimeMillis()
+                    continuation.resume(BiometricAuthResult.Success(result.cryptoObject))
+                }
 
-                        override fun onAuthenticationError(
-                            errorCode: Int,
-                            errString: CharSequence
-                        ) {
-                            super.onAuthenticationError(errorCode, errString)
-                            AppLogger.w(TAG, "Biometric authentication error: $errorCode - $errString")
-                            val message = translateErrorMessage(errorCode)
-                            val needsFallback = shouldOfferFallback(errorCode)
-                            if (needsFallback) {
-                                continuation.resume(BiometricAuthResult.NeedsFallback(message))
-                            } else {
-                                continuation.resume(BiometricAuthResult.Error(message, errorCode))
-                            }
-                        }
-
-                        override fun onAuthenticationFailed() {
-                            super.onAuthenticationFailed()
-                            AppLogger.w(TAG, "Biometric authentication failed")
-                            continuation.resume(
-                                BiometricAuthResult.NeedsFallback("Biometria não reconhecida. Tente novamente.", 1)
-                            )
-                        }
+                override fun onAuthenticationError(
+                    errorCode: Int,
+                    errString: CharSequence
+                ) {
+                    super.onAuthenticationError(errorCode, errString)
+                    AppLogger.w(TAG, "Biometric authentication error: $errorCode - $errString")
+                    val message = translateErrorMessage(errorCode)
+                    val needsFallback = shouldOfferFallback(errorCode)
+                    if (needsFallback) {
+                        continuation.resume(BiometricAuthResult.NeedsFallback(message))
+                    } else {
+                        continuation.resume(BiometricAuthResult.Error(message, errorCode))
                     }
                 }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    AppLogger.w(TAG, "Biometric authentication failed")
+                    continuation.resume(
+                        BiometricAuthResult.NeedsFallback("Biometria não reconhecida. Tente novamente.", 1)
+                    )
+                }
+            }
+            val biometricPrompt = BiometricPrompt(
+                fragmentActivity,
+                ContextCompat.getMainExecutor(fragmentActivity),
+                callback
             )
 
             val promptInfo = BiometricPrompt.PromptInfo.Builder()
@@ -165,10 +166,7 @@ class BiometricAuthManager(
                 .setSubtitle("Use sua biometria para acessar")
                 .setDescription("Coloque seu dedo no sensor ou olhe para a câmera")
                 .setNegativeButtonText("Usar PIN")
-                .setAllowedAuthenticators(
-                    BiometricManager.Authenticators.BIOMETRIC_WEAK or
-                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
-                )
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
                 .build()
 
             biometricPrompt.authenticate(promptInfo)

@@ -187,8 +187,7 @@ private fun FormContent(
                 }
             },
             readOnly = true,
-            enabled = !isSubmitting,
-            tag = "dateField"
+            enabled = !isSubmitting
         )
 
         // Time field
@@ -204,8 +203,7 @@ private fun FormContent(
                 }
             },
             readOnly = true,
-            enabled = !isSubmitting,
-            tag = "timeField"
+            enabled = !isSubmitting
         )
 
         // Duration field

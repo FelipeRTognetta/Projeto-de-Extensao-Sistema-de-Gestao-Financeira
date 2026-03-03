@@ -4,8 +4,8 @@ import android.content.Context
 import com.psychologist.financial.utils.AppLogger
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.byteArrayPreferences
-import androidx.datastore.preferences.core.stringPreferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.psychologist.financial.domain.models.EncryptionKey
 import com.psychologist.financial.domain.models.KeyPurpose
@@ -70,13 +70,13 @@ class SecureKeyStore(
     private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(DATASTORE_NAME)
     private val dataStore = context.dataStore
 
-    // DataStore keys
-    private val dbKeyStoredKey = byteArrayPreferences("database_key_encrypted")
-    private val backupKeyStoredKey = byteArrayPreferences("backup_key_encrypted")
-    private val dbKeyAliasKey = stringPreferences("database_key_alias")
-    private val backupKeyAliasKey = stringPreferences("backup_key_alias")
-    private val dbKeyCreatedAtKey = stringPreferences("database_key_created_at")
-    private val backupKeyCreatedAtKey = stringPreferences("backup_key_created_at")
+    // DataStore keys (ByteArray stored as Base64 string — DataStore 1.0.0 only supports primitives/String)
+    private val dbKeyStoredKey = stringPreferencesKey("database_key_encrypted")
+    private val backupKeyStoredKey = stringPreferencesKey("backup_key_encrypted")
+    private val dbKeyAliasKey = stringPreferencesKey("database_key_alias")
+    private val backupKeyAliasKey = stringPreferencesKey("backup_key_alias")
+    private val dbKeyCreatedAtKey = stringPreferencesKey("database_key_created_at")
+    private val backupKeyCreatedAtKey = stringPreferencesKey("backup_key_created_at")
 
     init {
         AppLogger.d(TAG, "SecureKeyStore initialized")
@@ -105,15 +105,14 @@ class SecureKeyStore(
                 key.alias
             )
 
-            // Encode to Base64 for DataStore storage
+            // Encode to Base64 for DataStore storage (DataStore 1.0.0 supports String only)
             val encodedKey = Base64.getEncoder().encodeToString(encryptedKeyMaterial)
 
             // Store in DataStore
-            dataStore.updateData { prefs ->
-                prefs
-                    .set(dbKeyStoredKey, encryptedKeyMaterial)
-                    .set(dbKeyAliasKey, key.alias)
-                    .set(dbKeyCreatedAtKey, key.createdAt.toString())
+            dataStore.edit { prefs ->
+                prefs[dbKeyStoredKey] = encodedKey
+                prefs[dbKeyAliasKey] = key.alias
+                prefs[dbKeyCreatedAtKey] = key.createdAt.toString()
             }
 
             AppLogger.d(TAG, "Database Key stored successfully")
@@ -136,8 +135,9 @@ class SecureKeyStore(
 
         return try {
             val prefs = dataStore.data.first()
-            val encryptedKeyMaterial = prefs[dbKeyStoredKey]
+            val encodedKey = prefs[dbKeyStoredKey]
                 ?: throw Exception("Database Key not found in storage")
+            val encryptedKeyMaterial = Base64.getDecoder().decode(encodedKey)
 
             val alias = prefs[dbKeyAliasKey]
                 ?: throw Exception("Database Key alias not found")
@@ -196,11 +196,10 @@ class SecureKeyStore(
         AppLogger.d(TAG, "Deleting Database Key")
 
         return try {
-            dataStore.updateData { prefs ->
-                prefs
-                    .remove(dbKeyStoredKey)
-                    .remove(dbKeyAliasKey)
-                    .remove(dbKeyCreatedAtKey)
+            dataStore.edit { prefs ->
+                prefs.remove(dbKeyStoredKey)
+                prefs.remove(dbKeyAliasKey)
+                prefs.remove(dbKeyCreatedAtKey)
             }
 
             AppLogger.d(TAG, "Database Key deleted successfully")
@@ -234,12 +233,11 @@ class SecureKeyStore(
                 key.alias
             )
 
-            // Store in DataStore
-            dataStore.updateData { prefs ->
-                prefs
-                    .set(backupKeyStoredKey, encryptedKeyMaterial)
-                    .set(backupKeyAliasKey, key.alias)
-                    .set(backupKeyCreatedAtKey, key.createdAt.toString())
+            // Store in DataStore (ByteArray encoded as Base64 string)
+            dataStore.edit { prefs ->
+                prefs[backupKeyStoredKey] = Base64.getEncoder().encodeToString(encryptedKeyMaterial)
+                prefs[backupKeyAliasKey] = key.alias
+                prefs[backupKeyCreatedAtKey] = key.createdAt.toString()
             }
 
             AppLogger.d(TAG, "Backup Key stored successfully")
@@ -260,8 +258,9 @@ class SecureKeyStore(
 
         return try {
             val prefs = dataStore.data.first()
-            val encryptedKeyMaterial = prefs[backupKeyStoredKey]
+            val encodedBackupKey = prefs[backupKeyStoredKey]
                 ?: return null
+            val encryptedKeyMaterial = Base64.getDecoder().decode(encodedBackupKey)
 
             val alias = prefs[backupKeyAliasKey]
                 ?: throw Exception("Backup Key alias not found")
@@ -320,11 +319,10 @@ class SecureKeyStore(
         AppLogger.d(TAG, "Deleting Backup Key")
 
         return try {
-            dataStore.updateData { prefs ->
-                prefs
-                    .remove(backupKeyStoredKey)
-                    .remove(backupKeyAliasKey)
-                    .remove(backupKeyCreatedAtKey)
+            dataStore.edit { prefs ->
+                prefs.remove(backupKeyStoredKey)
+                prefs.remove(backupKeyAliasKey)
+                prefs.remove(backupKeyCreatedAtKey)
             }
 
             AppLogger.d(TAG, "Backup Key deleted successfully")

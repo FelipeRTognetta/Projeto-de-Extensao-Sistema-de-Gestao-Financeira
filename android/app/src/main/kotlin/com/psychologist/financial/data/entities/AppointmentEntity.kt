@@ -82,7 +82,7 @@ import java.time.LocalTime
 data class AppointmentEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "id")
-    val id: Long = 0L,
+    override val id: Long = 0L,
 
     @ColumnInfo(name = "patient_id")
     val patientId: Long,
@@ -100,8 +100,8 @@ data class AppointmentEntity(
     val notes: String? = null,
 
     @ColumnInfo(name = "created_date")
-    val createdDate: LocalDateTime = LocalDateTime.now()
-) : BaseEntity(id = id, createdDate = createdDate) {
+    override val createdDate: LocalDateTime = LocalDateTime.now()
+) : BaseEntity() {
 
     /**
      * Calculate billable hours for this appointment

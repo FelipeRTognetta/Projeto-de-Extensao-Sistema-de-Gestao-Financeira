@@ -1,5 +1,6 @@
 package com.psychologist.financial.data.repositories
 
+import com.psychologist.financial.data.database.AppDatabase
 import com.psychologist.financial.data.database.PaymentDao
 import com.psychologist.financial.data.entities.PaymentEntity
 import com.psychologist.financial.domain.models.Payment
@@ -71,8 +72,9 @@ import java.time.LocalDate
  * ```
  */
 class PaymentRepository(
+    database: AppDatabase,
     private val paymentDao: PaymentDao
-) : BaseRepository() {
+) : BaseRepository(database) {
 
     // ========================================
     // Create Operations
@@ -476,7 +478,10 @@ class PaymentRepository(
      * Delete all payments
      */
     suspend fun deleteAll() {
-        paymentDao.deleteAll()
+        val all = paymentDao.getAll()
+        if (all.isNotEmpty()) {
+            paymentDao.deleteAll(all)
+        }
     }
 
     // ========================================

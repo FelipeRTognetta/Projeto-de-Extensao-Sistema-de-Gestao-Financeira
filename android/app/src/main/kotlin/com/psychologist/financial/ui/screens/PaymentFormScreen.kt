@@ -93,7 +93,7 @@ fun PaymentFormScreen(
 
     // Handle success navigation
     when (val result = formState.submissionResult) {
-        is com.psychologist.financial.domain.usecases.CreatePaymentUseCase.CreatePaymentResult.Success -> {
+        is com.psychologist.financial.domain.usecases.CreatePaymentResult.Success -> {
             LaunchedEffect(result) {
                 onSuccess()
             }
@@ -142,7 +142,7 @@ fun PaymentFormScreen(
                 onAppointmentIdChange = { viewModel.setFormAppointmentId(it) },
                 onSubmit = { viewModel.submitCreatePaymentForm(patientId) },
                 onCancel = onCancel,
-                onValidate = { viewModel.validateForm() }
+                onValidate = { viewModel.validateForm(patientId) }
             )
         }
     }
@@ -167,7 +167,7 @@ private fun FormContent(
     onAppointmentIdChange: (Long?) -> Unit,
     onSubmit: () -> Unit,
     onCancel: () -> Unit,
-    onValidate: () -> Boolean
+    onValidate: () -> Unit
 ) {
     val methodDropdownExpanded = remember { mutableStateOf(false) }
     val statusDropdownExpanded = remember { mutableStateOf(false) }
@@ -182,9 +182,9 @@ private fun FormContent(
     ) {
         // Error message if submission failed
         formState.submissionResult?.let { result ->
-            if (result is com.psychologist.financial.domain.usecases.CreatePaymentUseCase.CreatePaymentResult.Error) {
+            if (result is com.psychologist.financial.domain.usecases.CreatePaymentResult.ValidationError) {
                 ErrorBanner(
-                    message = result.message,
+                    message = result.getFirstErrorMessage(),
                     onDismiss = { /* Clear handled by ViewModel */ }
                 )
             }
@@ -198,16 +198,18 @@ private fun FormContent(
             modifier = Modifier.fillMaxWidth(),
             isError = formState.hasFieldError("amount"),
             supportingText = {
-                formState.getFieldError("amount")?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error)
-                } ?: Text("Exemplo: 150.00")
+                val amountError = formState.getFieldError("amount")
+                if (amountError != null) {
+                    Text(amountError, color = MaterialTheme.colorScheme.error)
+                } else {
+                    Text("Exemplo: 150.00")
+                }
             },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Decimal,
                 imeAction = ImeAction.Next
             ),
-            enabled = !isSubmitting,
-            tag = "amountField"
+            enabled = !isSubmitting
         )
 
         // Date field
@@ -218,13 +220,13 @@ private fun FormContent(
             modifier = Modifier.fillMaxWidth(),
             isError = formState.hasFieldError("date"),
             supportingText = {
-                formState.getFieldError("date")?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error)
+                val dateError = formState.getFieldError("date")
+                if (dateError != null) {
+                    Text(dateError, color = MaterialTheme.colorScheme.error)
                 }
             },
             readOnly = true,
-            enabled = !isSubmitting,
-            tag = "dateField"
+            enabled = !isSubmitting
         )
 
         // Method dropdown

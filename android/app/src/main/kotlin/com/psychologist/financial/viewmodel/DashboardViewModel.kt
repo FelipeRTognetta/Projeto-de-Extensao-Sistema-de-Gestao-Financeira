@@ -150,7 +150,7 @@ class DashboardViewModel(
      */
     fun loadDashboard() {
         Log.d(TAG, "Loading dashboard for ${_selectedMonth.value.selectedMonth}")
-        setLoading(true)
+        setDashboardLoading(true)
 
         val currentMonth = _selectedMonth.value.selectedMonth
 
@@ -163,7 +163,7 @@ class DashboardViewModel(
         // Load trends (previous month)
         loadTrendData(currentMonth)
 
-        setLoading(false)
+        setDashboardLoading(false)
     }
 
     /**
@@ -239,7 +239,7 @@ class DashboardViewModel(
      * @param yearMonth Month to load
      */
     private fun loadMetrics(yearMonth: YearMonth) {
-        launchSafe {
+        launchDashboard {
             try {
                 Log.d(TAG, "Loading metrics for $yearMonth")
                 val metrics = useCase.execute(yearMonth)
@@ -258,7 +258,7 @@ class DashboardViewModel(
                 _metricsState.value = DashboardViewState.MetricsState.Error(
                     e.message ?: "Failed to load metrics"
                 )
-                setError("Failed to load metrics: ${e.message}")
+                setDashboardError("Failed to load metrics: ${e.message}")
             }
         }
     }
@@ -269,7 +269,7 @@ class DashboardViewModel(
      * @param yearMonth Month to load
      */
     private fun loadMonthlyMetrics(yearMonth: YearMonth) {
-        launchSafe {
+        launchDashboard {
             try {
                 Log.d(TAG, "Loading monthly metrics for $yearMonth")
 
@@ -303,7 +303,7 @@ class DashboardViewModel(
      * @param yearMonth Current month
      */
     private fun loadTrendData(yearMonth: YearMonth) {
-        launchSafe {
+        launchDashboard {
             try {
                 Log.d(TAG, "Loading trend data for $yearMonth")
 
@@ -355,7 +355,7 @@ class DashboardViewModel(
      *
      * @param block Suspend function to execute
      */
-    private fun launchSafe(block: suspend () -> Unit) {
+    private fun launchDashboard(block: suspend () -> Unit) {
         viewModelScope.launch(coroutineContext) {
             try {
                 block()
@@ -370,12 +370,8 @@ class DashboardViewModel(
      *
      * @param isLoading True if loading
      */
-    private fun setLoading(isLoading: Boolean) {
-        if (isLoading) {
-            _isLoading.value = true
-        } else {
-            _isLoading.value = false
-        }
+    private fun setDashboardLoading(isLoading: Boolean) {
+        setLoading(isLoading)
         updateDashboardState()
     }
 
@@ -384,16 +380,17 @@ class DashboardViewModel(
      *
      * @param message Error message
      */
-    private fun setError(message: String?) {
-        _error.value = message
+    private fun setDashboardError(message: String?) {
+        if (message != null) setError(message) else clearError()
         updateDashboardState()
     }
 
     /**
      * Clear error
      */
-    fun clearError() {
-        setError(null)
+    override fun clearError() {
+        super.clearError()
+        updateDashboardState()
     }
 
     // ========================================

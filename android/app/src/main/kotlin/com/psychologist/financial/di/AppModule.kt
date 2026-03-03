@@ -147,17 +147,17 @@ object AppModule {
     }
 
     val appointmentRepository: AppointmentRepository by lazy {
-        AppointmentRepository(database.appointmentDao())
+        AppointmentRepository(database, database.appointmentDao())
             .also { Log.d(TAG, "AppointmentRepository created") }
     }
 
     val paymentRepository: PaymentRepository by lazy {
-        PaymentRepository(database.paymentDao())
+        PaymentRepository(database, database.paymentDao())
             .also { Log.d(TAG, "PaymentRepository created") }
     }
 
     val dashboardRepository: DashboardRepository by lazy {
-        DashboardRepository(database.paymentDao(), database.patientDao())
+        DashboardRepository(database, database.paymentDao(), database.patientDao())
             .also { Log.d(TAG, "DashboardRepository created") }
     }
 

@@ -90,7 +90,7 @@ class GetAllPatientsUseCase(
      */
     fun executeFlow(includeInactive: Boolean = false): Flow<List<Patient>> {
         return if (includeInactive) {
-            patientRepository.getAllPatients().toFlow()
+            kotlinx.coroutines.flow.flow { emit(patientRepository.getAllPatients()) }
         } else {
             patientRepository.getActivePatientsFlow()
         }

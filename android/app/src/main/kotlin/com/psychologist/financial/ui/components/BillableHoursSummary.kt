@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -165,7 +166,7 @@ private fun BillableHoursSummaryDetails(
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
             )
             Text(
-                text = summary.getFirstSessionDate(),
+                text = summary.firstSessionDate?.toString() ?: "N/A",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 fontWeight = FontWeight.SemiBold
@@ -179,7 +180,7 @@ private fun BillableHoursSummaryDetails(
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
             )
             Text(
-                text = String.format("%.1f", summary.getSessionsPerWeek()),
+                text = summary.getFormattedSessionsPerWeek(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 fontWeight = FontWeight.SemiBold
@@ -193,7 +194,7 @@ private fun BillableHoursSummaryDetails(
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
             )
             Text(
-                text = summary.getProgressStatus(),
+                text = summary.progressStatus,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 fontWeight = FontWeight.SemiBold
@@ -214,7 +215,7 @@ private fun BillableHoursSummaryDetails(
  */
 @Composable
 private fun MetricColumn(
-    icon: androidx.compose.material.icons.materialIcon,
+    icon: ImageVector,
     label: String,
     value: String,
     contentColor: androidx.compose.ui.graphics.Color
