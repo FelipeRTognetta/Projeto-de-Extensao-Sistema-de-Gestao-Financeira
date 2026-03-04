@@ -303,7 +303,10 @@ data class PatientEntity(
             name: String = "Test Patient",
             phone: String? = "(11) 99999-9999",
             email: String? = "test@example.com",
-            status: String = Constants.PatientStatus.ACTIVE.name
+            status: String = Constants.PatientStatus.ACTIVE.name,
+            cpf: String? = null,
+            endereco: String? = null,
+            naoPagante: Boolean = false
         ): PatientEntity {
             val today = LocalDate.now()
             return PatientEntity(
@@ -315,7 +318,10 @@ data class PatientEntity(
                 initialConsultDate = today,
                 registrationDate = today,
                 lastAppointmentDate = null,
-                createdDate = LocalDateTime.now()
+                createdDate = LocalDateTime.now(),
+                cpf = cpf,
+                endereco = endereco,
+                naoPagante = naoPagante
             )
         }
     }

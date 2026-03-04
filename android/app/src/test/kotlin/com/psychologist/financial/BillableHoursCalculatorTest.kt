@@ -449,8 +449,8 @@ class BillableHoursCalculatorTest {
 
         val breakdown = calculator.calculateMonthlyBreakdown(appointments)
         assertEquals(2, breakdown.size)
-        assertEquals(1.0, breakdown[currentMonth], 0.01)
-        assertEquals(2.0, breakdown[lastMonth], 0.01)
+        assertEquals(1.0, breakdown[currentMonth]!!, 0.01)
+        assertEquals(2.0, breakdown[lastMonth]!!, 0.01)
     }
 
     @Test
@@ -480,7 +480,7 @@ class BillableHoursCalculatorTest {
 
         val breakdown = calculator.calculateDailyBreakdown(appointments)
         assertEquals(1, breakdown.size)
-        assertEquals(1.0, breakdown[yesterday], 0.01)
+        assertEquals(1.0, breakdown[yesterday]!!, 0.01)
     }
 
     // ========================================

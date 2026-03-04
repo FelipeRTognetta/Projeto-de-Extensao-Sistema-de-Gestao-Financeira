@@ -5,6 +5,7 @@ import com.psychologist.financial.data.database.PatientDao
 import com.psychologist.financial.data.entities.PatientEntity
 import com.psychologist.financial.domain.models.Patient
 import com.psychologist.financial.domain.models.PatientStatus
+import com.psychologist.financial.domain.models.PayerInfo
 import com.psychologist.financial.utils.AppLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -56,6 +57,7 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
     }
 
     private val patientDao: PatientDao = database.patientDao()
+    private val payerInfoDao = database.payerInfoDao()
 
     // ========================================
     // CREATE Operations
@@ -145,7 +147,14 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
      */
     suspend fun getPatient(id: Long): Patient? {
         return withRead {
-            patientDao.getPatient(id)?.toPatient()
+            val entity = patientDao.getPatient(id) ?: return@withRead null
+            val patient = entity.toPatient()
+            if (patient.naoPagante) {
+                val payerEntity = payerInfoDao.getByPatientId(id)
+                patient.copy(payerInfo = payerEntity?.toDomainPayerInfo())
+            } else {
+                patient
+            }
         }
     }
 
@@ -553,4 +562,18 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
             naoPagante = this.naoPagante
         )
     }
+
+    /**
+     * Convert PayerInfoEntity to PayerInfo domain model
+     */
+    private fun com.psychologist.financial.data.entities.PayerInfoEntity.toDomainPayerInfo(): PayerInfo =
+        PayerInfo(
+            id = this.id,
+            patientId = this.patientId,
+            nome = this.nome,
+            cpf = this.cpf,
+            endereco = this.endereco,
+            email = this.email,
+            telefone = this.telefone
+        )
 }

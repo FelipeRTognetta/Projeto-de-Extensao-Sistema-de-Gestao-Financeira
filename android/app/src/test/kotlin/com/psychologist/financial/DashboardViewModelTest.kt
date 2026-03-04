@@ -22,6 +22,7 @@ import org.junit.Before
 import org.junit.Test
 import org.mockito.Mock
 import org.mockito.MockitoAnnotations
+import kotlinx.coroutines.runBlocking
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.whenever
@@ -342,9 +343,9 @@ class DashboardViewModelTest {
     // ========================================
 
     private fun mockGetDashboardMetrics(month: YearMonth, metrics: DashboardMetrics) {
-        doAnswer {
-            metrics
-        }.whenever(useCase).execute(month)
+        runBlocking {
+            whenever(useCase.execute(month)).thenReturn(metrics)
+        }
     }
 
     // Additional test scenarios

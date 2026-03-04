@@ -3,14 +3,13 @@ package com.psychologist.financial
 import com.psychologist.financial.data.database.PatientDao
 import com.psychologist.financial.data.database.PaymentDao
 import com.psychologist.financial.data.repositories.DashboardRepository
-import com.psychologist.financial.domain.models.DashboardMetrics
 import com.psychologist.financial.domain.models.PatientStatus
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
+import org.mockito.Mockito.mock
 import org.mockito.junit.MockitoJUnitRunner
 import org.mockito.kotlin.any
 import org.mockito.kotlin.whenever
@@ -52,12 +51,13 @@ class DashboardRepositoryUnitTest {
     @Before
     fun setUp() {
         repository = DashboardRepository(
+            database = mock(),
             paymentDao = mockPaymentDao,
             patientDao = mockPatientDao
         )
     }
 
-    private fun setupDefaultMonthMocks(
+    private suspend fun setupDefaultMonthMocks(
         revenue: BigDecimal = BigDecimal("3000.00"),
         patients: Int = 10,
         avgFee: BigDecimal = BigDecimal("250.00"),
@@ -65,7 +65,7 @@ class DashboardRepositoryUnitTest {
         transactions: Int = 12
     ) {
         whenever(mockPaymentDao.getSumByStatusAndDateRange(any(), any(), any())).thenReturn(revenue)
-        whenever(mockPatientDao.countByStatus(PatientStatus.ACTIVE)).thenReturn(patients)
+        whenever(mockPatientDao.countByStatus(PatientStatus.ACTIVE.name)).thenReturn(patients)
         whenever(mockPaymentDao.getAverageByStatusAndDateRange(any(), any(), any())).thenReturn(avgFee)
         whenever(mockPaymentDao.getSumByStatus("PENDING")).thenReturn(outstanding)
         whenever(mockPaymentDao.countByDateRange(any(), any())).thenReturn(transactions)
@@ -151,7 +151,7 @@ class DashboardRepositoryUnitTest {
 
     @Test
     fun `getActivePatientCount delegates to DAO`() = runTest {
-        whenever(mockPatientDao.countByStatus(PatientStatus.ACTIVE)).thenReturn(18)
+        whenever(mockPatientDao.countByStatus(PatientStatus.ACTIVE.name)).thenReturn(18)
 
         val count = repository.getActivePatientCount()
 

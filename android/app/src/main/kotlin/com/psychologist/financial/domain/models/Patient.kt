@@ -321,7 +321,11 @@ data class Patient(
             name: String = "Test Patient",
             phone: String? = "(11) 99999-9999",
             email: String? = "test@example.com",
-            status: PatientStatus = PatientStatus.ACTIVE
+            status: PatientStatus = PatientStatus.ACTIVE,
+            cpf: String? = null,
+            endereco: String? = null,
+            naoPagante: Boolean = false,
+            payerInfo: PayerInfo? = null
         ): Patient {
             val today = LocalDate.now()
             return Patient(
@@ -333,7 +337,11 @@ data class Patient(
                 initialConsultDate = today,
                 registrationDate = today,
                 lastAppointmentDate = null,
-                createdDate = LocalDateTime.now()
+                createdDate = LocalDateTime.now(),
+                cpf = cpf,
+                endereco = endereco,
+                naoPagante = naoPagante,
+                payerInfo = payerInfo
             )
         }
 
@@ -358,7 +366,11 @@ data class Patient(
             email: String?,
             appointmentCount: Int = 0,
             billableHours: Double = 0.0,
-            amountDue: java.math.BigDecimal = java.math.BigDecimal.ZERO
+            amountDue: java.math.BigDecimal = java.math.BigDecimal.ZERO,
+            cpf: String? = null,
+            endereco: String? = null,
+            naoPagante: Boolean = false,
+            payerInfo: PayerInfo? = null
         ): Patient {
             val today = LocalDate.now()
             return Patient(
@@ -371,7 +383,11 @@ data class Patient(
                 registrationDate = today,
                 appointmentCount = appointmentCount,
                 totalBillableHours = billableHours,
-                amountDueNow = amountDue
+                amountDueNow = amountDue,
+                cpf = cpf,
+                endereco = endereco,
+                naoPagante = naoPagante,
+                payerInfo = payerInfo
             )
         }
     }

@@ -9,6 +9,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
+import org.mockito.Mockito.mock
 import org.mockito.junit.MockitoJUnitRunner
 import org.mockito.kotlin.any
 import org.mockito.kotlin.whenever
@@ -49,7 +50,7 @@ class PaymentRepositoryUnitTest {
 
     @Before
     fun setUp() {
-        repository = PaymentRepository(paymentDao = mockPaymentDao)
+        repository = PaymentRepository(database = mock(), paymentDao = mockPaymentDao)
     }
 
     private fun makePaymentEntity(
@@ -63,9 +64,8 @@ class PaymentRepositoryUnitTest {
         appointmentId = null,
         amount = amount,
         status = status,
-        method = Payment.METHOD_PIX,
-        paymentDate = yesterday,
-        recordedDate = yesterday.atStartOfDay()
+        paymentMethod = Payment.METHOD_PIX,
+        paymentDate = yesterday
     )
 
     // ========================================
@@ -75,7 +75,7 @@ class PaymentRepositoryUnitTest {
     @Test
     fun `getByPatient returns mapped payment list`() = runTest {
         val entities = listOf(makePaymentEntity(1L), makePaymentEntity(2L))
-        whenever(mockPaymentDao.getPaymentsByPatient(1L)).thenReturn(entities)
+        whenever(mockPaymentDao.getByPatient(1L)).thenReturn(entities)
 
         val result = repository.getByPatient(patientId = 1L)
 
@@ -85,7 +85,7 @@ class PaymentRepositoryUnitTest {
 
     @Test
     fun `getByPatient returns empty list when no payments`() = runTest {
-        whenever(mockPaymentDao.getPaymentsByPatient(99L)).thenReturn(emptyList())
+        whenever(mockPaymentDao.getByPatient(99L)).thenReturn(emptyList())
 
         val result = repository.getByPatient(patientId = 99L)
 
@@ -99,7 +99,7 @@ class PaymentRepositoryUnitTest {
     @Test
     fun `getByPatientFlow emits payments reactively`() = runTest {
         val entities = listOf(makePaymentEntity(1L))
-        whenever(mockPaymentDao.getPaymentsByPatientFlow(1L))
+        whenever(mockPaymentDao.getByPatientFlow(1L))
             .thenReturn(flowOf(entities))
 
         val flow = repository.getByPatientFlow(patientId = 1L)
@@ -117,7 +117,7 @@ class PaymentRepositoryUnitTest {
     @Test
     fun `getByPatientAndStatus returns only paid payments`() = runTest {
         val paidEntities = listOf(makePaymentEntity(1L, status = Payment.STATUS_PAID))
-        whenever(mockPaymentDao.getPaymentsByPatientAndStatus(1L, Payment.STATUS_PAID))
+        whenever(mockPaymentDao.getByPatientAndStatus(1L, Payment.STATUS_PAID))
             .thenReturn(paidEntities)
 
         val result = repository.getByPatientAndStatus(1L, Payment.STATUS_PAID)
@@ -128,7 +128,7 @@ class PaymentRepositoryUnitTest {
 
     @Test
     fun `getByPatientAndStatus returns empty when status not matching`() = runTest {
-        whenever(mockPaymentDao.getPaymentsByPatientAndStatus(1L, Payment.STATUS_PENDING))
+        whenever(mockPaymentDao.getByPatientAndStatus(1L, Payment.STATUS_PENDING))
             .thenReturn(emptyList())
 
         val result = repository.getByPatientAndStatus(1L, Payment.STATUS_PENDING)
@@ -164,7 +164,7 @@ class PaymentRepositoryUnitTest {
 
     @Test
     fun `getTotalAmountPaid delegates to DAO`() = runTest {
-        whenever(mockPaymentDao.getSumByPatientAndStatus(1L, Payment.STATUS_PAID))
+        whenever(mockPaymentDao.getTotalAmountPaid(1L))
             .thenReturn(BigDecimal("500.00"))
 
         val total = repository.getTotalAmountPaid(patientId = 1L)
@@ -174,7 +174,7 @@ class PaymentRepositoryUnitTest {
 
     @Test
     fun `getAmountDueNow delegates to DAO`() = runTest {
-        whenever(mockPaymentDao.getSumByPatientAndStatus(1L, Payment.STATUS_PAID))
+        whenever(mockPaymentDao.getAmountDueNow(1L))
             .thenReturn(BigDecimal("200.00"))
 
         val amount = repository.getAmountDueNow(patientId = 1L)
@@ -184,7 +184,7 @@ class PaymentRepositoryUnitTest {
 
     @Test
     fun `getTotalOutstanding delegates to DAO`() = runTest {
-        whenever(mockPaymentDao.getSumByPatientAndStatus(1L, Payment.STATUS_PENDING))
+        whenever(mockPaymentDao.getTotalOutstanding(1L))
             .thenReturn(BigDecimal("150.00"))
 
         val outstanding = repository.getTotalOutstanding(patientId = 1L)
@@ -199,7 +199,7 @@ class PaymentRepositoryUnitTest {
     @Test
     fun `getById returns payment when exists`() = runTest {
         val entity = makePaymentEntity(1L)
-        whenever(mockPaymentDao.getPaymentById(1L)).thenReturn(entity)
+        whenever(mockPaymentDao.getById(1L)).thenReturn(entity)
 
         val result = repository.getById(id = 1L)
 
@@ -209,7 +209,7 @@ class PaymentRepositoryUnitTest {
 
     @Test
     fun `getById returns null when not found`() = runTest {
-        whenever(mockPaymentDao.getPaymentById(99L)).thenReturn(null)
+        whenever(mockPaymentDao.getById(99L)).thenReturn(null)
 
         val result = repository.getById(id = 99L)
 

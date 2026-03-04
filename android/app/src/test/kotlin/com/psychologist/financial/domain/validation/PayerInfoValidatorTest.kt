@@ -1,9 +1,10 @@
 package com.psychologist.financial.domain.validation
 
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * Unit tests for PayerInfoValidator.
@@ -33,38 +34,38 @@ class PayerInfoValidatorTest {
     @Test
     fun validatePayerInfo_nomeVazio_retornaErro() {
         val errors = validator.validate(nome = "", cpf = null, email = null)
-        assertTrue(errors.isNotEmpty(), "Nome vazio deve retornar erro")
+        assertTrue("Nome vazio deve retornar erro", errors.isNotEmpty())
         val nomeError = errors.find { it.field == "payerNome" }
-        assertTrue(nomeError != null, "Deve existir erro no campo 'payerNome'")
+        assertTrue("Deve existir erro no campo 'payerNome'", nomeError != null)
     }
 
     @Test
     fun validatePayerInfo_nomeComUmChar_retornaErro() {
         val errors = validator.validate(nome = "A", cpf = null, email = null)
-        assertTrue(errors.isNotEmpty(), "Nome com 1 char deve retornar erro")
+        assertTrue("Nome com 1 char deve retornar erro", errors.isNotEmpty())
         val nomeError = errors.find { it.field == "payerNome" }
-        assertTrue(nomeError != null, "Deve existir erro no campo 'payerNome'")
+        assertTrue("Deve existir erro no campo 'payerNome'", nomeError != null)
     }
 
     @Test
     fun validatePayerInfo_nomeValido_semErros() {
         val errors = validator.validate(nome = "Maria Silva", cpf = null, email = null)
-        assertEquals(0, errors.size, "Nome válido não deve retornar erros")
+        assertEquals("Nome válido não deve retornar erros", 0, errors.size)
     }
 
     @Test
     fun validatePayerInfo_nomeMinimo_semErros() {
         val errors = validator.validate(nome = "Jo", cpf = null, email = null)
-        assertEquals(0, errors.size, "Nome com 2 chars é válido")
+        assertEquals("Nome com 2 chars é válido", 0, errors.size)
     }
 
     @Test
     fun validatePayerInfo_nomeMaximoExcedido_retornaErro() {
         val nomeLongo = "A".repeat(201)
         val errors = validator.validate(nome = nomeLongo, cpf = null, email = null)
-        assertTrue(errors.isNotEmpty(), "Nome com 201 chars deve retornar erro")
+        assertTrue("Nome com 201 chars deve retornar erro", errors.isNotEmpty())
         val nomeError = errors.find { it.field == "payerNome" }
-        assertTrue(nomeError != null, "Deve existir erro no campo 'payerNome'")
+        assertTrue("Deve existir erro no campo 'payerNome'", nomeError != null)
     }
 
     // ========================================
@@ -74,27 +75,27 @@ class PayerInfoValidatorTest {
     @Test
     fun validatePayerInfo_cpfNulo_semErros() {
         val errors = validator.validate(nome = "Maria Silva", cpf = null, email = null)
-        assertEquals(0, errors.size, "CPF nulo é válido (opcional)")
+        assertEquals("CPF nulo é válido (opcional)", 0, errors.size)
     }
 
     @Test
     fun validatePayerInfo_cpfValido_semErros() {
         val errors = validator.validate(nome = "Maria Silva", cpf = "52998224725", email = null)
-        assertEquals(0, errors.size, "CPF válido não deve retornar erros")
+        assertEquals("CPF válido não deve retornar erros", 0, errors.size)
     }
 
     @Test
     fun validatePayerInfo_cpfInvalido_retornaErro() {
         val errors = validator.validate(nome = "Maria Silva", cpf = "11111111111", email = null)
-        assertTrue(errors.isNotEmpty(), "CPF inválido deve retornar erro")
+        assertTrue("CPF inválido deve retornar erro", errors.isNotEmpty())
         val cpfError = errors.find { it.field == "payerCpf" }
-        assertTrue(cpfError != null, "Deve existir erro no campo 'payerCpf'")
+        assertTrue("Deve existir erro no campo 'payerCpf'", cpfError != null)
     }
 
     @Test
     fun validatePayerInfo_cpfFormatadoValido_semErros() {
         val errors = validator.validate(nome = "Maria Silva", cpf = "529.982.247-25", email = null)
-        assertEquals(0, errors.size, "CPF formatado válido não deve retornar erros")
+        assertEquals("CPF formatado válido não deve retornar erros", 0, errors.size)
     }
 
     // ========================================
@@ -104,21 +105,21 @@ class PayerInfoValidatorTest {
     @Test
     fun validatePayerInfo_emailNulo_semErros() {
         val errors = validator.validate(nome = "Maria Silva", cpf = null, email = null)
-        assertEquals(0, errors.size, "Email nulo é válido (opcional)")
+        assertEquals("Email nulo é válido (opcional)", 0, errors.size)
     }
 
     @Test
     fun validatePayerInfo_emailValido_semErros() {
         val errors = validator.validate(nome = "Maria Silva", cpf = null, email = "maria@exemplo.com")
-        assertEquals(0, errors.size, "Email válido não deve retornar erros")
+        assertEquals("Email válido não deve retornar erros", 0, errors.size)
     }
 
     @Test
     fun validatePayerInfo_emailInvalido_retornaErro() {
         val errors = validator.validate(nome = "Maria Silva", cpf = null, email = "email-invalido")
-        assertTrue(errors.isNotEmpty(), "Email inválido deve retornar erro")
+        assertTrue("Email inválido deve retornar erro", errors.isNotEmpty())
         val emailError = errors.find { it.field == "payerEmail" }
-        assertTrue(emailError != null, "Deve existir erro no campo 'payerEmail'")
+        assertTrue("Deve existir erro no campo 'payerEmail'", emailError != null)
     }
 
     // ========================================
@@ -128,7 +129,7 @@ class PayerInfoValidatorTest {
     @Test
     fun validatePayerInfo_apenasNomeInformado_semErros() {
         val errors = validator.validate(nome = "João Responsável", cpf = null, email = null)
-        assertEquals(0, errors.size, "Apenas nome (obrigatório) é suficiente")
+        assertEquals("Apenas nome (obrigatório) é suficiente", 0, errors.size)
     }
 
     @Test
@@ -138,6 +139,6 @@ class PayerInfoValidatorTest {
             cpf = "52998224725",
             email = "maria@exemplo.com"
         )
-        assertEquals(0, errors.size, "Todos os campos válidos não deve retornar erros")
+        assertEquals("Todos os campos válidos não deve retornar erros", 0, errors.size)
     }
 }

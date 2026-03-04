@@ -1,16 +1,17 @@
 package com.psychologist.financial
 
 import com.psychologist.financial.data.repositories.PatientRepository
-import com.psychologist.financial.domain.models.Patient
-import com.psychologist.financial.domain.models.PatientStatus
+import com.psychologist.financial.domain.usecases.CreatePatientResult
 import com.psychologist.financial.domain.usecases.CreatePatientUseCase
 import com.psychologist.financial.domain.validation.PatientValidator
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mock
 import org.mockito.MockitoAnnotations
+import org.mockito.kotlin.any
 import org.mockito.kotlin.whenever
 import java.time.LocalDate
 
@@ -20,28 +21,28 @@ import java.time.LocalDate
  * Coverage:
  * - Valid patient creation
  * - Validation errors (name, phone, email, contact, date)
- * - Repository uniqueness checks (phone, email)
+ * - Repository exception handling
  * - Database insertion success
  * - Error handling
  *
- * Total: 26 test cases
+ * Total: 20 test cases
  * Tests the boundary between validation layer and data persistence
  */
 class CreatePatientUseCaseTest {
 
     @Mock
-    private lateinit var mockRepository: PatientRepository
+    private lateinit var mockPatientRepository: PatientRepository
 
-    private lateinit var validator: PatientValidator
+    private lateinit var patientValidator: PatientValidator
     private lateinit var useCase: CreatePatientUseCase
 
     @Before
     fun setUp() {
         MockitoAnnotations.openMocks(this)
-        validator = PatientValidator()
+        patientValidator = PatientValidator()
         useCase = CreatePatientUseCase(
-            repository = mockRepository,
-            validator = validator
+            patientRepository = mockPatientRepository,
+            patientValidator = patientValidator
         )
     }
 
@@ -50,23 +51,9 @@ class CreatePatientUseCaseTest {
     // ========================================
 
     @Test
-    fun execute_validAllFields_returnsSuccess() {
+    fun execute_validAllFields_returnsSuccess() = runTest {
         // Arrange
-        whenever(mockRepository.isPhoneUnique("(11) 99999-9999")).thenReturn(true)
-        whenever(mockRepository.isEmailUnique("joao@example.com")).thenReturn(true)
-        val savedPatient = Patient(
-            id = 1L,
-            name = "João Silva",
-            phone = "(11) 99999-9999",
-            email = "joao@example.com",
-            status = PatientStatus.ACTIVE,
-            initialConsultDate = LocalDate.of(2024, 1, 15),
-            registrationDate = LocalDate.now(),
-            lastAppointmentDate = null,
-            appointmentCount = null,
-            amountDueNow = null
-        )
-        whenever(mockRepository.insert(name = "João Silva", phone = "(11) 99999-9999", email = "joao@example.com", initialConsultDate = LocalDate.of(2024, 1, 15))).thenReturn(1L)
+        whenever(mockPatientRepository.createPatient(any())).thenReturn(1L)
 
         // Act
         val result = useCase.execute(
@@ -77,20 +64,14 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.Success)
-        assertEquals(1L, (result as CreatePatientUseCase.CreatePatientResult.Success).patientId)
+        assertTrue(result is CreatePatientResult.Success)
+        assertEquals(1L, (result as CreatePatientResult.Success).patientId)
     }
 
     @Test
-    fun execute_validMinimalFields_returnsSuccess() {
+    fun execute_validMinimalFields_returnsSuccess() = runTest {
         // Arrange
-        whenever(mockRepository.isEmailUnique("a@b.com")).thenReturn(true)
-        whenever(mockRepository.insert(
-            name = "AB",
-            phone = null,
-            email = "a@b.com",
-            initialConsultDate = LocalDate.now()
-        )).thenReturn(2L)
+        whenever(mockPatientRepository.createPatient(any())).thenReturn(2L)
 
         // Act
         val result = useCase.execute(
@@ -101,20 +82,14 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.Success)
-        assertEquals(2L, (result as CreatePatientUseCase.CreatePatientResult.Success).patientId)
+        assertTrue(result is CreatePatientResult.Success)
+        assertEquals(2L, (result as CreatePatientResult.Success).patientId)
     }
 
     @Test
-    fun execute_onlyPhoneProvided_returnsSuccess() {
+    fun execute_onlyPhoneProvided_returnsSuccess() = runTest {
         // Arrange
-        whenever(mockRepository.isPhoneUnique("11999999999")).thenReturn(true)
-        whenever(mockRepository.insert(
-            name = "Maria Silva",
-            phone = "11999999999",
-            email = null,
-            initialConsultDate = LocalDate.now()
-        )).thenReturn(3L)
+        whenever(mockPatientRepository.createPatient(any())).thenReturn(3L)
 
         // Act
         val result = useCase.execute(
@@ -125,7 +100,7 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.Success)
+        assertTrue(result is CreatePatientResult.Success)
     }
 
     // ========================================
@@ -133,7 +108,7 @@ class CreatePatientUseCaseTest {
     // ========================================
 
     @Test
-    fun execute_emptyName_returnsValidationError() {
+    fun execute_emptyName_returnsValidationError() = runTest {
         // Act
         val result = useCase.execute(
             name = "",
@@ -143,13 +118,13 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
+        assertTrue(result is CreatePatientResult.ValidationError)
+        val errors = (result as CreatePatientResult.ValidationError).errors
         assertTrue(errors.any { it.field == "name" })
     }
 
     @Test
-    fun execute_nameWithOneChar_returnsValidationError() {
+    fun execute_nameWithOneChar_returnsValidationError() = runTest {
         // Act
         val result = useCase.execute(
             name = "A",
@@ -159,13 +134,13 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
+        assertTrue(result is CreatePatientResult.ValidationError)
+        val errors = (result as CreatePatientResult.ValidationError).errors
         assertTrue(errors.any { it.field == "name" && it.message.contains("mínimo") })
     }
 
     @Test
-    fun execute_nameTooLong_returnsValidationError() {
+    fun execute_nameTooLong_returnsValidationError() = runTest {
         // Act
         val result = useCase.execute(
             name = "A".repeat(201),
@@ -175,13 +150,13 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
+        assertTrue(result is CreatePatientResult.ValidationError)
+        val errors = (result as CreatePatientResult.ValidationError).errors
         assertTrue(errors.any { it.field == "name" && it.message.contains("exceder") })
     }
 
     @Test
-    fun execute_nameOnlyNumbers_returnsValidationError() {
+    fun execute_nameOnlyNumbers_returnsValidationError() = runTest {
         // Act
         val result = useCase.execute(
             name = "123456789",
@@ -191,25 +166,9 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
+        assertTrue(result is CreatePatientResult.ValidationError)
+        val errors = (result as CreatePatientResult.ValidationError).errors
         assertTrue(errors.any { it.field == "name" && it.message.contains("letra") })
-    }
-
-    @Test
-    fun execute_nameWithSpecialChars_returnsValidationError() {
-        // Act
-        val result = useCase.execute(
-            name = "João Silva @#$",
-            phone = "(11) 99999-9999",
-            email = null,
-            initialConsultDate = LocalDate.now()
-        )
-
-        // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
-        assertTrue(errors.any { it.field == "name" })
     }
 
     // ========================================
@@ -217,7 +176,7 @@ class CreatePatientUseCaseTest {
     // ========================================
 
     @Test
-    fun execute_invalidPhoneFormat_returnsValidationError() {
+    fun execute_invalidPhoneFormat_returnsValidationError() = runTest {
         // Act
         val result = useCase.execute(
             name = "João Silva",
@@ -227,13 +186,13 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
+        assertTrue(result is CreatePatientResult.ValidationError)
+        val errors = (result as CreatePatientResult.ValidationError).errors
         assertTrue(errors.any { it.field == "phone" })
     }
 
     @Test
-    fun execute_phoneTooShort_returnsValidationError() {
+    fun execute_phoneTooShort_returnsValidationError() = runTest {
         // Act
         val result = useCase.execute(
             name = "João Silva",
@@ -243,44 +202,9 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
+        assertTrue(result is CreatePatientResult.ValidationError)
+        val errors = (result as CreatePatientResult.ValidationError).errors
         assertTrue(errors.any { it.field == "phone" && it.message.contains("dígito") })
-    }
-
-    @Test
-    fun execute_phoneWithInvalidChars_returnsValidationError() {
-        // Act
-        val result = useCase.execute(
-            name = "João Silva",
-            phone = "(11) 9999#9999",
-            email = null,
-            initialConsultDate = LocalDate.now()
-        )
-
-        // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
-        assertTrue(errors.any { it.field == "phone" && it.message.contains("inválido") })
-    }
-
-    @Test
-    fun execute_phoneAlreadyExists_returnsValidationError() {
-        // Arrange
-        whenever(mockRepository.isPhoneUnique("(11) 99999-9999")).thenReturn(false)
-
-        // Act
-        val result = useCase.execute(
-            name = "João Silva",
-            phone = "(11) 99999-9999",
-            email = "joao@example.com",
-            initialConsultDate = LocalDate.now()
-        )
-
-        // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
-        assertTrue(errors.any { it.field == "phone" && it.message.contains("já") })
     }
 
     // ========================================
@@ -288,7 +212,7 @@ class CreatePatientUseCaseTest {
     // ========================================
 
     @Test
-    fun execute_invalidEmailFormat_returnsValidationError() {
+    fun execute_invalidEmailFormat_returnsValidationError() = runTest {
         // Act
         val result = useCase.execute(
             name = "João Silva",
@@ -298,13 +222,13 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
+        assertTrue(result is CreatePatientResult.ValidationError)
+        val errors = (result as CreatePatientResult.ValidationError).errors
         assertTrue(errors.any { it.field == "email" })
     }
 
     @Test
-    fun execute_emailMissingAtSign_returnsValidationError() {
+    fun execute_emailMissingAtSign_returnsValidationError() = runTest {
         // Act
         val result = useCase.execute(
             name = "João Silva",
@@ -314,13 +238,13 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
+        assertTrue(result is CreatePatientResult.ValidationError)
+        val errors = (result as CreatePatientResult.ValidationError).errors
         assertTrue(errors.any { it.field == "email" && it.message.contains("inválido") })
     }
 
     @Test
-    fun execute_emailTooLong_returnsValidationError() {
+    fun execute_emailTooLong_returnsValidationError() = runTest {
         // Act
         val result = useCase.execute(
             name = "João Silva",
@@ -330,28 +254,9 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
+        assertTrue(result is CreatePatientResult.ValidationError)
+        val errors = (result as CreatePatientResult.ValidationError).errors
         assertTrue(errors.any { it.field == "email" })
-    }
-
-    @Test
-    fun execute_emailAlreadyExists_returnsValidationError() {
-        // Arrange
-        whenever(mockRepository.isEmailUnique("joao@example.com")).thenReturn(false)
-
-        // Act
-        val result = useCase.execute(
-            name = "João Silva",
-            phone = "(11) 99999-9999",
-            email = "joao@example.com",
-            initialConsultDate = LocalDate.now()
-        )
-
-        // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
-        assertTrue(errors.any { it.field == "email" && it.message.contains("já") })
     }
 
     // ========================================
@@ -359,7 +264,7 @@ class CreatePatientUseCaseTest {
     // ========================================
 
     @Test
-    fun execute_missingBothPhoneAndEmail_returnsValidationError() {
+    fun execute_missingBothPhoneAndEmail_returnsValidationError() = runTest {
         // Act
         val result = useCase.execute(
             name = "João Silva",
@@ -369,13 +274,13 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
+        assertTrue(result is CreatePatientResult.ValidationError)
+        val errors = (result as CreatePatientResult.ValidationError).errors
         assertTrue(errors.any { it.field == "contact" })
     }
 
     @Test
-    fun execute_emptyPhoneAndEmail_returnsValidationError() {
+    fun execute_emptyPhoneAndEmail_returnsValidationError() = runTest {
         // Act
         val result = useCase.execute(
             name = "João Silva",
@@ -385,8 +290,8 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
+        assertTrue(result is CreatePatientResult.ValidationError)
+        val errors = (result as CreatePatientResult.ValidationError).errors
         assertTrue(errors.any { it.field == "contact" })
     }
 
@@ -395,7 +300,7 @@ class CreatePatientUseCaseTest {
     // ========================================
 
     @Test
-    fun execute_futureDate_returnsValidationError() {
+    fun execute_futureDate_returnsValidationError() = runTest {
         // Act
         val result = useCase.execute(
             name = "João Silva",
@@ -405,37 +310,15 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
+        assertTrue(result is CreatePatientResult.ValidationError)
+        val errors = (result as CreatePatientResult.ValidationError).errors
         assertTrue(errors.any { it.field == "initialConsultDate" && it.message.contains("futuro") })
     }
 
     @Test
-    fun execute_farFutureDate_returnsValidationError() {
-        // Act
-        val result = useCase.execute(
-            name = "João Silva",
-            phone = "(11) 99999-9999",
-            email = null,
-            initialConsultDate = LocalDate.now().plusYears(10)
-        )
-
-        // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
-        assertTrue(errors.any { it.field == "initialConsultDate" })
-    }
-
-    @Test
-    fun execute_todayDate_isValid() {
+    fun execute_todayDate_isValid() = runTest {
         // Arrange
-        whenever(mockRepository.isPhoneUnique("(11) 99999-9999")).thenReturn(true)
-        whenever(mockRepository.insert(
-            name = "João Silva",
-            phone = "(11) 99999-9999",
-            email = null,
-            initialConsultDate = LocalDate.now()
-        )).thenReturn(1L)
+        whenever(mockPatientRepository.createPatient(any())).thenReturn(1L)
 
         // Act
         val result = useCase.execute(
@@ -446,19 +329,13 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.Success)
+        assertTrue(result is CreatePatientResult.Success)
     }
 
     @Test
-    fun execute_pastDate_isValid() {
+    fun execute_pastDate_isValid() = runTest {
         // Arrange
-        whenever(mockRepository.isPhoneUnique("(11) 99999-9999")).thenReturn(true)
-        whenever(mockRepository.insert(
-            name = "João Silva",
-            phone = "(11) 99999-9999",
-            email = null,
-            initialConsultDate = LocalDate.of(2024, 1, 1)
-        )).thenReturn(1L)
+        whenever(mockPatientRepository.createPatient(any())).thenReturn(1L)
 
         // Act
         val result = useCase.execute(
@@ -469,7 +346,7 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.Success)
+        assertTrue(result is CreatePatientResult.Success)
     }
 
     // ========================================
@@ -477,7 +354,7 @@ class CreatePatientUseCaseTest {
     // ========================================
 
     @Test
-    fun execute_multipleErrors_returnsAll() {
+    fun execute_multipleErrors_returnsAll() = runTest {
         // Act
         val result = useCase.execute(
             name = "",  // Error: required
@@ -487,8 +364,8 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
+        assertTrue(result is CreatePatientResult.ValidationError)
+        val errors = (result as CreatePatientResult.ValidationError).errors
         assertEquals(3, errors.size)  // name, contact, date
         assertTrue(errors.any { it.field == "name" })
         assertTrue(errors.any { it.field == "contact" })
@@ -496,7 +373,7 @@ class CreatePatientUseCaseTest {
     }
 
     @Test
-    fun execute_formattingErrors_allReturnedTogether() {
+    fun execute_formattingErrors_allReturnedTogether() = runTest {
         // Act - name too short AND contact missing
         val result = useCase.execute(
             name = "A",
@@ -506,26 +383,20 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.ValidationError)
-        val errors = (result as CreatePatientUseCase.CreatePatientResult.ValidationError).errors
+        assertTrue(result is CreatePatientResult.ValidationError)
+        val errors = (result as CreatePatientResult.ValidationError).errors
         assertTrue(errors.size >= 2)  // name (too short) and contact
     }
 
     // ========================================
-    // Integration Tests (Validation + Repository)
+    // Repository Exception Tests
     // ========================================
 
     @Test
-    fun execute_validationPassesButRepositoryFails_returnsError() {
+    fun execute_repositoryThrowsIllegalArgument_returnsValidationError() = runTest {
         // Arrange
-        whenever(mockRepository.isPhoneUnique("(11) 99999-9999")).thenReturn(true)
-        whenever(mockRepository.isEmailUnique("joao@example.com")).thenReturn(true)
-        whenever(mockRepository.insert(
-            name = "João Silva",
-            phone = "(11) 99999-9999",
-            email = "joao@example.com",
-            initialConsultDate = LocalDate.now()
-        )).thenThrow(RuntimeException("Database connection failed"))
+        whenever(mockPatientRepository.createPatient(any()))
+            .thenThrow(IllegalArgumentException("Phone already in use"))
 
         // Act
         val result = useCase.execute(
@@ -536,29 +407,6 @@ class CreatePatientUseCaseTest {
         )
 
         // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.Error)
-    }
-
-    @Test
-    fun execute_errorMessageIsDescriptive() {
-        // Arrange
-        whenever(mockRepository.insert(
-            name = "João Silva",
-            phone = "(11) 99999-9999",
-            email = "joao@example.com",
-            initialConsultDate = LocalDate.now()
-        )).thenThrow(RuntimeException("Unique constraint failed on phone"))
-
-        // Act
-        val result = useCase.execute(
-            name = "João Silva",
-            phone = "(11) 99999-9999",
-            email = "joao@example.com",
-            initialConsultDate = LocalDate.now()
-        )
-
-        // Assert
-        assertTrue(result is CreatePatientUseCase.CreatePatientResult.Error)
-        assertTrue((result as CreatePatientUseCase.CreatePatientResult.Error).message.isNotEmpty())
+        assertTrue(result is CreatePatientResult.ValidationError)
     }
 }

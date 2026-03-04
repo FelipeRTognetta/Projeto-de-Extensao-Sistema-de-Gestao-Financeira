@@ -82,7 +82,7 @@ class CreatePaymentUseCaseTest {
     fun `execute with valid data returns Success`() = runTest {
         whenever(mockPaymentValidator.validateNewPayment(any(), any(), any(), any(), any()))
             .thenReturn(emptyList())
-        whenever(mockPatientRepository.getById(1L)).thenReturn(activePatient)
+        whenever(mockPatientRepository.getPatient(1L)).thenReturn(activePatient)
         whenever(mockPaymentRepository.insert(any(), any(), any(), any(), any(), any()))
             .thenReturn(99L)
 
@@ -102,7 +102,7 @@ class CreatePaymentUseCaseTest {
     fun `execute with optional appointmentId links payment to appointment`() = runTest {
         whenever(mockPaymentValidator.validateNewPayment(any(), any(), any(), any(), any()))
             .thenReturn(emptyList())
-        whenever(mockPatientRepository.getById(1L)).thenReturn(activePatient)
+        whenever(mockPatientRepository.getPatient(1L)).thenReturn(activePatient)
         whenever(mockPaymentRepository.insert(any(), any(), any(), any(), any(), any()))
             .thenReturn(5L)
 
@@ -122,7 +122,7 @@ class CreatePaymentUseCaseTest {
     fun `execute with PENDING status creates valid payment`() = runTest {
         whenever(mockPaymentValidator.validateNewPayment(any(), any(), any(), any(), any()))
             .thenReturn(emptyList())
-        whenever(mockPatientRepository.getById(1L)).thenReturn(activePatient)
+        whenever(mockPatientRepository.getPatient(1L)).thenReturn(activePatient)
         whenever(mockPaymentRepository.insert(any(), any(), any(), any(), any(), any()))
             .thenReturn(3L)
 
@@ -197,7 +197,7 @@ class CreatePaymentUseCaseTest {
     fun `execute returns ValidationError when patient not found`() = runTest {
         whenever(mockPaymentValidator.validateNewPayment(any(), any(), any(), any(), any()))
             .thenReturn(emptyList())
-        whenever(mockPatientRepository.getById(999L)).thenReturn(null)
+        whenever(mockPatientRepository.getPatient(999L)).thenReturn(null)
 
         val result = useCase.execute(
             patientId = 999L,
@@ -219,7 +219,7 @@ class CreatePaymentUseCaseTest {
     fun `execute returns ValidationError for inactive patient`() = runTest {
         whenever(mockPaymentValidator.validateNewPayment(any(), any(), any(), any(), any()))
             .thenReturn(emptyList())
-        whenever(mockPatientRepository.getById(2L)).thenReturn(inactivePatient)
+        whenever(mockPatientRepository.getPatient(2L)).thenReturn(inactivePatient)
 
         val result = useCase.execute(
             patientId = 2L,
@@ -242,7 +242,7 @@ class CreatePaymentUseCaseTest {
     fun `execute returns ValidationError on IllegalArgumentException from repository`() = runTest {
         whenever(mockPaymentValidator.validateNewPayment(any(), any(), any(), any(), any()))
             .thenReturn(emptyList())
-        whenever(mockPatientRepository.getById(1L)).thenReturn(activePatient)
+        whenever(mockPatientRepository.getPatient(1L)).thenReturn(activePatient)
         whenever(mockPaymentRepository.insert(any(), any(), any(), any(), any(), any()))
             .thenThrow(IllegalArgumentException("Dados inválidos"))
 
@@ -265,7 +265,7 @@ class CreatePaymentUseCaseTest {
     fun `executeWithObject delegates to execute`() = runTest {
         whenever(mockPaymentValidator.validateNewPayment(any(), any(), any(), any(), any()))
             .thenReturn(emptyList())
-        whenever(mockPatientRepository.getById(1L)).thenReturn(activePatient)
+        whenever(mockPatientRepository.getPatient(1L)).thenReturn(activePatient)
         whenever(mockPaymentRepository.insert(any(), any(), any(), any(), any(), any()))
             .thenReturn(7L)
 
@@ -291,7 +291,7 @@ class CreatePaymentUseCaseTest {
     fun `validate returns empty list for valid payment`() = runTest {
         whenever(mockPaymentValidator.validateNewPayment(any(), any(), any(), any(), any()))
             .thenReturn(emptyList())
-        whenever(mockPatientRepository.getById(1L)).thenReturn(activePatient)
+        whenever(mockPatientRepository.getPatient(1L)).thenReturn(activePatient)
 
         val errors = useCase.validate(
             patientId = 1L,
@@ -308,7 +308,7 @@ class CreatePaymentUseCaseTest {
     fun `validate returns errors for inactive patient`() = runTest {
         whenever(mockPaymentValidator.validateNewPayment(any(), any(), any(), any(), any()))
             .thenReturn(emptyList())
-        whenever(mockPatientRepository.getById(2L)).thenReturn(inactivePatient)
+        whenever(mockPatientRepository.getPatient(2L)).thenReturn(inactivePatient)
 
         val errors = useCase.validate(
             patientId = 2L,
@@ -326,7 +326,7 @@ class CreatePaymentUseCaseTest {
     fun `validate returns errors for missing patient`() = runTest {
         whenever(mockPaymentValidator.validateNewPayment(any(), any(), any(), any(), any()))
             .thenReturn(emptyList())
-        whenever(mockPatientRepository.getById(999L)).thenReturn(null)
+        whenever(mockPatientRepository.getPatient(999L)).thenReturn(null)
 
         val errors = useCase.validate(
             patientId = 999L,

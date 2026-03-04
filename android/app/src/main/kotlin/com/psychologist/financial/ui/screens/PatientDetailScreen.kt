@@ -197,6 +197,9 @@ private fun PatientDetailContent(
         // Contact information
         ContactCard(patient)
 
+        // Responsável Financeiro — shown only when naoPagante=true
+        PatientDetailPayerSection(patient)
+
         // Status and dates
         StatusCard(patient)
 
@@ -321,6 +324,56 @@ private fun PatientHeader(patient: Patient) {
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
             )
+        }
+    }
+}
+
+/**
+ * Responsável Financeiro (Payer Information) card.
+ *
+ * Displayed only when [patient.naoPagante] is true and [patient.payerInfo] is not null.
+ * Shows all non-null fields: nome, CPF (formatted), endereço, e-mail, telefone.
+ * Exposed as `internal` so Compose UI tests can render it directly.
+ */
+@Composable
+internal fun PatientDetailPayerSection(patient: Patient) {
+    if (!patient.naoPagante || patient.payerInfo == null) return
+
+    val payer = patient.payerInfo
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Responsável Financeiro",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+
+            ContactRow(label = "Nome", value = payer.nome)
+
+            payer.getFormattedCpf()?.let {
+                ContactRow(label = "CPF", value = it)
+            }
+
+            if (!payer.endereco.isNullOrEmpty()) {
+                ContactRow(label = "Endereço", value = payer.endereco)
+            }
+
+            if (!payer.email.isNullOrEmpty()) {
+                ContactRow(label = "Email", value = payer.email)
+            }
+
+            if (!payer.telefone.isNullOrEmpty()) {
+                ContactRow(label = "Telefone", value = payer.telefone)
+            }
         }
     }
 }
