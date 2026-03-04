@@ -202,6 +202,36 @@ data class PatientEntity(
     val lastAppointmentDate: LocalDate? = null,
 
     /**
+     * Patient CPF (Brazilian tax ID)
+     *
+     * Optional field. When provided, must be unique across all patients.
+     * Stored as 11 raw digits (e.g., "12345678909").
+     * Uniqueness enforced by partial index idx_patient_cpf (WHERE cpf IS NOT NULL)
+     * and application-level check via PatientDao.isCpfInUse().
+     * Display with mask XXX.XXX.XXX-XX applied at UI layer only.
+     */
+    @ColumnInfo(name = "cpf")
+    val cpf: String? = null,
+
+    /**
+     * Patient address
+     *
+     * Optional free-text field. No structure enforced.
+     */
+    @ColumnInfo(name = "endereco")
+    val endereco: String? = null,
+
+    /**
+     * Whether the patient is a non-paying patient
+     *
+     * When true, a Responsável Financeiro (PayerInfo) must be associated.
+     * Default false — most patients pay directly.
+     * Stored as INTEGER (0 = false, 1 = true).
+     */
+    @ColumnInfo(name = "nao_pagante")
+    val naoPagante: Boolean = false,
+
+    /**
      * Creation timestamp (from BaseEntity)
      *
      * When this record was created in database.

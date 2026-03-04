@@ -424,6 +424,29 @@ interface PatientDao {
     )
     suspend fun isEmailInUse(email: String, excludePatientId: Long = 0): Boolean
 
+    /**
+     * Check if a CPF is already in use by another patient.
+     *
+     * Used for application-level uniqueness validation before INSERT/UPDATE,
+     * complementing the partial unique index idx_patient_cpf in the database.
+     *
+     * @param cpf CPF to check (11 raw digits, no mask)
+     * @param excludePatientId Exclude this patient's ID from the check (for updates)
+     * @return true if the CPF is already registered to a different patient
+     *
+     * Example:
+     * ```kotlin
+     * val cpfExists = patientDao.isCpfInUse("12345678909", excludePatientId = currentId)
+     * ```
+     */
+    @Query(
+        """
+        SELECT COUNT(*) > 0 FROM patient
+        WHERE cpf = :cpf AND id != :excludePatientId
+        """
+    )
+    suspend fun isCpfInUse(cpf: String, excludePatientId: Long = 0): Boolean
+
     // ========================================
     // UPDATE Operations
     // ========================================

@@ -131,6 +131,36 @@ data class Patient(
     val createdDate: LocalDateTime = LocalDateTime.now(),
 
     /**
+     * Patient CPF (Brazilian tax ID)
+     *
+     * Optional. Stored as 11 raw digits. Displayed with mask XXX.XXX.XXX-XX in the UI.
+     * Unique per patient when provided.
+     */
+    val cpf: String? = null,
+
+    /**
+     * Patient address
+     *
+     * Optional free-text field.
+     */
+    val endereco: String? = null,
+
+    /**
+     * Whether the patient is a non-paying patient
+     *
+     * When true, a PayerInfo (Responsável Financeiro) is associated with this patient.
+     */
+    val naoPagante: Boolean = false,
+
+    /**
+     * Responsável Financeiro (payer information)
+     *
+     * Populated when naoPagante = true. Null otherwise.
+     * Loaded alongside the patient when naoPagante is true.
+     */
+    val payerInfo: PayerInfo? = null,
+
+    /**
      * Number of appointments (derived)
      *
      * Optional - loaded separately from appointments table.
