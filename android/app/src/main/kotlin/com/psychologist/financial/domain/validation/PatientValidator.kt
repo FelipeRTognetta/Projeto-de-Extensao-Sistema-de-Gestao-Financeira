@@ -327,6 +327,73 @@ class PatientValidator {
     }
 
     /**
+     * Validate Brazilian CPF (Cadastro de Pessoas Físicas)
+     *
+     * Rules:
+     * - Optional (null or empty → valid, no errors returned)
+     * - Accepts raw digits ("12345678909") or masked format ("123.456.789-09")
+     * - After stripping non-digits: must be exactly 11 digits
+     * - All-same-digit sequences (e.g., "11111111111") → invalid
+     * - Must pass modulo-11 check digit algorithm
+     *
+     * Algorithm:
+     * 1. Strip all non-digit characters
+     * 2. Validate length == 11
+     * 3. Reject all-same-digit sequences
+     * 4. First check digit (pos 9):
+     *    sum = digits[0..8] × weights[10..2]; rem = sum % 11
+     *    expected = if (rem < 2) 0 else (11 - rem)
+     * 5. Second check digit (pos 10):
+     *    sum = digits[0..9] × weights[11..2]; rem = sum % 11
+     *    expected = if (rem < 2) 0 else (11 - rem)
+     *
+     * @param cpf CPF to validate (raw digits or formatted; null/empty is valid)
+     * @return List of ValidationError (empty if valid)
+     *
+     * Example:
+     * ```kotlin
+     * validator.validateCpf("123.456.789-09")  // → empty (valid)
+     * validator.validateCpf("11111111111")      // → error (all same digits)
+     * validator.validateCpf(null)               // → empty (optional field)
+     * ```
+     */
+    fun validateCpf(cpf: String?): List<ValidationError> {
+        if (cpf.isNullOrEmpty()) return emptyList()
+
+        val digits = cpf.filter { it.isDigit() }
+
+        if (digits.length != 11) {
+            return listOf(
+                ValidationError(field = "cpf", message = "CPF deve conter 11 dígitos")
+            )
+        }
+
+        if (digits.all { it == digits[0] }) {
+            return listOf(
+                ValidationError(field = "cpf", message = "CPF inválido")
+            )
+        }
+
+        val intDigits = digits.map { it.digitToInt() }
+
+        val firstSum = (0..8).sumOf { intDigits[it] * (10 - it) }
+        val firstRem = firstSum % 11
+        val expectedFirst = if (firstRem < 2) 0 else 11 - firstRem
+        if (intDigits[9] != expectedFirst) {
+            return listOf(ValidationError(field = "cpf", message = "CPF inválido"))
+        }
+
+        val secondSum = (0..9).sumOf { intDigits[it] * (11 - it) }
+        val secondRem = secondSum % 11
+        val expectedSecond = if (secondRem < 2) 0 else 11 - secondRem
+        if (intDigits[10] != expectedSecond) {
+            return listOf(ValidationError(field = "cpf", message = "CPF inválido"))
+        }
+
+        return emptyList()
+    }
+
+    /**
      * Validate patient update (same as new, but with id)
      *
      * For future use when implementing patient edit.

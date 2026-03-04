@@ -354,6 +354,18 @@ private fun ContactCard(patient: Patient) {
                 ContactRow(label = "Email", value = patient.email)
             }
 
+            if (!patient.cpf.isNullOrEmpty()) {
+                val digits = patient.cpf.filter { it.isDigit() }
+                val formatted = if (digits.length == 11) {
+                    "${digits.substring(0, 3)}.${digits.substring(3, 6)}.${digits.substring(6, 9)}-${digits.substring(9)}"
+                } else digits
+                ContactRow(label = "CPF", value = formatted)
+            }
+
+            if (!patient.endereco.isNullOrEmpty()) {
+                ContactRow(label = "Endereço", value = patient.endereco)
+            }
+
             if (patient.phone.isNullOrEmpty() && patient.email.isNullOrEmpty()) {
                 Text(
                     text = "Sem contato registrado",

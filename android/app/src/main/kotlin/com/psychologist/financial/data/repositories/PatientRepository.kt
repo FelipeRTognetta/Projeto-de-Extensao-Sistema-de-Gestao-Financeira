@@ -110,6 +110,13 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
                 }
             }
 
+            // Check CPF uniqueness
+            if (!patient.cpf.isNullOrEmpty()) {
+                if (patientDao.isCpfInUse(patient.cpf, excludePatientId = 0)) {
+                    throw IllegalArgumentException("CPF already in use: ${patient.cpf}")
+                }
+            }
+
             // Convert domain model to entity and insert
             val entity = patient.toEntity()
             val generatedId = patientDao.insert(entity)
@@ -380,6 +387,13 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
                 }
             }
 
+            // Check CPF uniqueness (exclude self)
+            if (!patient.cpf.isNullOrEmpty()) {
+                if (patientDao.isCpfInUse(patient.cpf, excludePatientId = patient.id)) {
+                    throw IllegalArgumentException("CPF already in use: ${patient.cpf}")
+                }
+            }
+
             val entity = patient.toEntity()
             patientDao.update(entity)
             AppLogger.d(TAG, "Patient updated: id=${patient.id}, name=${patient.name}")
@@ -511,7 +525,10 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
             initialConsultDate = this.initialConsultDate,
             registrationDate = this.registrationDate,
             lastAppointmentDate = this.lastAppointmentDate,
-            createdDate = this.createdDate
+            createdDate = this.createdDate,
+            cpf = this.cpf,
+            endereco = this.endereco,
+            naoPagante = this.naoPagante
         )
     }
 
@@ -530,7 +547,10 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
             initialConsultDate = this.initialConsultDate,
             registrationDate = this.registrationDate,
             lastAppointmentDate = this.lastAppointmentDate,
-            createdDate = this.createdDate
+            createdDate = this.createdDate,
+            cpf = this.cpf,
+            endereco = this.endereco,
+            naoPagante = this.naoPagante
         )
     }
 }
