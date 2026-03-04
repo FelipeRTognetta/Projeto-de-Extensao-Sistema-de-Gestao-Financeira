@@ -253,7 +253,8 @@ object AppModule {
     fun providePaymentViewModel(): PaymentViewModel = PaymentViewModel(
         repository = paymentRepository,
         getPatientPaymentsUseCase = getPatientPaymentsUseCase,
-        createPaymentUseCase = createPaymentUseCase
+        createPaymentUseCase = createPaymentUseCase,
+        getPatientAppointmentsUseCase = getPatientAppointmentsUseCase
     )
 
     fun provideDashboardViewModel(): DashboardViewModel = DashboardViewModel(

@@ -1,5 +1,7 @@
 package com.psychologist.financial.ui.screens
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,14 +11,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,68 +36,95 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.psychologist.financial.domain.models.Appointment
 import com.psychologist.financial.ui.components.ErrorBanner
 import com.psychologist.financial.viewmodel.PaymentViewModel
 import com.psychologist.financial.viewmodel.PaymentViewState
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 /**
- * Payment creation form screen
+ * Format a raw centavos digit string to currency display.
+ *
+ * Examples:
+ *   "0"     → "R$ 0,00"
+ *   "1"     → "R$ 0,01"
+ *   "150"   → "R$ 1,50"
+ *   "15000" → "R$ 150,00"
+ *   "1500000" → "R$ 15.000,00"
+ */
+private fun formatCurrencyMask(digits: String): String {
+    val long = digits.filter { it.isDigit() }.toLongOrNull() ?: 0L
+    val cents = long % 100
+    val integer = long / 100
+    val intStr = integer.toString()
+    val withSeparators = if (intStr.length > 3) {
+        intStr.reversed().chunked(3).joinToString(".").reversed()
+    } else {
+        intStr
+    }
+    return "R$ $withSeparators,${"%02d".format(cents)}"
+}
+
+/**
+ * Payment creation/edit form screen
  *
  * Features:
- * - Amount input (decimal) with validation
- * - Date picker for payment date
+ * - Amount input (decimal) with validation — accepts both dot and comma (e.g. "150.00" or "150,00")
+ * - Date picker dialog for payment date
  * - Payment method selector (dropdown)
  * - Payment status selector (PAID/PENDING)
- * - Optional appointment linker
+ * - Optional appointment linker with picker dialog
  * - Real-time validation with error feedback
  * - Submit button
  * - Loading state during submission
  * - Success/error messages
  *
- * Navigation:
- * - Back button → PaymentListScreen
- * - Submit → PaymentListScreen (on success)
- *
- * Usage:
- * ```kotlin
- * PaymentFormScreen(
- *     viewModel = paymentViewModel,
- *     patientId = 1L,
- *     onSuccess = { navigateBack() },
- *     onCancel = { navigateBack() }
- * )
- * ```
- *
- * @param viewModel PaymentViewModel for form state
- * @param patientId Patient ID to create payment for
- * @param onSuccess Callback when payment created successfully
- * @param onCancel Callback when user cancels (back button)
+ * @param paymentId When non-null, operates in edit mode — pre-populates the form with existing data
  */
 @Composable
 fun PaymentFormScreen(
     viewModel: PaymentViewModel,
     patientId: Long,
+    paymentId: Long? = null,
     onSuccess: () -> Unit,
     onCancel: () -> Unit
 ) {
+    val isEditMode = paymentId != null
+
     val formState = viewModel.createFormState.collectAsState().value
     val formAmount = viewModel.formAmount.collectAsState().value
     val formDate = viewModel.formDate.collectAsState().value
     val formMethod = viewModel.formMethod.collectAsState().value
     val formStatus = viewModel.formStatus.collectAsState().value
     val formAppointmentId = viewModel.formAppointmentId.collectAsState().value
+    val patientAppointments = viewModel.patientAppointments.collectAsState().value
     val isSubmitting = formState.isSubmitting
+
+    // Load existing payment for editing, and appointments for picker
+    LaunchedEffect(patientId, paymentId) {
+        viewModel.loadAppointmentsForPatient(patientId)
+        if (paymentId != null) {
+            viewModel.loadPaymentForEdit(paymentId)
+        } else {
+            viewModel.resetForm()
+        }
+    }
 
     // Handle success navigation
     when (val result = formState.submissionResult) {
@@ -108,7 +143,7 @@ fun PaymentFormScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Novo Pagamento") },
+                title = { Text(if (isEditMode) "Editar Pagamento" else "Novo Pagamento") },
                 navigationIcon = {
                     IconButton(onClick = onCancel) {
                         Icon(Icons.Default.ArrowBack, "Voltar")
@@ -134,23 +169,26 @@ fun PaymentFormScreen(
                 formMethod = formMethod,
                 formStatus = formStatus,
                 formAppointmentId = formAppointmentId,
+                patientAppointments = patientAppointments,
                 isSubmitting = isSubmitting,
                 onAmountChange = { viewModel.setFormAmount(it) },
                 onDateChange = { viewModel.setFormDate(it) },
                 onMethodChange = { viewModel.setFormMethod(it) },
                 onStatusChange = { viewModel.setFormStatus(it) },
                 onAppointmentIdChange = { viewModel.setFormAppointmentId(it) },
-                onSubmit = { viewModel.submitCreatePaymentForm(patientId) },
-                onCancel = onCancel,
-                onValidate = { viewModel.validateForm(patientId) }
+                onSubmit = {
+                    if (isEditMode && paymentId != null) {
+                        viewModel.submitUpdatePaymentForm(paymentId, patientId)
+                    } else {
+                        viewModel.submitCreatePaymentForm(patientId)
+                    }
+                },
+                onCancel = onCancel
             )
         }
     }
 }
 
-/**
- * Form content (fields and buttons)
- */
 @Composable
 private fun FormContent(
     formState: PaymentViewState.CreatePaymentState,
@@ -159,6 +197,7 @@ private fun FormContent(
     formMethod: String,
     formStatus: String,
     formAppointmentId: Long?,
+    patientAppointments: List<Appointment>,
     isSubmitting: Boolean,
     onAmountChange: (String) -> Unit,
     onDateChange: (LocalDate) -> Unit,
@@ -166,13 +205,88 @@ private fun FormContent(
     onStatusChange: (String) -> Unit,
     onAppointmentIdChange: (Long?) -> Unit,
     onSubmit: () -> Unit,
-    onCancel: () -> Unit,
-    onValidate: () -> Unit
+    onCancel: () -> Unit
 ) {
     val methodDropdownExpanded = remember { mutableStateOf(false) }
     val statusDropdownExpanded = remember { mutableStateOf(false) }
     val methods = listOf("Dinheiro", "Débito", "Crédito", "Pix", "Cheque", "Outro")
-    val statuses = listOf("PAID", "PENDING")
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showAppointmentPicker by remember { mutableStateOf(false) }
+
+    val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+
+    // DatePickerDialog
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = formDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val millis = datePickerState.selectedDateMillis
+                    if (millis != null) {
+                        onDateChange(
+                            Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+                        )
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    // Appointment picker dialog
+    if (showAppointmentPicker) {
+        AlertDialog(
+            onDismissRequest = { showAppointmentPicker = false },
+            title = { Text("Selecionar Consulta") },
+            text = {
+                if (patientAppointments.isEmpty()) {
+                    Text("Nenhuma consulta encontrada para este paciente.")
+                } else {
+                    Column {
+                        patientAppointments.forEach { appointment ->
+                            val label = "${appointment.date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))} às ${appointment.displayTime} (${appointment.durationMinutes}min)"
+                            Text(
+                                text = label,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onAppointmentIdChange(appointment.id)
+                                        showAppointmentPicker = false
+                                    }
+                                    .padding(vertical = 12.dp, horizontal = 4.dp),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (formAppointmentId == appointment.id)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurface
+                            )
+                            HorizontalDivider()
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAppointmentPicker = false }) { Text("Fechar") }
+            },
+            dismissButton = {
+                if (formAppointmentId != null) {
+                    TextButton(onClick = {
+                        onAppointmentIdChange(null)
+                        showAppointmentPicker = false
+                    }) { Text("Remover vínculo") }
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -190,39 +304,47 @@ private fun FormContent(
             }
         }
 
-        // Amount field
+        // Amount field with currency mask
         OutlinedTextField(
-            value = formAmount,
-            onValueChange = { onAmountChange(it) },
-            label = { Text("Valor (R$) *") },
+            value = formatCurrencyMask(formAmount),
+            onValueChange = { newText ->
+                // Pass only the digit portion to the ViewModel
+                onAmountChange(newText.filter { it.isDigit() })
+            },
+            label = { Text("Valor *") },
             modifier = Modifier.fillMaxWidth(),
             isError = formState.hasFieldError("amount"),
             supportingText = {
                 val amountError = formState.getFieldError("amount")
                 if (amountError != null) {
                     Text(amountError, color = MaterialTheme.colorScheme.error)
-                } else {
-                    Text("Exemplo: 150.00")
                 }
             },
             keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Decimal,
+                keyboardType = KeyboardType.Number,
                 imeAction = ImeAction.Next
             ),
             enabled = !isSubmitting
         )
 
-        // Date field
+        // Date field with picker
         OutlinedTextField(
-            value = formDate.toString(),
+            value = formDate.format(dateFormatter),
             onValueChange = { },
             label = { Text("Data do Pagamento *") },
             modifier = Modifier.fillMaxWidth(),
-            isError = formState.hasFieldError("date"),
+            isError = formState.hasFieldError("paymentDate"),
             supportingText = {
-                val dateError = formState.getFieldError("date")
+                val dateError = formState.getFieldError("paymentDate")
                 if (dateError != null) {
                     Text(dateError, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            trailingIcon = {
+                IconButton(
+                    onClick = { if (!isSubmitting) showDatePicker = true }
+                ) {
+                    Icon(Icons.Default.DateRange, contentDescription = "Selecionar data")
                 }
             },
             readOnly = true,
@@ -232,9 +354,9 @@ private fun FormContent(
         // Method dropdown
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+            shape = RoundedCornerShape(4.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(
+            border = BorderStroke(
                 1.dp,
                 if (formState.hasFieldError("method"))
                     MaterialTheme.colorScheme.error
@@ -247,7 +369,7 @@ private fun FormContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(0.dp),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                shape = RoundedCornerShape(4.dp)
             ) {
                 Text(
                     text = formMethod.ifEmpty { "Selecione Método *" },
@@ -279,16 +401,16 @@ private fun FormContent(
                 text = it,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(start = 16.dp, top = -12.dp)
+                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
             )
         }
 
         // Status dropdown
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+            shape = RoundedCornerShape(4.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(
+            border = BorderStroke(
                 1.dp,
                 if (formState.hasFieldError("status"))
                     MaterialTheme.colorScheme.error
@@ -301,7 +423,7 @@ private fun FormContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(0.dp),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                shape = RoundedCornerShape(4.dp)
             ) {
                 Text(
                     text = when (formStatus) {
@@ -342,7 +464,7 @@ private fun FormContent(
                 text = it,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(start = 16.dp, top = -12.dp)
+                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
             )
         }
 
@@ -362,30 +484,36 @@ private fun FormContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedButton(
-                    onClick = { onAppointmentIdChange(null) },
-                    modifier = Modifier.weight(1f),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
-                ) {
-                    Text("Nenhuma")
+                if (formAppointmentId != null) {
+                    OutlinedButton(
+                        onClick = { onAppointmentIdChange(null) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text("Remover")
+                    }
                 }
 
                 OutlinedButton(
-                    onClick = { /* TODO: Show appointment picker */ },
+                    onClick = { showAppointmentPicker = true },
                     modifier = Modifier.weight(1f),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                    shape = RoundedCornerShape(4.dp),
+                    enabled = !isSubmitting
                 ) {
-                    Text(
-                        if (formAppointmentId != null) "Selecionar Outra" else "Selecionar"
-                    )
+                    Text(if (formAppointmentId != null) "Trocar Consulta" else "Selecionar")
                 }
             }
 
-            formAppointmentId?.let {
+            formAppointmentId?.let { apptId ->
+                val appt = patientAppointments.find { it.id == apptId }
+                val label = appt?.let {
+                    "${it.date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))} às ${it.displayTime}"
+                } ?: "Consulta #$apptId"
                 Text(
-                    text = "Consulta #$it selecionada",
+                    text = "Consulta selecionada: $label",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 8.dp)
@@ -442,7 +570,6 @@ private fun FormContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Help text
         Text(
             text = "Os campos marcados com * são obrigatórios.",
             style = MaterialTheme.typography.bodySmall,

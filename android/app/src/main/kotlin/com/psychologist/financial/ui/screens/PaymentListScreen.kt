@@ -89,6 +89,7 @@ fun PaymentListScreen(
     val listState = viewModel.paymentListState.collectAsState().value
     val balanceState = viewModel.balanceState.collectAsState().value
     val statusFilter = viewModel.statusFilter.collectAsState().value
+    val allPayments = viewModel.allPayments.collectAsState().value
 
     // Load payments and balance when screen opens
     LaunchedEffect(patientId) {
@@ -159,10 +160,19 @@ fun PaymentListScreen(
                 }
 
                 is PaymentViewState.ListState.Empty -> {
-                    // Empty state
-                    EmptyPaymentsContent(
-                        onAddPayment = onAddPayment
-                    )
+                    if (allPayments.isEmpty()) {
+                        // Truly no payments for this patient
+                        EmptyPaymentsContent(onAddPayment = onAddPayment)
+                    } else {
+                        // Payments exist but none match the current filter
+                        PaymentListContent(
+                            payments = emptyList(),
+                            balance = balanceState.balance,
+                            statusFilter = statusFilter,
+                            onStatusFilterChange = { viewModel.setStatusFilter(it) },
+                            onSelectPayment = onSelectPayment
+                        )
+                    }
                 }
 
                 is PaymentViewState.ListState.Error -> {
@@ -235,22 +245,39 @@ private fun PaymentListContent(
             }
         }
 
-        // Payment list
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            contentPadding = PaddingValues(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(
-                items = payments,
-                key = { it.id }
-            ) { payment ->
-                PaymentListItem(
-                    payment = payment,
-                    onClick = { onSelectPayment(payment.id) }
+        // Payment list or filtered-empty message
+        if (payments.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Nenhum pagamento neste filtro.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(24.dp)
                 )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentPadding = PaddingValues(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(
+                    items = payments,
+                    key = { it.id }
+                ) { payment ->
+                    PaymentListItem(
+                        payment = payment,
+                        onClick = { onSelectPayment(payment.id) }
+                    )
+                }
             }
         }
     }

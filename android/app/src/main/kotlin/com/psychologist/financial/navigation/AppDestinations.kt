@@ -114,6 +114,14 @@ sealed class AppDestinations(val route: String) {
         fun createRoute(patientId: Long): String = "payments/$patientId/form"
     }
 
+    /** Payment edit form screen */
+    object PaymentEdit : AppDestinations("payments/{patientId}/{paymentId}/edit") {
+        const val ARG_PATIENT_ID = "patientId"
+        const val ARG_PAYMENT_ID = "paymentId"
+        fun createRoute(patientId: Long, paymentId: Long): String =
+            "payments/$patientId/$paymentId/edit"
+    }
+
     // ========================================
     // Dashboard & Export Routes
     // ========================================

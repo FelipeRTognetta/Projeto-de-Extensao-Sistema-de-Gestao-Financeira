@@ -3,10 +3,12 @@ package com.psychologist.financial.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.psychologist.financial.data.repositories.PaymentRepository
+import com.psychologist.financial.domain.models.Appointment
 import com.psychologist.financial.domain.models.Payment
 import com.psychologist.financial.domain.models.PatientBalance
 import com.psychologist.financial.domain.usecases.CreatePaymentResult
 import com.psychologist.financial.domain.usecases.CreatePaymentUseCase
+import com.psychologist.financial.domain.usecases.GetPatientAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientPaymentsUseCase
 import com.psychologist.financial.services.BalanceCalculator
 import kotlinx.coroutines.Dispatchers
@@ -78,6 +80,7 @@ class PaymentViewModel(
     private val repository: PaymentRepository,
     private val getPatientPaymentsUseCase: GetPatientPaymentsUseCase,
     private val createPaymentUseCase: CreatePaymentUseCase,
+    private val getPatientAppointmentsUseCase: GetPatientAppointmentsUseCase? = null,
     private val balanceCalculator: BalanceCalculator = BalanceCalculator()
 ) : ViewModel() {
 
@@ -92,6 +95,10 @@ class PaymentViewModel(
 
     private val _currentPatientId = MutableStateFlow<Long?>(null)
     val currentPatientId: StateFlow<Long?> = _currentPatientId.asStateFlow()
+
+    // Master unfiltered list — required for correct filter reapplication
+    private val _allPayments = MutableStateFlow<List<Payment>>(emptyList())
+    val allPayments: StateFlow<List<Payment>> = _allPayments.asStateFlow()
 
     // ========================================
     // Payment Detail State
@@ -136,6 +143,9 @@ class PaymentViewModel(
     private val _formAppointmentId = MutableStateFlow<Long?>(null)
     val formAppointmentId: StateFlow<Long?> = _formAppointmentId.asStateFlow()
 
+    private val _patientAppointments = MutableStateFlow<List<Appointment>>(emptyList())
+    val patientAppointments: StateFlow<List<Appointment>> = _patientAppointments.asStateFlow()
+
     // ========================================
     // Filter State
     // ========================================
@@ -154,19 +164,24 @@ class PaymentViewModel(
      */
     fun loadPatientPayments(patientId: Long) {
         _currentPatientId.value = patientId
+        _statusFilter.value = PaymentViewState.PaymentStatusFilter.ALL
         _paymentListState.value = PaymentViewState.ListState.Loading
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val payments = getPatientPaymentsUseCase.execute(patientId)
 
+                _allPayments.value = payments
                 if (payments.isEmpty()) {
                     _paymentListState.value = PaymentViewState.ListState.Empty
                 } else {
-                    _paymentListState.value = PaymentViewState.ListState.Success(
-                        payments = applyStatusFilter(payments)
-                    )
-                    // Calculate and update balance
+                    val filtered = applyStatusFilter(payments)
+                    _paymentListState.value = if (filtered.isEmpty()) {
+                        PaymentViewState.ListState.Empty
+                    } else {
+                        PaymentViewState.ListState.Success(payments = filtered)
+                    }
+                    // Calculate and update balance from full list
                     updateBalance(payments, patientId)
                 }
             } catch (e: Exception) {
@@ -349,12 +364,16 @@ class PaymentViewModel(
     // ========================================
 
     /**
-     * Set payment amount (as text, converted to BigDecimal on submit)
+     * Set payment amount from raw digit input.
      *
-     * @param amount Payment amount as string (e.g. "150.00")
+     * Stores only digits representing centavos (e.g. "15000" = R$ 150,00).
+     * Non-digit characters are stripped automatically.
+     *
+     * @param input New input string (may contain non-digit chars — they are stripped)
      */
-    fun setFormAmount(amount: String) {
-        _formAmount.value = amount
+    fun setFormAmount(input: String) {
+        _formAmount.value = input.filter { it.isDigit() }.trimStart('0').ifEmpty { "0" }
+        _createFormState.update { it.copy(fieldErrors = it.fieldErrors - "amount") }
     }
 
     /**
@@ -371,6 +390,7 @@ class PaymentViewModel(
      */
     fun setFormStatus(status: String) {
         _formStatus.value = status
+        _createFormState.update { it.copy(fieldErrors = it.fieldErrors - "status") }
     }
 
     /**
@@ -380,6 +400,7 @@ class PaymentViewModel(
      */
     fun setFormMethod(method: String) {
         _formMethod.value = method
+        _createFormState.update { it.copy(fieldErrors = it.fieldErrors - "method") }
     }
 
     /**
@@ -389,6 +410,7 @@ class PaymentViewModel(
      */
     fun setFormDate(date: LocalDate) {
         _formDate.value = date
+        _createFormState.update { it.copy(fieldErrors = it.fieldErrors - "paymentDate") }
     }
 
     /**
@@ -401,10 +423,126 @@ class PaymentViewModel(
     }
 
     /**
+     * Load available appointments for patient (used in appointment picker)
+     *
+     * @param patientId Patient ID
+     */
+    fun loadAppointmentsForPatient(patientId: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val appointments = getPatientAppointmentsUseCase?.execute(patientId) ?: emptyList()
+                _patientAppointments.value = appointments
+            } catch (e: Exception) {
+                _patientAppointments.value = emptyList()
+            }
+        }
+    }
+
+    /**
+     * Load an existing payment into the form for editing.
+     *
+     * Normalizes stored method constants (e.g. "PIX", "CASH") to the form's
+     * display names ("Pix", "Dinheiro"), since the form dropdown stores display names.
+     *
+     * @param paymentId Payment ID to edit
+     */
+    fun loadPaymentForEdit(paymentId: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val payment = repository.getById(paymentId) ?: return@launch
+                // Convert BigDecimal to centavos digits (e.g. 150.00 → "15000")
+                val centavos = payment.amount.multiply(BigDecimal(100)).toLong()
+                _formAmount.value = centavos.toString()
+                _formDate.value = payment.paymentDate
+                _formMethod.value = normalizeMethodForForm(payment.paymentMethod)
+                _formStatus.value = payment.status
+                _formAppointmentId.value = payment.appointmentId
+                _createFormState.value = PaymentViewState.CreatePaymentState()
+            } catch (e: Exception) {
+                // ignore — form stays at defaults
+            }
+        }
+    }
+
+    /**
+     * Convert centavos digit string to BigDecimal.
+     * e.g. "15000" → BigDecimal("150.00"), "0" → BigDecimal.ZERO
+     */
+    private fun centavosToDecimal(digits: String): BigDecimal {
+        val long = digits.toLongOrNull() ?: 0L
+        return BigDecimal(long).divide(BigDecimal(100))
+    }
+
+    /** Map stored method constants or legacy values to form display names. */
+    private fun normalizeMethodForForm(method: String): String = when (method) {
+        "CASH" -> "Dinheiro"
+        "TRANSFER" -> "Dinheiro"
+        "CARD" -> "Crédito"
+        "CHECK" -> "Cheque"
+        "PIX" -> "Pix"
+        else -> method  // already a display name (e.g. "Pix", "Débito")
+    }
+
+    /**
+     * Submit update for an existing payment
+     *
+     * @param paymentId Payment ID to update
+     * @param patientId Patient ID (for validation and reload)
+     */
+    fun submitUpdatePaymentForm(paymentId: Long, patientId: Long) {
+        _createFormState.update { it.copy(isSubmitting = true) }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val errors = createPaymentUseCase.validate(
+                    patientId = patientId,
+                    amount = centavosToDecimal(_formAmount.value),
+                    status = _formStatus.value,
+                    paymentMethod = _formMethod.value,
+                    paymentDate = _formDate.value
+                )
+
+                if (errors.isNotEmpty()) {
+                    _createFormState.update { state ->
+                        state.copy(
+                            isSubmitting = false,
+                            fieldErrors = errors.associate { it.field to it.message }
+                        )
+                    }
+                    return@launch
+                }
+
+                val existing = repository.getById(paymentId) ?: return@launch
+                val updated = existing.copy(
+                    amount = centavosToDecimal(_formAmount.value),
+                    paymentDate = _formDate.value,
+                    paymentMethod = _formMethod.value,
+                    status = _formStatus.value,
+                    appointmentId = _formAppointmentId.value
+                )
+                repository.update(updated)
+
+                _createFormState.update { state ->
+                    state.copy(
+                        isSubmitting = false,
+                        submissionResult = CreatePaymentResult.Success(paymentId),
+                        fieldErrors = emptyMap()
+                    )
+                }
+                refreshPatientPayments()
+            } catch (e: Exception) {
+                _createFormState.update { state ->
+                    state.copy(isSubmitting = false)
+                }
+            }
+        }
+    }
+
+    /**
      * Reset form to initial state
      */
     fun resetForm() {
-        _formAmount.value = ""
+        _formAmount.value = "0"
         _formStatus.value = Payment.STATUS_PAID
         _formMethod.value = Payment.METHOD_TRANSFER
         _formDate.value = LocalDate.now()
@@ -425,7 +563,7 @@ class PaymentViewModel(
         viewModelScope.launch(Dispatchers.Default) {
             val errors = createPaymentUseCase.validate(
                 patientId = patientId,
-                amount = _formAmount.value.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+                amount = centavosToDecimal(_formAmount.value),
                 status = _formStatus.value,
                 paymentMethod = _formMethod.value,
                 paymentDate = _formDate.value
@@ -453,7 +591,7 @@ class PaymentViewModel(
                 val result = createPaymentUseCase.execute(
                     patientId = patientId,
                     appointmentId = _formAppointmentId.value,
-                    amount = _formAmount.value.toBigDecimalOrNull() ?: BigDecimal.ZERO,
+                    amount = centavosToDecimal(_formAmount.value),
                     status = _formStatus.value,
                     paymentMethod = _formMethod.value,
                     paymentDate = _formDate.value
@@ -500,12 +638,14 @@ class PaymentViewModel(
     fun setStatusFilter(filter: PaymentViewState.PaymentStatusFilter) {
         _statusFilter.value = filter
 
-        // Reapply filter to current list
-        val currentState = _paymentListState.value
-        if (currentState is PaymentViewState.ListState.Success) {
-            _paymentListState.value = PaymentViewState.ListState.Success(
-                payments = applyStatusFilter(currentState.payments)
-            )
+        // Always reapply to the master (unfiltered) list
+        val all = _allPayments.value
+        if (all.isEmpty()) return
+        val filtered = applyStatusFilter(all)
+        _paymentListState.value = if (filtered.isEmpty()) {
+            PaymentViewState.ListState.Empty
+        } else {
+            PaymentViewState.ListState.Success(payments = filtered)
         }
     }
 

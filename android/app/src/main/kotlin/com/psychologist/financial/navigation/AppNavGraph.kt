@@ -313,7 +313,11 @@ fun AppNavGraph(
                 onAddPayment = {
                     navController.navigate(AppDestinations.PaymentForm.createRoute(patientId))
                 },
-                onSelectPayment = { /* Detail screen not implemented yet */ }
+                onSelectPayment = { selectedPaymentId ->
+                    navController.navigate(
+                        AppDestinations.PaymentEdit.createRoute(patientId, selectedPaymentId)
+                    )
+                }
             )
         }
 
@@ -332,6 +336,33 @@ fun AppNavGraph(
             PaymentFormScreen(
                 viewModel = paymentViewModel,
                 patientId = patientId,
+                onSuccess = { navController.popBackStack() },
+                onCancel = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = AppDestinations.PaymentEdit.route,
+            arguments = listOf(
+                navArgument(AppDestinations.PaymentEdit.ARG_PATIENT_ID) {
+                    type = NavType.LongType
+                },
+                navArgument(AppDestinations.PaymentEdit.ARG_PAYMENT_ID) {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val patientId = backStackEntry.arguments?.getLong(
+                AppDestinations.PaymentEdit.ARG_PATIENT_ID
+            ) ?: return@composable
+            val paymentId = backStackEntry.arguments?.getLong(
+                AppDestinations.PaymentEdit.ARG_PAYMENT_ID
+            ) ?: return@composable
+
+            PaymentFormScreen(
+                viewModel = paymentViewModel,
+                patientId = patientId,
+                paymentId = paymentId,
                 onSuccess = { navController.popBackStack() },
                 onCancel = { navController.popBackStack() }
             )
