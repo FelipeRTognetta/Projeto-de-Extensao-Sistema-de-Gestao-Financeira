@@ -117,11 +117,15 @@ fun AppointmentListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAddAppointment,
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Default.Add, "Adicionar Consulta")
+            // Only show FAB when viewing a specific patient (patientId > 0)
+            // In global view (patientId = 0), appointments must be created from patient profile
+            if (patientId > 0L) {
+                FloatingActionButton(
+                    onClick = onAddAppointment,
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Default.Add, "Adicionar Consulta")
+                }
             }
         }
     ) { paddingValues ->
@@ -153,7 +157,8 @@ fun AppointmentListScreen(
                 is AppointmentViewState.ListState.Empty -> {
                     // Empty state
                     EmptyAppointmentsContent(
-                        onAddAppointment = onAddAppointment
+                        onAddAppointment = onAddAppointment,
+                        isGlobalView = patientId == 0L
                     )
                 }
 
@@ -290,7 +295,8 @@ private fun BillableHoursSummaryCard(
  */
 @Composable
 private fun EmptyAppointmentsContent(
-    onAddAppointment: () -> Unit
+    onAddAppointment: () -> Unit,
+    isGlobalView: Boolean = false
 ) {
     Column(
         modifier = Modifier
@@ -310,18 +316,23 @@ private fun EmptyAppointmentsContent(
         )
 
         Text(
-            text = "Ainda não há consultas registradas para este paciente.",
+            text = if (isGlobalView)
+                "Para registrar uma consulta, acesse o perfil do paciente."
+            else
+                "Ainda não há consultas registradas para este paciente.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
 
-        androidx.compose.foundation.layout.Spacer(
-            modifier = Modifier.height(24.dp)
-        )
+        if (!isGlobalView) {
+            androidx.compose.foundation.layout.Spacer(
+                modifier = Modifier.height(24.dp)
+            )
 
-        Button(onClick = onAddAppointment) {
-            Text("Registrar Primeira Consulta")
+            Button(onClick = onAddAppointment) {
+                Text("Registrar Primeira Consulta")
+            }
         }
     }
 }

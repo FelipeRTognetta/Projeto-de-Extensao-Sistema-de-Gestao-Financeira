@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.psychologist.financial.domain.models.Patient
 import com.psychologist.financial.ui.components.ErrorBanner
 import com.psychologist.financial.viewmodel.PatientViewModel
 import com.psychologist.financial.viewmodel.PatientViewState.CreatePatientState
@@ -71,8 +72,10 @@ import java.time.LocalDate
 fun PatientFormScreen(
     viewModel: PatientViewModel,
     onSuccess: (Long) -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    editingPatient: Patient? = null
 ) {
+    val isEditing = editingPatient != null
     val formState = viewModel.createFormState.collectAsState().value
     val formName = viewModel.formName.collectAsState().value
     val formPhone = viewModel.formPhone.collectAsState().value
@@ -80,25 +83,30 @@ fun PatientFormScreen(
     val formDate = viewModel.formInitialConsultDate.collectAsState().value
     val isSubmitting = formState.isSubmitting
 
+    // Pre-fill form when editing
+    LaunchedEffect(editingPatient?.id) {
+        if (editingPatient != null) {
+            viewModel.prepareEditForm(editingPatient)
+        } else {
+            viewModel.resetForm()
+        }
+    }
+
     // Handle success navigation
     when (val result = formState.submissionResult) {
         is CreatePatientState.SubmissionResult.Success -> {
-            // Navigate to detail screen after success
             LaunchedEffect(result) {
                 onSuccess(result.patientId)
             }
-            // Clear result so we don't navigate twice
             viewModel.clearSubmissionResult()
         }
-        else -> {
-            // Handle other results
-        }
+        else -> { }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Novo Paciente") },
+                title = { Text(if (isEditing) "Editar Paciente" else "Novo Paciente") },
                 navigationIcon = {
                     IconButton(onClick = onCancel) {
                         Icon(Icons.Default.ArrowBack, "Voltar")
@@ -128,7 +136,13 @@ fun PatientFormScreen(
                 onPhoneChange = { viewModel.setFormPhone(it) },
                 onEmailChange = { viewModel.setFormEmail(it) },
                 onDateChange = { viewModel.setFormInitialConsultDate(it) },
-                onSubmit = { viewModel.submitCreatePatientForm() },
+                onSubmit = {
+                    if (isEditing) {
+                        viewModel.submitEditPatientForm(editingPatient!!.id)
+                    } else {
+                        viewModel.submitCreatePatientForm()
+                    }
+                },
                 onCancel = onCancel,
                 onValidate = { viewModel.validateForm() }
             )

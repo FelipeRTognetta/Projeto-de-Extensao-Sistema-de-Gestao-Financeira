@@ -108,63 +108,48 @@ fun PatientListScreen(
             )
         }
     ) { paddingValues ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            when {
-                isLoading -> {
-                    // Loading state
-                    LoadingContent()
-                }
-
-                errorMessage != null -> {
-                    // Error state with retry
-                    ErrorContent(
-                        message = errorMessage,
-                        onRetry = { viewModel.loadPatients() },
-                        onDismiss = { viewModel.clearError() }
-                    )
-                }
-
-                listState is ListState.Loading -> {
-                    // Loading indicator
-                    LoadingContent()
-                }
-
-                listState is ListState.Success -> {
-                    // Patient list
-                    PatientListContent(
-                        patients = listState.patients,
-                        onPatientClick = onPatientClick,
-                        onRefresh = { viewModel.refreshPatients() }
-                    )
-                }
-
-                listState is ListState.Empty -> {
-                    // Empty state
-                    EmptyListContent(
-                        onAddClick = onAddClick
-                    )
-                }
-
-                listState is ListState.Error -> {
-                    // Error state
-                    ErrorContent(
-                        message = listState.message,
-                        onRetry = { viewModel.loadPatients() },
-                        onDismiss = { viewModel.clearError() }
-                    )
-                }
-            }
-
-            // Status filter chips
+            // Filter chips always at top, never overlapping the list
             if (listState !is ListState.Error && errorMessage == null) {
                 FilterChips(
                     includeInactive = includeInactive,
                     onFilterChange = { viewModel.toggleInactiveFilter() }
                 )
+            }
+
+            // Content fills remaining space below filter chips
+            Box(modifier = Modifier.weight(1f)) {
+                when {
+                    isLoading -> LoadingContent()
+
+                    errorMessage != null -> ErrorContent(
+                        message = errorMessage,
+                        onRetry = { viewModel.loadPatients() },
+                        onDismiss = { viewModel.clearError() }
+                    )
+
+                    listState is ListState.Loading -> LoadingContent()
+
+                    listState is ListState.Success -> PatientListContent(
+                        patients = listState.patients,
+                        onPatientClick = onPatientClick,
+                        onRefresh = { viewModel.refreshPatients() }
+                    )
+
+                    listState is ListState.Empty -> EmptyListContent(
+                        onAddClick = onAddClick
+                    )
+
+                    listState is ListState.Error -> ErrorContent(
+                        message = listState.message,
+                        onRetry = { viewModel.loadPatients() },
+                        onDismiss = { viewModel.clearError() }
+                    )
+                }
             }
         }
     }

@@ -53,8 +53,14 @@ sealed class AppDestinations(val route: String) {
         fun createRoute(patientId: Long): String = "patients/$patientId"
     }
 
-    /** Patient creation/edit form screen */
-    object PatientForm : AppDestinations("patients/form")
+    /** Patient creation form screen */
+    object PatientForm : AppDestinations("patients/new")
+
+    /** Patient edit form screen */
+    object PatientEdit : AppDestinations("patients/{patientId}/edit") {
+        const val ARG_PATIENT_ID = "patientId"
+        fun createRoute(patientId: Long): String = "patients/$patientId/edit"
+    }
 
     // ========================================
     // Appointment Routes
@@ -78,6 +84,14 @@ sealed class AppDestinations(val route: String) {
         fun createRoute(patientId: Long): String = "appointments/$patientId/form"
     }
 
+    /** Appointment edit form screen */
+    object AppointmentEdit : AppDestinations("appointments/{patientId}/{appointmentId}/edit") {
+        const val ARG_PATIENT_ID = "patientId"
+        const val ARG_APPOINTMENT_ID = "appointmentId"
+        fun createRoute(patientId: Long, appointmentId: Long): String =
+            "appointments/$patientId/$appointmentId/edit"
+    }
+
     // ========================================
     // Payment Routes
     // ========================================
@@ -98,6 +112,14 @@ sealed class AppDestinations(val route: String) {
     object PaymentForm : AppDestinations("payments/{patientId}/form") {
         const val ARG_PATIENT_ID = "patientId"
         fun createRoute(patientId: Long): String = "payments/$patientId/form"
+    }
+
+    /** Payment edit form screen */
+    object PaymentEdit : AppDestinations("payments/{patientId}/{paymentId}/edit") {
+        const val ARG_PATIENT_ID = "patientId"
+        const val ARG_PAYMENT_ID = "paymentId"
+        fun createRoute(patientId: Long, paymentId: Long): String =
+            "payments/$patientId/$paymentId/edit"
     }
 
     // ========================================

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- App-specific external storage: getExternalFilesDir("exports") -->
+    <external-files-path name="exports" path="exports/" />
+    <!-- Cache fallback: cacheDir/exports -->
+    <cache-path name="cache_exports" path="exports/" />
+</paths>

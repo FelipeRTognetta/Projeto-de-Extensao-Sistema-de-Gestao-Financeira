@@ -1,6 +1,7 @@
 package com.psychologist.financial.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -140,8 +141,14 @@ fun AppNavGraph(
                 viewModel = patientViewModel,
                 patientId = patientId,
                 onBack = { navController.popBackStack() },
-                onEdit = {
-                    navController.navigate(AppDestinations.PatientForm.route)
+                onEdit = { id ->
+                    navController.navigate(AppDestinations.PatientEdit.createRoute(id))
+                },
+                onNavigateToAppointments = { pid, pname ->
+                    navController.navigate(AppDestinations.AppointmentList.createRoute(pid, pname))
+                },
+                onNavigateToPayments = { pid, pname ->
+                    navController.navigate(AppDestinations.PaymentList.createRoute(pid, pname))
                 }
             )
         }
@@ -152,6 +159,33 @@ fun AppNavGraph(
                 onSuccess = { patientId ->
                     navController.navigate(AppDestinations.PatientDetail.createRoute(patientId)) {
                         popUpTo(AppDestinations.PatientList.route)
+                    }
+                },
+                onCancel = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = AppDestinations.PatientEdit.route,
+            arguments = listOf(
+                navArgument(AppDestinations.PatientEdit.ARG_PATIENT_ID) {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val patientId = backStackEntry.arguments?.getLong(
+                AppDestinations.PatientEdit.ARG_PATIENT_ID
+            ) ?: return@composable
+
+            val detailState = patientViewModel.patientDetailState.collectAsState().value
+            val patient = (detailState as? com.psychologist.financial.viewmodel.PatientViewState.DetailState.Success)?.patient
+
+            PatientFormScreen(
+                viewModel = patientViewModel,
+                editingPatient = patient,
+                onSuccess = {
+                    navController.navigate(AppDestinations.PatientDetail.createRoute(patientId)) {
+                        popUpTo(AppDestinations.PatientDetail.createRoute(patientId)) { inclusive = true }
                     }
                 },
                 onCancel = { navController.popBackStack() }
@@ -191,7 +225,11 @@ fun AppNavGraph(
                 onAddAppointment = {
                     navController.navigate(AppDestinations.AppointmentForm.createRoute(patientId))
                 },
-                onSelectAppointment = { /* Detail screen not implemented yet */ }
+                onSelectAppointment = { appointmentId ->
+                    navController.navigate(
+                        AppDestinations.AppointmentEdit.createRoute(patientId, appointmentId)
+                    )
+                }
             )
         }
 
@@ -210,6 +248,33 @@ fun AppNavGraph(
             AppointmentFormScreen(
                 viewModel = appointmentViewModel,
                 patientId = patientId,
+                onSuccess = { navController.popBackStack() },
+                onCancel = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = AppDestinations.AppointmentEdit.route,
+            arguments = listOf(
+                navArgument(AppDestinations.AppointmentEdit.ARG_PATIENT_ID) {
+                    type = NavType.LongType
+                },
+                navArgument(AppDestinations.AppointmentEdit.ARG_APPOINTMENT_ID) {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val patientId = backStackEntry.arguments?.getLong(
+                AppDestinations.AppointmentEdit.ARG_PATIENT_ID
+            ) ?: return@composable
+            val appointmentId = backStackEntry.arguments?.getLong(
+                AppDestinations.AppointmentEdit.ARG_APPOINTMENT_ID
+            ) ?: return@composable
+
+            AppointmentFormScreen(
+                viewModel = appointmentViewModel,
+                patientId = patientId,
+                editingAppointmentId = appointmentId,
                 onSuccess = { navController.popBackStack() },
                 onCancel = { navController.popBackStack() }
             )
@@ -248,7 +313,11 @@ fun AppNavGraph(
                 onAddPayment = {
                     navController.navigate(AppDestinations.PaymentForm.createRoute(patientId))
                 },
-                onSelectPayment = { /* Detail screen not implemented yet */ }
+                onSelectPayment = { selectedPaymentId ->
+                    navController.navigate(
+                        AppDestinations.PaymentEdit.createRoute(patientId, selectedPaymentId)
+                    )
+                }
             )
         }
 
@@ -267,6 +336,33 @@ fun AppNavGraph(
             PaymentFormScreen(
                 viewModel = paymentViewModel,
                 patientId = patientId,
+                onSuccess = { navController.popBackStack() },
+                onCancel = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = AppDestinations.PaymentEdit.route,
+            arguments = listOf(
+                navArgument(AppDestinations.PaymentEdit.ARG_PATIENT_ID) {
+                    type = NavType.LongType
+                },
+                navArgument(AppDestinations.PaymentEdit.ARG_PAYMENT_ID) {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val patientId = backStackEntry.arguments?.getLong(
+                AppDestinations.PaymentEdit.ARG_PATIENT_ID
+            ) ?: return@composable
+            val paymentId = backStackEntry.arguments?.getLong(
+                AppDestinations.PaymentEdit.ARG_PAYMENT_ID
+            ) ?: return@composable
+
+            PaymentFormScreen(
+                viewModel = paymentViewModel,
+                patientId = patientId,
+                paymentId = paymentId,
                 onSuccess = { navController.popBackStack() },
                 onCancel = { navController.popBackStack() }
             )

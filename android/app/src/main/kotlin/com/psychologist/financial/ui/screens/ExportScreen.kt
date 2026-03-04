@@ -1,5 +1,6 @@
 package com.psychologist.financial.ui.screens
 
+import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -26,10 +27,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import com.psychologist.financial.ui.components.ErrorDialog
 import com.psychologist.financial.ui.components.ExportProgressComponent
 import com.psychologist.financial.ui.components.ExportSuccessIndicator
@@ -496,6 +499,8 @@ private fun SuccessScreen(
     state: ExportViewState.Success,
     viewModel: ExportViewModel
 ) {
+    val context = LocalContext.current
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -516,10 +521,24 @@ private fun SuccessScreen(
                 // Share button
                 Button(
                     onClick = {
-                        // TODO: Share files implementation
-                        // val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE)
-                        // shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, files)
-                        // context.startActivity(shareIntent)
+                        val files = state.result.getFiles()
+                        if (files.isNotEmpty()) {
+                            val uris = ArrayList(files.map { file ->
+                                FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.fileprovider",
+                                    file
+                                )
+                            })
+                            val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                                type = "text/csv"
+                                putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(
+                                Intent.createChooser(shareIntent, "Compartilhar arquivos CSV")
+                            )
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
