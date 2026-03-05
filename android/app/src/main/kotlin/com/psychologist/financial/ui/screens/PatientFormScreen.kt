@@ -272,26 +272,29 @@ private fun FormContent(
             enabled = !isSubmitting
         )
 
-        // Phone field
+        // CPF field
         OutlinedTextField(
-            value = formPhone,
+            value = formCpf,
             onValueChange = {
-                onPhoneChange(it)
+                val digits = it.filter { c -> c.isDigit() }.take(11)
+                onCpfChange(digits)
                 onValidate()
             },
-            label = { Text("Telefone (opcional)") },
+            label = { Text("CPF (opcional)") },
             modifier = Modifier.fillMaxWidth(),
-            isError = formState.hasFieldError("phone"),
+            isError = formState.hasFieldError("cpf"),
             supportingText = {
-                formState.getFieldError("phone")?.let {
+                formState.getFieldError("cpf")?.let {
                     Text(it, color = MaterialTheme.colorScheme.error)
                 }
             },
+            visualTransformation = CpfVisualTransformation(),
             keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Phone,
+                keyboardType = KeyboardType.Number,
                 imeAction = ImeAction.Next
             ),
-            enabled = !isSubmitting
+            enabled = !isSubmitting,
+            placeholder = { Text("000.000.000-00") }
         )
 
         // Email field
@@ -316,29 +319,26 @@ private fun FormContent(
             enabled = !isSubmitting
         )
 
-        // CPF field
+        // Phone field
         OutlinedTextField(
-            value = formCpf,
+            value = formPhone,
             onValueChange = {
-                val digits = it.filter { c -> c.isDigit() }.take(11)
-                onCpfChange(digits)
+                onPhoneChange(it)
                 onValidate()
             },
-            label = { Text("CPF (opcional)") },
+            label = { Text("Telefone (opcional)") },
             modifier = Modifier.fillMaxWidth(),
-            isError = formState.hasFieldError("cpf"),
+            isError = formState.hasFieldError("phone"),
             supportingText = {
-                formState.getFieldError("cpf")?.let {
+                formState.getFieldError("phone")?.let {
                     Text(it, color = MaterialTheme.colorScheme.error)
                 }
             },
-            visualTransformation = CpfVisualTransformation(),
             keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Number,
+                keyboardType = KeyboardType.Phone,
                 imeAction = ImeAction.Next
             ),
-            enabled = !isSubmitting,
-            placeholder = { Text("000.000.000-00") }
+            enabled = !isSubmitting
         )
 
         // Address field
@@ -458,21 +458,6 @@ private fun FormContent(
                 placeholder = { Text("000.000.000-00") }
             )
 
-            // Payer address (optional)
-            OutlinedTextField(
-                value = formPayerEndereco,
-                onValueChange = { onPayerEnderecoChange(it) },
-                label = { Text("Endereço do Responsável (opcional)") },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Next
-                ),
-                minLines = 2,
-                maxLines = 3,
-                enabled = !isSubmitting
-            )
-
             // Payer email (optional)
             OutlinedTextField(
                 value = formPayerEmail,
@@ -503,8 +488,23 @@ private fun FormContent(
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Phone,
+                    imeAction = ImeAction.Next
+                ),
+                enabled = !isSubmitting
+            )
+
+            // Payer address (optional)
+            OutlinedTextField(
+                value = formPayerEndereco,
+                onValueChange = { onPayerEnderecoChange(it) },
+                label = { Text("Endereço do Responsável (opcional)") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
                     imeAction = ImeAction.Done
                 ),
+                minLines = 2,
+                maxLines = 3,
                 enabled = !isSubmitting
             )
         }
