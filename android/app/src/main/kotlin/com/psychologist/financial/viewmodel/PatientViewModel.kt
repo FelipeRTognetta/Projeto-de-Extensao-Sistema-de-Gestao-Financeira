@@ -2,12 +2,14 @@ package com.psychologist.financial.viewmodel
 
 import android.util.Log
 import androidx.lifecycle.viewModelScope
+import com.psychologist.financial.data.repositories.PayerInfoRepository
 import com.psychologist.financial.domain.models.Patient
 import com.psychologist.financial.domain.usecases.CreatePatientUseCase
 import com.psychologist.financial.domain.usecases.GetAllPatientsUseCase
 import com.psychologist.financial.domain.usecases.MarkPatientInactiveUseCase
 import com.psychologist.financial.domain.usecases.ReactivatePatientUseCase
 import com.psychologist.financial.domain.usecases.UpdatePatientUseCase
+import com.psychologist.financial.domain.validation.PayerInfoValidator
 import com.psychologist.financial.viewmodel.PatientViewState.CreatePatientState
 import com.psychologist.financial.viewmodel.PatientViewState.DetailState
 import com.psychologist.financial.viewmodel.PatientViewState.ListState
@@ -79,7 +81,9 @@ class PatientViewModel(
     private val createPatientUseCase: CreatePatientUseCase,
     private val markPatientInactiveUseCase: MarkPatientInactiveUseCase,
     private val reactivatePatientUseCase: ReactivatePatientUseCase,
-    private val updatePatientUseCase: UpdatePatientUseCase
+    private val updatePatientUseCase: UpdatePatientUseCase,
+    private val payerInfoRepository: PayerInfoRepository? = null,
+    private val payerInfoValidator: PayerInfoValidator = PayerInfoValidator()
 ) : BaseViewModel() {
 
     private companion object {
@@ -165,6 +169,55 @@ class PatientViewModel(
      */
     private val _formInitialConsultDate = MutableStateFlow(LocalDate.now())
     val formInitialConsultDate: StateFlow<LocalDate> = _formInitialConsultDate.asStateFlow()
+
+    /**
+     * Form field value: CPF (raw digits only, max 11 chars)
+     */
+    private val _formCpf = MutableStateFlow("")
+    val formCpf: StateFlow<String> = _formCpf.asStateFlow()
+
+    /**
+     * Form field value: Address (free text)
+     */
+    private val _formEndereco = MutableStateFlow("")
+    val formEndereco: StateFlow<String> = _formEndereco.asStateFlow()
+
+    /**
+     * Form field value: naoPagante flag (false by default)
+     */
+    private val _formNaoPagante = MutableStateFlow(false)
+    val formNaoPagante: StateFlow<Boolean> = _formNaoPagante.asStateFlow()
+
+    // ========================================
+    // Payer (Responsável Financeiro) form fields
+    // ========================================
+
+    private val _formPayerNome = MutableStateFlow("")
+    val formPayerNome: StateFlow<String> = _formPayerNome.asStateFlow()
+
+    private val _formPayerCpf = MutableStateFlow("")
+    val formPayerCpf: StateFlow<String> = _formPayerCpf.asStateFlow()
+
+    private val _formPayerEndereco = MutableStateFlow("")
+    val formPayerEndereco: StateFlow<String> = _formPayerEndereco.asStateFlow()
+
+    private val _formPayerEmail = MutableStateFlow("")
+    val formPayerEmail: StateFlow<String> = _formPayerEmail.asStateFlow()
+
+    private val _formPayerTelefone = MutableStateFlow("")
+    val formPayerTelefone: StateFlow<String> = _formPayerTelefone.asStateFlow()
+
+    /**
+     * Payer field validation errors (field → error message)
+     */
+    private val _payerFieldErrors = MutableStateFlow<Map<String, String>>(emptyMap())
+    val payerFieldErrors: StateFlow<Map<String, String>> = _payerFieldErrors.asStateFlow()
+
+    /**
+     * True when the user toggled naoPagante off with an existing saved payer — shows confirmation dialog.
+     */
+    private val _showRemovePayerConfirmation = MutableStateFlow(false)
+    val showRemovePayerConfirmation: StateFlow<Boolean> = _showRemovePayerConfirmation.asStateFlow()
 
     /**
      * Cached patient list from use case
@@ -493,6 +546,16 @@ class PatientViewModel(
         _formPhone.value = ""
         _formEmail.value = ""
         _formInitialConsultDate.value = LocalDate.now()
+        _formCpf.value = ""
+        _formEndereco.value = ""
+        _formNaoPagante.value = false
+        _formPayerNome.value = ""
+        _formPayerCpf.value = ""
+        _formPayerEndereco.value = ""
+        _formPayerEmail.value = ""
+        _formPayerTelefone.value = ""
+        _payerFieldErrors.value = emptyMap()
+        _showRemovePayerConfirmation.value = false
         _createFormState.value = CreatePatientState()
         clearError()
     }
@@ -539,6 +602,85 @@ class PatientViewModel(
     }
 
     /**
+     * Update form field: CPF (raw digits, max 11)
+     *
+     * @param cpf CPF raw digits (filtering to digits only is done in the UI layer)
+     */
+    fun setFormCpf(cpf: String) {
+        _formCpf.value = cpf
+    }
+
+    /**
+     * Update form field: address
+     *
+     * @param endereco Free-text address
+     */
+    fun setFormEndereco(endereco: String) {
+        _formEndereco.value = endereco
+    }
+
+    /**
+     * Toggle the naoPagante flag.
+     *
+     * When toggling from true → false and a patientId is provided (edit mode),
+     * sets [showRemovePayerConfirmation] to true so the UI can show a confirmation dialog.
+     *
+     * @param value New value for naoPagante
+     * @param savedPayerExists True if the patient already has a saved payer record
+     */
+    fun setFormNaoPagante(value: Boolean, savedPayerExists: Boolean = false) {
+        if (!value && savedPayerExists) {
+            _showRemovePayerConfirmation.value = true
+        } else {
+            _formNaoPagante.value = value
+            if (!value) {
+                clearPayerFields()
+            }
+        }
+    }
+
+    /** Confirm payer removal: clears payer fields and turns off the naoPagante flag. */
+    fun confirmRemovePayer() {
+        _formNaoPagante.value = false
+        clearPayerFields()
+        _showRemovePayerConfirmation.value = false
+    }
+
+    /** Dismiss the remove-payer confirmation dialog without making changes. */
+    fun dismissRemovePayerConfirmation() {
+        _showRemovePayerConfirmation.value = false
+    }
+
+    fun setFormPayerNome(nome: String) {
+        _formPayerNome.value = nome
+    }
+
+    fun setFormPayerCpf(cpf: String) {
+        _formPayerCpf.value = cpf
+    }
+
+    fun setFormPayerEndereco(endereco: String) {
+        _formPayerEndereco.value = endereco
+    }
+
+    fun setFormPayerEmail(email: String) {
+        _formPayerEmail.value = email
+    }
+
+    fun setFormPayerTelefone(telefone: String) {
+        _formPayerTelefone.value = telefone
+    }
+
+    private fun clearPayerFields() {
+        _formPayerNome.value = ""
+        _formPayerCpf.value = ""
+        _formPayerEndereco.value = ""
+        _formPayerEmail.value = ""
+        _formPayerTelefone.value = ""
+        _payerFieldErrors.value = emptyMap()
+    }
+
+    /**
      * Validate form without submitting
      *
      * Checks form fields and updates validation errors.
@@ -554,18 +696,32 @@ class PatientViewModel(
      * ```
      */
     fun validateForm(): Boolean {
-        val errors = createPatientUseCase.validate(
+        val patientErrors = createPatientUseCase.validate(
             name = _formName.value,
             phone = _formPhone.value,
             email = _formEmail.value,
-            initialConsultDate = _formInitialConsultDate.value
+            initialConsultDate = _formInitialConsultDate.value,
+            cpf = _formCpf.value.ifBlank { null }
         )
 
         _createFormState.value = _createFormState.value.copy(
-            fieldErrors = errors.associate { it.field to it.message }
+            fieldErrors = patientErrors.associate { it.field to it.message }
         )
 
-        return errors.isEmpty()
+        var payerValid = true
+        if (_formNaoPagante.value) {
+            val payerErrors = payerInfoValidator.validate(
+                nome = _formPayerNome.value,
+                cpf = _formPayerCpf.value.ifBlank { null },
+                email = _formPayerEmail.value.ifBlank { null }
+            )
+            _payerFieldErrors.value = payerErrors.associate { it.field to it.message }
+            payerValid = payerErrors.isEmpty()
+        } else {
+            _payerFieldErrors.value = emptyMap()
+        }
+
+        return patientErrors.isEmpty() && payerValid
     }
 
     /**
@@ -581,6 +737,7 @@ class PatientViewModel(
      */
     fun submitCreatePatientForm() {
         Log.d(TAG, "Submitting patient creation form")
+        if (!validateForm()) return
         launchSafe {
             _createFormState.value = _createFormState.value.copy(
                 isSubmitting = true
@@ -590,12 +747,18 @@ class PatientViewModel(
                 name = _formName.value,
                 phone = _formPhone.value,
                 email = _formEmail.value,
-                initialConsultDate = _formInitialConsultDate.value
+                initialConsultDate = _formInitialConsultDate.value,
+                cpf = _formCpf.value.ifBlank { null },
+                endereco = _formEndereco.value.ifBlank { null }
             )
 
             when (result) {
                 is com.psychologist.financial.domain.usecases.CreatePatientResult.Success -> {
                     Log.d(TAG, "Patient created: id=${result.patientId}")
+                    // Save payer info if patient is non-paying
+                    if (_formNaoPagante.value && _formPayerNome.value.isNotBlank()) {
+                        savePayerInfo(result.patientId)
+                    }
                     _createFormState.value = _createFormState.value.copy(
                         isSubmitting = false,
                         submissionResult = CreatePatientState.SubmissionResult.Success(result.patientId)
@@ -645,6 +808,18 @@ class PatientViewModel(
         _formPhone.value = patient.phone ?: ""
         _formEmail.value = patient.email ?: ""
         _formInitialConsultDate.value = patient.initialConsultDate
+        _formCpf.value = patient.cpf ?: ""
+        _formEndereco.value = patient.endereco ?: ""
+        _formNaoPagante.value = patient.naoPagante
+        // Pre-fill payer fields if patient already has payer info loaded
+        val payer = patient.payerInfo
+        _formPayerNome.value = payer?.nome ?: ""
+        _formPayerCpf.value = payer?.cpf ?: ""
+        _formPayerEndereco.value = payer?.endereco ?: ""
+        _formPayerEmail.value = payer?.email ?: ""
+        _formPayerTelefone.value = payer?.telefone ?: ""
+        _payerFieldErrors.value = emptyMap()
+        _showRemovePayerConfirmation.value = false
         _createFormState.value = CreatePatientState()
         clearError()
     }
@@ -656,6 +831,7 @@ class PatientViewModel(
      */
     fun submitEditPatientForm(patientId: Long) {
         Log.d(TAG, "Submitting patient edit form for id=$patientId")
+        if (!validateForm()) return
         launchSafe {
             _createFormState.value = _createFormState.value.copy(isSubmitting = true)
 
@@ -664,12 +840,20 @@ class PatientViewModel(
                 name = _formName.value,
                 phone = _formPhone.value.ifBlank { null },
                 email = _formEmail.value.ifBlank { null },
-                initialConsultDate = _formInitialConsultDate.value
+                initialConsultDate = _formInitialConsultDate.value,
+                cpf = _formCpf.value.ifBlank { null },
+                endereco = _formEndereco.value.ifBlank { null }
             )
 
             when (result) {
                 is UpdatePatientUseCase.UpdatePatientResult.Success -> {
                     Log.d(TAG, "Patient updated: id=$patientId")
+                    // Save or remove payer info based on naoPagante flag
+                    if (_formNaoPagante.value && _formPayerNome.value.isNotBlank()) {
+                        savePayerInfo(patientId)
+                    } else if (!_formNaoPagante.value) {
+                        payerInfoRepository?.removePayerInfo(patientId)
+                    }
                     _createFormState.value = _createFormState.value.copy(
                         isSubmitting = false,
                         submissionResult = CreatePatientState.SubmissionResult.Success(patientId)
@@ -703,6 +887,23 @@ class PatientViewModel(
     // ========================================
     // Private Helpers
     // ========================================
+
+    private suspend fun savePayerInfo(patientId: Long) {
+        try {
+            val payerInfo = com.psychologist.financial.domain.models.PayerInfo(
+                patientId = patientId,
+                nome = _formPayerNome.value.trim(),
+                cpf = _formPayerCpf.value.filter { it.isDigit() }.ifEmpty { null },
+                endereco = _formPayerEndereco.value.ifBlank { null },
+                email = _formPayerEmail.value.ifBlank { null },
+                telefone = _formPayerTelefone.value.ifBlank { null }
+            )
+            payerInfoRepository?.savePayerInfo(patientId, payerInfo)
+            Log.d(TAG, "PayerInfo saved for patientId=$patientId")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving payer info for patientId=$patientId", e)
+        }
+    }
 
     /**
      * Observe reactive patient list updates

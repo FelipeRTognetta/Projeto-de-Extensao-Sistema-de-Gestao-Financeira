@@ -9,6 +9,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
+import org.mockito.Mockito.mock
 import org.mockito.junit.MockitoJUnitRunner
 import org.mockito.kotlin.any
 import org.mockito.kotlin.never
@@ -53,7 +54,7 @@ class AppointmentRepositoryUnitTest {
 
     @Before
     fun setUp() {
-        repository = AppointmentRepository(appointmentDao = mockAppointmentDao)
+        repository = AppointmentRepository(database = mock(), appointmentDao = mockAppointmentDao)
     }
 
     private fun makeAppointmentEntity(id: Long, patientId: Long = 1L, date: LocalDate = yesterday) =
@@ -61,7 +62,7 @@ class AppointmentRepositoryUnitTest {
             id = id,
             patientId = patientId,
             date = date,
-            time = LocalTime.of(10, 0),
+            timeStart = LocalTime.of(10, 0),
             durationMinutes = 60,
             notes = null
         )
@@ -73,7 +74,7 @@ class AppointmentRepositoryUnitTest {
     @Test
     fun `getByPatient returns mapped appointments`() = runTest {
         val entities = listOf(makeAppointmentEntity(1L), makeAppointmentEntity(2L))
-        whenever(mockAppointmentDao.getAppointmentsByPatient(1L)).thenReturn(entities)
+        whenever(mockAppointmentDao.getByPatient(1L)).thenReturn(entities)
 
         val result = repository.getByPatient(patientId = 1L)
 
@@ -83,7 +84,7 @@ class AppointmentRepositoryUnitTest {
 
     @Test
     fun `getByPatient returns empty list when no appointments`() = runTest {
-        whenever(mockAppointmentDao.getAppointmentsByPatient(99L)).thenReturn(emptyList())
+        whenever(mockAppointmentDao.getByPatient(99L)).thenReturn(emptyList())
 
         val result = repository.getByPatient(patientId = 99L)
 
@@ -97,7 +98,7 @@ class AppointmentRepositoryUnitTest {
     @Test
     fun `getByPatientFlow emits mapped appointments`() = runTest {
         val entities = listOf(makeAppointmentEntity(1L))
-        whenever(mockAppointmentDao.getAppointmentsByPatientFlow(1L))
+        whenever(mockAppointmentDao.getByPatientFlow(1L))
             .thenReturn(flowOf(entities))
 
         val flow = repository.getByPatientFlow(patientId = 1L)
@@ -143,7 +144,7 @@ class AppointmentRepositoryUnitTest {
     @Test
     fun `getByPatientAndDateRange returns appointments in range`() = runTest {
         val entity = makeAppointmentEntity(1L, date = yesterday)
-        whenever(mockAppointmentDao.getAppointmentsByPatientAndDateRange(any(), any(), any()))
+        whenever(mockAppointmentDao.getByPatientAndDateRange(any(), any(), any()))
             .thenReturn(listOf(entity))
 
         val result = repository.getByPatientAndDateRange(
@@ -170,7 +171,7 @@ class AppointmentRepositoryUnitTest {
 
     @Test
     fun `hasAppointments returns true when count greater than zero`() = runTest {
-        whenever(mockAppointmentDao.countByPatient(1L)).thenReturn(3)
+        whenever(mockAppointmentDao.hasAppointments(1L)).thenReturn(true)
 
         val has = repository.hasAppointments(patientId = 1L)
 
@@ -179,7 +180,7 @@ class AppointmentRepositoryUnitTest {
 
     @Test
     fun `hasAppointments returns false when count is zero`() = runTest {
-        whenever(mockAppointmentDao.countByPatient(1L)).thenReturn(0)
+        whenever(mockAppointmentDao.hasAppointments(1L)).thenReturn(false)
 
         val has = repository.hasAppointments(patientId = 1L)
 
@@ -201,12 +202,8 @@ class AppointmentRepositoryUnitTest {
 
     @Test
     fun `getTotalBillableHours calculates from past appointments`() = runTest {
-        val entities = listOf(
-            makeAppointmentEntity(1L, date = yesterday).copy(durationMinutes = 60),
-            makeAppointmentEntity(2L, date = yesterday).copy(durationMinutes = 90)
-        )
-        whenever(mockAppointmentDao.getPastAppointmentsByPatient(any(), any()))
-            .thenReturn(entities)
+        whenever(mockAppointmentDao.getTotalBillableHours(any(), any()))
+            .thenReturn(2.5)
 
         val hours = repository.getTotalBillableHours(patientId = 1L)
 

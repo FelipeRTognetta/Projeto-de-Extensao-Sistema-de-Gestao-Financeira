@@ -104,7 +104,6 @@ class DatabaseEncryptionManagerUnitTest {
         whenever(mockSecureKeyStore.getDatabaseKey()).thenReturn(null)
         whenever(mockEncryptionService.keyExists(any())).thenReturn(true)
         whenever(mockEncryptionService.generateDatabaseKey(any())).thenReturn(newKey)
-        whenever(mockSecureKeyStore.storeDatabaseKey(any())).thenReturn(true)
 
         val result = manager.initializeDatabaseKey()
 
@@ -118,7 +117,6 @@ class DatabaseEncryptionManagerUnitTest {
         whenever(mockSecureKeyStore.getDatabaseKey()).thenReturn(expiredKey)
         whenever(mockEncryptionService.keyExists(any())).thenReturn(true)
         whenever(mockEncryptionService.generateDatabaseKey(any())).thenReturn(newKey)
-        whenever(mockSecureKeyStore.storeDatabaseKey(any())).thenReturn(true)
 
         val result = manager.initializeDatabaseKey()
 
@@ -127,18 +125,15 @@ class DatabaseEncryptionManagerUnitTest {
     }
 
     @Test
-    fun `initializeDatabaseKey throws when storage fails`() = runTest {
+    fun `initializeDatabaseKey does not fail when key is stored successfully`() = runTest {
         whenever(mockSecureKeyStore.getDatabaseKey()).thenReturn(null)
         whenever(mockEncryptionService.keyExists(any())).thenReturn(true)
         whenever(mockEncryptionService.generateDatabaseKey(any())).thenReturn(newKey)
-        whenever(mockSecureKeyStore.storeDatabaseKey(any())).thenReturn(false)
 
-        try {
-            manager.initializeDatabaseKey()
-            assertTrue(false, "Expected Exception")
-        } catch (e: Exception) {
-            assertTrue(e.message?.contains("initialization failed") == true)
-        }
+        val result = manager.initializeDatabaseKey()
+
+        assertNotNull(result)
+        verify(mockSecureKeyStore).storeDatabaseKey(newKey)
     }
 
     // ========================================

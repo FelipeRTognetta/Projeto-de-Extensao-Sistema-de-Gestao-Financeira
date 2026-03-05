@@ -2,6 +2,7 @@ package com.psychologist.financial.domain.usecases
 
 import com.psychologist.financial.data.repositories.PatientRepository
 import com.psychologist.financial.domain.models.Patient
+import com.psychologist.financial.domain.validation.PatientValidator
 import java.time.LocalDate
 
 /**
@@ -15,7 +16,8 @@ import java.time.LocalDate
  * - Phone/email must be unique (excluding the patient itself)
  */
 class UpdatePatientUseCase(
-    private val repository: PatientRepository
+    private val repository: PatientRepository,
+    private val patientValidator: PatientValidator = PatientValidator()
 ) {
 
     sealed class UpdatePatientResult {
@@ -29,7 +31,9 @@ class UpdatePatientUseCase(
         name: String,
         phone: String?,
         email: String?,
-        initialConsultDate: LocalDate
+        initialConsultDate: LocalDate,
+        cpf: String? = null,
+        endereco: String? = null
     ): UpdatePatientResult {
         // Basic validation
         if (name.isBlank()) {
@@ -39,6 +43,12 @@ class UpdatePatientUseCase(
             return UpdatePatientResult.ValidationError("Informe telefone ou email")
         }
 
+        val rawCpf = cpf?.filter { it.isDigit() }?.ifEmpty { null }
+        val cpfErrors = patientValidator.validateCpf(rawCpf)
+        if (cpfErrors.isNotEmpty()) {
+            return UpdatePatientResult.ValidationError(cpfErrors.first().message)
+        }
+
         val existing = repository.getPatient(patientId)
             ?: return UpdatePatientResult.Error("Paciente não encontrado")
 
@@ -46,7 +56,9 @@ class UpdatePatientUseCase(
             name = name.trim(),
             phone = phone?.trim()?.ifBlank { null },
             email = email?.trim()?.ifBlank { null },
-            initialConsultDate = initialConsultDate
+            initialConsultDate = initialConsultDate,
+            cpf = rawCpf,
+            endereco = endereco?.trim()?.ifBlank { null }
         )
 
         return try {

@@ -8,7 +8,6 @@ import org.junit.Before
 import org.junit.Test
 import java.math.BigDecimal
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.YearMonth
 
 /**
@@ -64,9 +63,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("150.00"),
                 paymentDate = yesterday,
-                method = "Débito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Débito",
+                status = "PAID"
             ),
             Payment(
                 id = 2L,
@@ -74,9 +72,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("200.00"),
                 paymentDate = weekAgo,
-                method = "Crédito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Crédito",
+                status = "PAID"
             )
         )
 
@@ -96,9 +93,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("100.00"),
                 paymentDate = yesterday,
-                method = "Pix",
-                status = "PENDING",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Pix",
+                status = "PENDING"
             ),
             Payment(
                 id = 2L,
@@ -106,9 +102,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("150.00"),
                 paymentDate = weekAgo,
-                method = "Cheque",
-                status = "PENDING",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Cheque",
+                status = "PENDING"
             )
         )
 
@@ -128,9 +123,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("200.00"),
                 paymentDate = yesterday,
-                method = "Débito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Débito",
+                status = "PAID"
             ),
             Payment(
                 id = 2L,
@@ -138,9 +132,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("150.00"),
                 paymentDate = weekAgo,
-                method = "Pix",
-                status = "PENDING",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Pix",
+                status = "PENDING"
             ),
             Payment(
                 id = 3L,
@@ -148,9 +141,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("100.00"),
                 paymentDate = monthAgo,
-                method = "Crédito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Crédito",
+                status = "PAID"
             )
         )
 
@@ -170,9 +162,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("125.50"),
                 paymentDate = yesterday,
-                method = "Dinheiro",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Dinheiro",
+                status = "PAID"
             )
         )
 
@@ -191,9 +182,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("999999.99"),
                 paymentDate = yesterday,
-                method = "Crédito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Crédito",
+                status = "PAID"
             )
         )
 
@@ -215,9 +205,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("100.00"),
                 paymentDate = today,
-                method = "Débito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Débito",
+                status = "PAID"
             ),
             Payment(
                 id = 2L,
@@ -225,9 +214,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("200.00"),
                 paymentDate = monthAgo,
-                method = "Crédito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Crédito",
+                status = "PAID"
             )
         )
 
@@ -238,7 +226,7 @@ class BalanceCalculatorTest {
     }
 
     @Test
-    fun calculateByDateRange_validRange_includesOnlyPaymentsInRange() {
+    fun calculateRangeBalance_validRange_includesOnlyPaymentsInRange() {
         val startDate = weekAgo
         val endDate = today
 
@@ -249,9 +237,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("100.00"),
                 paymentDate = yesterday,
-                method = "Débito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Débito",
+                status = "PAID"
             ),
             Payment(
                 id = 2L,
@@ -259,9 +246,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("200.00"),
                 paymentDate = monthAgo,  // Outside range
-                method = "Crédito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Crédito",
+                status = "PAID"
             ),
             Payment(
                 id = 3L,
@@ -269,13 +255,12 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("50.00"),
                 paymentDate = today,
-                method = "Pix",
-                status = "PENDING",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Pix",
+                status = "PENDING"
             )
         )
 
-        val rangeBalance = calculator.calculateByDateRange(payments, startDate, endDate)
+        val rangeBalance = calculator.calculateRangeBalance(payments, startDate, endDate)
 
         assertEquals(BigDecimal("100.00"), rangeBalance.amountDueNow)
         assertEquals(BigDecimal("50.00"), rangeBalance.totalOutstanding)
@@ -294,9 +279,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("500.00"),
                 paymentDate = yesterday,
-                method = "Crédito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Crédito",
+                status = "PAID"
             )
         )
 
@@ -314,9 +298,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("100.00"),
                 paymentDate = yesterday,
-                method = "Débito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Débito",
+                status = "PAID"
             ),
             Payment(
                 id = 2L,
@@ -324,9 +307,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("100.00"),
                 paymentDate = weekAgo,
-                method = "Crédito",
-                status = "PENDING",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Crédito",
+                status = "PENDING"
             )
         )
 
@@ -344,9 +326,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("300.00"),
                 paymentDate = yesterday,
-                method = "Cheque",
-                status = "PENDING",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Cheque",
+                status = "PENDING"
             )
         )
 
@@ -360,7 +341,7 @@ class BalanceCalculatorTest {
     // ========================================
 
     @Test
-    fun calculateByMethod_groupsPaymentsByMethod() {
+    fun calculateMethodBreakdown_groupsPaymentsByMethod() {
         val payments = listOf(
             Payment(
                 id = 1L,
@@ -368,9 +349,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("100.00"),
                 paymentDate = yesterday,
-                method = "Débito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Débito",
+                status = "PAID"
             ),
             Payment(
                 id = 2L,
@@ -378,9 +358,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("150.00"),
                 paymentDate = weekAgo,
-                method = "Débito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Débito",
+                status = "PAID"
             ),
             Payment(
                 id = 3L,
@@ -388,13 +367,12 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("200.00"),
                 paymentDate = monthAgo,
-                method = "Crédito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Crédito",
+                status = "PAID"
             )
         )
 
-        val breakdown = calculator.calculateByMethod(payments)
+        val breakdown = calculator.calculateMethodBreakdown(payments)
 
         assertTrue(breakdown.containsKey("Débito"))
         assertTrue(breakdown.containsKey("Crédito"))
@@ -403,11 +381,11 @@ class BalanceCalculatorTest {
     }
 
     // ========================================
-    // Status-Based Calculations
+    // Status-Based Calculations via calculateBalance
     // ========================================
 
     @Test
-    fun calculateByStatus_separatesPaidAndPending() {
+    fun calculateBalance_separatesPaidAndPending() {
         val payments = listOf(
             Payment(
                 id = 1L,
@@ -415,9 +393,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("100.00"),
                 paymentDate = yesterday,
-                method = "Débito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Débito",
+                status = "PAID"
             ),
             Payment(
                 id = 2L,
@@ -425,18 +402,15 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("200.00"),
                 paymentDate = weekAgo,
-                method = "Crédito",
-                status = "PENDING",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Crédito",
+                status = "PENDING"
             )
         )
 
-        val breakdown = calculator.calculateByStatus(payments)
+        val balance = calculator.calculateBalance(payments)
 
-        assertTrue(breakdown.containsKey("PAID"))
-        assertTrue(breakdown.containsKey("PENDING"))
-        assertEquals(BigDecimal("100.00"), breakdown["PAID"])
-        assertEquals(BigDecimal("200.00"), breakdown["PENDING"])
+        assertEquals(BigDecimal("100.00"), balance.amountDueNow)
+        assertEquals(BigDecimal("200.00"), balance.totalOutstanding)
     }
 
     // ========================================
@@ -452,9 +426,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("10.01"),
                 paymentDate = yesterday,
-                method = "Pix",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Pix",
+                status = "PAID"
             ),
             Payment(
                 id = 2L,
@@ -462,9 +435,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("20.02"),
                 paymentDate = weekAgo,
-                method = "Débito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Débito",
+                status = "PAID"
             )
         )
 
@@ -482,9 +454,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("10.00"),
                 paymentDate = today.minusDays((i % 365).toLong()),
-                method = "Débito",
-                status = if (i % 2 == 0) "PAID" else "PENDING",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Débito",
+                status = if (i % 2 == 0) "PAID" else "PENDING"
             )
         }
 
@@ -503,9 +474,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("0.01"),
                 paymentDate = yesterday,
-                method = "Pix",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Pix",
+                status = "PAID"
             )
         )
 
@@ -523,9 +493,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("100.00"),
                 paymentDate = yesterday,
-                method = "Débito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Débito",
+                status = "PAID"
             ),
             Payment(
                 id = 2L,
@@ -533,9 +502,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("200.00"),
                 paymentDate = weekAgo,
-                method = "Crédito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Crédito",
+                status = "PAID"
             ),
             Payment(
                 id = 3L,
@@ -543,9 +511,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("300.00"),
                 paymentDate = monthAgo,
-                method = "Cheque",
-                status = "PENDING",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Cheque",
+                status = "PENDING"
             )
         )
 
@@ -564,9 +531,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("1500.00"),
                 paymentDate = yesterday,
-                method = "Crédito",
-                status = "PAID",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Crédito",
+                status = "PAID"
             ),
             Payment(
                 id = 2L,
@@ -574,9 +540,8 @@ class BalanceCalculatorTest {
                 appointmentId = null,
                 amount = BigDecimal("750.00"),
                 paymentDate = weekAgo,
-                method = "Cheque",
-                status = "PENDING",
-                recordedDate = LocalDateTime.now()
+                paymentMethod = "Cheque",
+                status = "PENDING"
             )
         )
 

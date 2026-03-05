@@ -494,7 +494,7 @@ class CsvExportServiceTest {
         // Arrange - Create 100 test patients
         val patients = (1..100).map { i ->
             Patient(
-                id = i,
+                id = i.toLong(),
                 name = "Patient $i",
                 phone = "555-000$i",
                 email = "patient$i@test.com",

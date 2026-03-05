@@ -1,5 +1,6 @@
 package com.psychologist.financial.services
 
+import android.annotation.SuppressLint
 import com.psychologist.financial.utils.AppLogger
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -117,6 +118,7 @@ class EncryptionService {
         }
     }
 
+    @SuppressLint("WrongConstant")
     private fun tryGenerateKey(
         alias: String,
         requiresUserAuth: Boolean,
@@ -305,6 +307,7 @@ class EncryptionService {
      *
      * @return true if StrongBox available
      */
+    @SuppressLint("WrongConstant")
     fun isStrongBoxAvailable(): Boolean {
         // Probe StrongBox by attempting to generate a test key with StrongBox backing.
         // keyStore.containsAlias() never throws, so it cannot be used as a probe.

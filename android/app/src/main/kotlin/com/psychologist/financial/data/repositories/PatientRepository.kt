@@ -5,6 +5,7 @@ import com.psychologist.financial.data.database.PatientDao
 import com.psychologist.financial.data.entities.PatientEntity
 import com.psychologist.financial.domain.models.Patient
 import com.psychologist.financial.domain.models.PatientStatus
+import com.psychologist.financial.domain.models.PayerInfo
 import com.psychologist.financial.utils.AppLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -56,6 +57,7 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
     }
 
     private val patientDao: PatientDao = database.patientDao()
+    private val payerInfoDao = database.payerInfoDao()
 
     // ========================================
     // CREATE Operations
@@ -110,6 +112,13 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
                 }
             }
 
+            // Check CPF uniqueness
+            if (!patient.cpf.isNullOrEmpty()) {
+                if (patientDao.isCpfInUse(patient.cpf, excludePatientId = 0)) {
+                    throw IllegalArgumentException("CPF already in use: ${patient.cpf}")
+                }
+            }
+
             // Convert domain model to entity and insert
             val entity = patient.toEntity()
             val generatedId = patientDao.insert(entity)
@@ -138,7 +147,14 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
      */
     suspend fun getPatient(id: Long): Patient? {
         return withRead {
-            patientDao.getPatient(id)?.toPatient()
+            val entity = patientDao.getPatient(id) ?: return@withRead null
+            val patient = entity.toPatient()
+            if (patient.naoPagante) {
+                val payerEntity = payerInfoDao.getByPatientId(id)
+                patient.copy(payerInfo = payerEntity?.toDomainPayerInfo())
+            } else {
+                patient
+            }
         }
     }
 
@@ -380,6 +396,13 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
                 }
             }
 
+            // Check CPF uniqueness (exclude self)
+            if (!patient.cpf.isNullOrEmpty()) {
+                if (patientDao.isCpfInUse(patient.cpf, excludePatientId = patient.id)) {
+                    throw IllegalArgumentException("CPF already in use: ${patient.cpf}")
+                }
+            }
+
             val entity = patient.toEntity()
             patientDao.update(entity)
             AppLogger.d(TAG, "Patient updated: id=${patient.id}, name=${patient.name}")
@@ -511,7 +534,10 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
             initialConsultDate = this.initialConsultDate,
             registrationDate = this.registrationDate,
             lastAppointmentDate = this.lastAppointmentDate,
-            createdDate = this.createdDate
+            createdDate = this.createdDate,
+            cpf = this.cpf,
+            endereco = this.endereco,
+            naoPagante = this.naoPagante
         )
     }
 
@@ -530,7 +556,24 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
             initialConsultDate = this.initialConsultDate,
             registrationDate = this.registrationDate,
             lastAppointmentDate = this.lastAppointmentDate,
-            createdDate = this.createdDate
+            createdDate = this.createdDate,
+            cpf = this.cpf,
+            endereco = this.endereco,
+            naoPagante = this.naoPagante
         )
     }
+
+    /**
+     * Convert PayerInfoEntity to PayerInfo domain model
+     */
+    private fun com.psychologist.financial.data.entities.PayerInfoEntity.toDomainPayerInfo(): PayerInfo =
+        PayerInfo(
+            id = this.id,
+            patientId = this.patientId,
+            nome = this.nome,
+            cpf = this.cpf,
+            endereco = this.endereco,
+            email = this.email,
+            telefone = this.telefone
+        )
 }

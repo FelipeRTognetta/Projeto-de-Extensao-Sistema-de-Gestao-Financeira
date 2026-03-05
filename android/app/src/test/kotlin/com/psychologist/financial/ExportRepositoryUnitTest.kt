@@ -82,7 +82,7 @@ class ExportRepositoryUnitTest {
         id = id,
         patientId = 1L,
         date = yesterday,
-        time = LocalTime.of(10, 0),
+        timeStart = LocalTime.of(10, 0),
         durationMinutes = 60,
         notes = null
     )
@@ -93,9 +93,8 @@ class ExportRepositoryUnitTest {
         appointmentId = null,
         amount = BigDecimal("150.00"),
         status = "PAID",
-        method = "PIX",
-        paymentDate = yesterday,
-        recordedDate = yesterday.atStartOfDay()
+        paymentMethod = "PIX",
+        paymentDate = yesterday
     )
 
     // ========================================
@@ -130,7 +129,7 @@ class ExportRepositoryUnitTest {
     @Test
     fun `getAllAppointments returns mapped appointment list`() = runTest {
         val entities = listOf(makeAppointmentEntity(1L))
-        whenever(mockAppointmentDao.getAllAppointments()).thenReturn(entities)
+        whenever(mockAppointmentDao.getAll()).thenReturn(entities)
 
         val result = repository.getAllAppointments()
 
@@ -145,7 +144,7 @@ class ExportRepositoryUnitTest {
     @Test
     fun `getAllPayments returns mapped payment list`() = runTest {
         val entities = listOf(makePaymentEntity(1L), makePaymentEntity(2L))
-        whenever(mockPaymentDao.getAllPayments()).thenReturn(entities)
+        whenever(mockPaymentDao.getAll()).thenReturn(entities)
 
         val result = repository.getAllPayments()
 
@@ -168,7 +167,7 @@ class ExportRepositoryUnitTest {
 
     @Test
     fun `countAllAppointments delegates to DAO`() = runTest {
-        whenever(mockAppointmentDao.countAllAppointments()).thenReturn(20)
+        whenever(mockAppointmentDao.count()).thenReturn(20)
 
         val count = repository.countAllAppointments()
 
@@ -177,7 +176,7 @@ class ExportRepositoryUnitTest {
 
     @Test
     fun `countAllPayments delegates to DAO`() = runTest {
-        whenever(mockPaymentDao.countAllPayments()).thenReturn(35)
+        whenever(mockPaymentDao.count()).thenReturn(35)
 
         val count = repository.countAllPayments()
 
@@ -191,10 +190,8 @@ class ExportRepositoryUnitTest {
     @Test
     fun `hasDataToExport returns true when patients exist`() = runTest {
         whenever(mockPatientDao.countAllPatients()).thenReturn(3)
-        whenever(mockAppointmentDao.countAllAppointments()).thenReturn(0)
-        whenever(mockPaymentDao.countAllPayments()).thenReturn(0)
-        whenever(mockPatientDao.getPatientsByStatus("ACTIVE")).thenReturn(emptyList())
-        whenever(mockPatientDao.getPatientsByStatus("INACTIVE")).thenReturn(emptyList())
+        whenever(mockAppointmentDao.count()).thenReturn(0)
+        whenever(mockPaymentDao.count()).thenReturn(0)
 
         val hasData = repository.hasDataToExport()
 
@@ -204,8 +201,8 @@ class ExportRepositoryUnitTest {
     @Test
     fun `hasDataToExport returns false when all counts zero`() = runTest {
         whenever(mockPatientDao.countAllPatients()).thenReturn(0)
-        whenever(mockAppointmentDao.countAllAppointments()).thenReturn(0)
-        whenever(mockPaymentDao.countAllPayments()).thenReturn(0)
+        whenever(mockAppointmentDao.count()).thenReturn(0)
+        whenever(mockPaymentDao.count()).thenReturn(0)
 
         val hasData = repository.hasDataToExport()
 
@@ -219,11 +216,10 @@ class ExportRepositoryUnitTest {
     @Test
     fun `getExportStatistics returns complete stats map`() = runTest {
         whenever(mockPatientDao.countAllPatients()).thenReturn(10)
-        whenever(mockAppointmentDao.countAllAppointments()).thenReturn(50)
-        whenever(mockPaymentDao.countAllPayments()).thenReturn(75)
-        whenever(mockPatientDao.getPatientsByStatus("ACTIVE"))
-            .thenReturn(listOf(makePatientEntity(1L)))
-        whenever(mockPatientDao.getPatientsByStatus("INACTIVE")).thenReturn(emptyList())
+        whenever(mockAppointmentDao.count()).thenReturn(50)
+        whenever(mockPaymentDao.count()).thenReturn(75)
+        whenever(mockPatientDao.getAllActivePatients()).thenReturn(listOf(makePatientEntity(1L)))
+        whenever(mockPatientDao.getAllInactivePatients()).thenReturn(emptyList())
 
         val stats = repository.getExportStatistics()
 

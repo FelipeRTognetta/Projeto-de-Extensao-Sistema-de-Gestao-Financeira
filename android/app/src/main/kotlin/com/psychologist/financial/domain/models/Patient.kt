@@ -131,6 +131,36 @@ data class Patient(
     val createdDate: LocalDateTime = LocalDateTime.now(),
 
     /**
+     * Patient CPF (Brazilian tax ID)
+     *
+     * Optional. Stored as 11 raw digits. Displayed with mask XXX.XXX.XXX-XX in the UI.
+     * Unique per patient when provided.
+     */
+    val cpf: String? = null,
+
+    /**
+     * Patient address
+     *
+     * Optional free-text field.
+     */
+    val endereco: String? = null,
+
+    /**
+     * Whether the patient is a non-paying patient
+     *
+     * When true, a PayerInfo (Responsável Financeiro) is associated with this patient.
+     */
+    val naoPagante: Boolean = false,
+
+    /**
+     * Responsável Financeiro (payer information)
+     *
+     * Populated when naoPagante = true. Null otherwise.
+     * Loaded alongside the patient when naoPagante is true.
+     */
+    val payerInfo: PayerInfo? = null,
+
+    /**
      * Number of appointments (derived)
      *
      * Optional - loaded separately from appointments table.
@@ -291,7 +321,11 @@ data class Patient(
             name: String = "Test Patient",
             phone: String? = "(11) 99999-9999",
             email: String? = "test@example.com",
-            status: PatientStatus = PatientStatus.ACTIVE
+            status: PatientStatus = PatientStatus.ACTIVE,
+            cpf: String? = null,
+            endereco: String? = null,
+            naoPagante: Boolean = false,
+            payerInfo: PayerInfo? = null
         ): Patient {
             val today = LocalDate.now()
             return Patient(
@@ -303,7 +337,11 @@ data class Patient(
                 initialConsultDate = today,
                 registrationDate = today,
                 lastAppointmentDate = null,
-                createdDate = LocalDateTime.now()
+                createdDate = LocalDateTime.now(),
+                cpf = cpf,
+                endereco = endereco,
+                naoPagante = naoPagante,
+                payerInfo = payerInfo
             )
         }
 
@@ -328,7 +366,11 @@ data class Patient(
             email: String?,
             appointmentCount: Int = 0,
             billableHours: Double = 0.0,
-            amountDue: java.math.BigDecimal = java.math.BigDecimal.ZERO
+            amountDue: java.math.BigDecimal = java.math.BigDecimal.ZERO,
+            cpf: String? = null,
+            endereco: String? = null,
+            naoPagante: Boolean = false,
+            payerInfo: PayerInfo? = null
         ): Patient {
             val today = LocalDate.now()
             return Patient(
@@ -341,7 +383,11 @@ data class Patient(
                 registrationDate = today,
                 appointmentCount = appointmentCount,
                 totalBillableHours = billableHours,
-                amountDueNow = amountDue
+                amountDueNow = amountDue,
+                cpf = cpf,
+                endereco = endereco,
+                naoPagante = naoPagante,
+                payerInfo = payerInfo
             )
         }
     }

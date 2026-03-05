@@ -102,16 +102,23 @@ class CreatePatientUseCase(
         name: String,
         phone: String? = null,
         email: String? = null,
-        initialConsultDate: LocalDate = LocalDate.now()
+        initialConsultDate: LocalDate = LocalDate.now(),
+        cpf: String? = null,
+        endereco: String? = null
     ): CreatePatientResult {
         return try {
             // Validate input
-            val validationErrors = patientValidator.validateNewPatient(
-                name = name,
-                phone = phone,
-                email = email,
-                initialConsultDate = initialConsultDate
+            val validationErrors = mutableListOf<ValidationError>()
+            validationErrors.addAll(
+                patientValidator.validateNewPatient(
+                    name = name,
+                    phone = phone,
+                    email = email,
+                    initialConsultDate = initialConsultDate
+                )
             )
+            val rawCpf = cpf?.filter { it.isDigit() }?.ifEmpty { null }
+            validationErrors.addAll(patientValidator.validateCpf(rawCpf))
 
             if (validationErrors.isNotEmpty()) {
                 Log.w(TAG, "Validation failed: ${validationErrors.size} errors")
@@ -128,7 +135,9 @@ class CreatePatientUseCase(
                 initialConsultDate = initialConsultDate,
                 registrationDate = LocalDate.now(),
                 lastAppointmentDate = null,
-                createdDate = LocalDateTime.now()
+                createdDate = LocalDateTime.now(),
+                cpf = rawCpf,
+                endereco = endereco?.trim()?.ifBlank { null }
             )
 
             // Save to repository
@@ -209,14 +218,21 @@ class CreatePatientUseCase(
         name: String,
         phone: String? = null,
         email: String? = null,
-        initialConsultDate: LocalDate = LocalDate.now()
+        initialConsultDate: LocalDate = LocalDate.now(),
+        cpf: String? = null
     ): List<ValidationError> {
-        return patientValidator.validateNewPatient(
-            name = name,
-            phone = phone,
-            email = email,
-            initialConsultDate = initialConsultDate
+        val errors = mutableListOf<ValidationError>()
+        errors.addAll(
+            patientValidator.validateNewPatient(
+                name = name,
+                phone = phone,
+                email = email,
+                initialConsultDate = initialConsultDate
+            )
         )
+        val rawCpf = cpf?.filter { it.isDigit() }?.ifEmpty { null }
+        errors.addAll(patientValidator.validateCpf(rawCpf))
+        return errors
     }
 }
 

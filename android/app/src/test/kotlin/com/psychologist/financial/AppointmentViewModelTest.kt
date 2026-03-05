@@ -6,6 +6,7 @@ import com.psychologist.financial.domain.models.Appointment
 import com.psychologist.financial.domain.models.BillableHoursSummary
 import com.psychologist.financial.domain.usecases.CreateAppointmentUseCase
 import com.psychologist.financial.domain.usecases.GetPatientAppointmentsUseCase
+import com.psychologist.financial.domain.usecases.UpdateAppointmentUseCase
 import com.psychologist.financial.services.BillableHoursCalculator
 import com.psychologist.financial.viewmodel.AppointmentViewModel
 import com.psychologist.financial.viewmodel.AppointmentViewState
@@ -62,6 +63,9 @@ class AppointmentViewModelTest {
 
     @Mock
     private lateinit var mockCreateAppointmentUseCase: CreateAppointmentUseCase
+
+    @Mock
+    private lateinit var mockUpdateAppointmentUseCase: UpdateAppointmentUseCase
 
     private lateinit var mockBillableHoursCalculator: BillableHoursCalculator
 
@@ -120,6 +124,7 @@ class AppointmentViewModelTest {
             repository = mockRepository,
             getPatientAppointmentsUseCase = mockGetPatientAppointmentsUseCase,
             createAppointmentUseCase = mockCreateAppointmentUseCase,
+            updateAppointmentUseCase = mockUpdateAppointmentUseCase,
             billableHoursCalculator = mockBillableHoursCalculator
         )
     }
@@ -218,7 +223,7 @@ class AppointmentViewModelTest {
     }
 
     @Test
-    fun loadPatientAppointments_initialState_isLoading() {
+    fun loadPatientAppointments_initialState_isLoading() = runTest {
         // Arrange
         val patientId = 1L
         whenever(mockGetPatientAppointmentsUseCase.execute(patientId))
@@ -362,7 +367,7 @@ class AppointmentViewModelTest {
     }
 
     @Test
-    fun selectAppointment_initialState_isLoading() {
+    fun selectAppointment_initialState_isLoading() = runTest {
         // Arrange
         val appointmentId = 1L
         whenever(mockRepository.getById(appointmentId))

@@ -8,6 +8,7 @@ import net.sqlcipher.database.SupportFactory
 import androidx.room.Room
 import com.psychologist.financial.data.entities.AppointmentEntity
 import com.psychologist.financial.data.entities.PatientEntity
+import com.psychologist.financial.data.entities.PayerInfoEntity
 import com.psychologist.financial.data.entities.PaymentEntity
 import com.psychologist.financial.utils.Constants
 import android.util.Log
@@ -46,6 +47,7 @@ import com.psychologist.financial.services.SecureKeyStore
         PatientEntity::class,
         AppointmentEntity::class,
         PaymentEntity::class,
+        PayerInfoEntity::class,
     ],
     version = Constants.DATABASE_VERSION,
     exportSchema = false
@@ -56,6 +58,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun patientDao(): PatientDao
     abstract fun appointmentDao(): AppointmentDao
     abstract fun paymentDao(): PaymentDao
+    abstract fun payerInfoDao(): PayerInfoDao
 
     companion object {
         private const val TAG = "AppDatabase"
@@ -163,6 +166,7 @@ abstract class AppDatabase : RoomDatabase() {
                 Constants.DATABASE_NAME
             )
                 .openHelperFactory(SupportFactory(passphraseBytes))
+                .addMigrations(MIGRATION_1_2)
                 .addCallback(databaseCallback)
                 .apply {
                     // Configuration options
@@ -194,6 +198,7 @@ abstract class AppDatabase : RoomDatabase() {
                 Constants.DATABASE_NAME
             )
                 .openHelperFactory(SupportFactory(encryptionKey))
+                .addMigrations(MIGRATION_1_2)
                 .addCallback(databaseCallback)
                 .apply {
                     setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)

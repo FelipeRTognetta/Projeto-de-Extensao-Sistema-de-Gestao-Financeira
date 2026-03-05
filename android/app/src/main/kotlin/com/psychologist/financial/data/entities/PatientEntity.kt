@@ -65,7 +65,9 @@ import java.time.LocalDateTime
         // Composite index for filtering active patients by registration date
         Index(name = "idx_patient_status_regdate", value = ["status", "registration_date"]),
         // Index for "most recently active patients" query
-        Index(name = "idx_patient_last_appt", value = ["last_appointment_date"], unique = false)
+        Index(name = "idx_patient_last_appt", value = ["last_appointment_date"], unique = false),
+        // Unique index for CPF (SQLite allows multiple NULLs even with UNIQUE)
+        Index(name = "idx_patient_cpf", value = ["cpf"], unique = true)
     ]
 )
 data class PatientEntity(
@@ -202,6 +204,36 @@ data class PatientEntity(
     val lastAppointmentDate: LocalDate? = null,
 
     /**
+     * Patient CPF (Brazilian tax ID)
+     *
+     * Optional field. When provided, must be unique across all patients.
+     * Stored as 11 raw digits (e.g., "12345678909").
+     * Uniqueness enforced by partial index idx_patient_cpf (WHERE cpf IS NOT NULL)
+     * and application-level check via PatientDao.isCpfInUse().
+     * Display with mask XXX.XXX.XXX-XX applied at UI layer only.
+     */
+    @ColumnInfo(name = "cpf", defaultValue = "NULL")
+    val cpf: String? = null,
+
+    /**
+     * Patient address
+     *
+     * Optional free-text field. No structure enforced.
+     */
+    @ColumnInfo(name = "endereco", defaultValue = "NULL")
+    val endereco: String? = null,
+
+    /**
+     * Whether the patient is a non-paying patient
+     *
+     * When true, a Responsável Financeiro (PayerInfo) must be associated.
+     * Default false — most patients pay directly.
+     * Stored as INTEGER (0 = false, 1 = true).
+     */
+    @ColumnInfo(name = "nao_pagante", defaultValue = "0")
+    val naoPagante: Boolean = false,
+
+    /**
      * Creation timestamp (from BaseEntity)
      *
      * When this record was created in database.
@@ -273,7 +305,10 @@ data class PatientEntity(
             name: String = "Test Patient",
             phone: String? = "(11) 99999-9999",
             email: String? = "test@example.com",
-            status: String = Constants.PatientStatus.ACTIVE.name
+            status: String = Constants.PatientStatus.ACTIVE.name,
+            cpf: String? = null,
+            endereco: String? = null,
+            naoPagante: Boolean = false
         ): PatientEntity {
             val today = LocalDate.now()
             return PatientEntity(
@@ -285,7 +320,10 @@ data class PatientEntity(
                 initialConsultDate = today,
                 registrationDate = today,
                 lastAppointmentDate = null,
-                createdDate = LocalDateTime.now()
+                createdDate = LocalDateTime.now(),
+                cpf = cpf,
+                endereco = endereco,
+                naoPagante = naoPagante
             )
         }
     }

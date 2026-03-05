@@ -8,6 +8,7 @@ import com.psychologist.financial.data.repositories.AppointmentRepository
 import com.psychologist.financial.data.repositories.DashboardRepository
 import com.psychologist.financial.data.repositories.ExportRepository
 import com.psychologist.financial.data.repositories.PatientRepository
+import com.psychologist.financial.data.repositories.PayerInfoRepository
 import com.psychologist.financial.data.repositories.PaymentRepository
 import com.psychologist.financial.domain.usecases.CreateAppointmentUseCase
 import com.psychologist.financial.domain.usecases.UpdateAppointmentUseCase
@@ -22,6 +23,7 @@ import com.psychologist.financial.domain.usecases.MarkPatientInactiveUseCase
 import com.psychologist.financial.domain.usecases.ReactivatePatientUseCase
 import com.psychologist.financial.domain.usecases.UpdatePatientUseCase
 import com.psychologist.financial.domain.validation.PatientValidator
+import com.psychologist.financial.domain.validation.PayerInfoValidator
 import com.psychologist.financial.domain.validation.PaymentValidator
 import com.psychologist.financial.services.BiometricAuthManager
 import com.psychologist.financial.services.DatabaseEncryptionManager
@@ -167,11 +169,16 @@ object AppModule {
         ExportRepository(database).also { Log.d(TAG, "ExportRepository created") }
     }
 
+    val payerInfoRepository: PayerInfoRepository by lazy {
+        PayerInfoRepository(database).also { Log.d(TAG, "PayerInfoRepository created") }
+    }
+
     // ========================================
     // Validators (stateless, no shared state)
     // ========================================
 
     val patientValidator: PatientValidator by lazy { PatientValidator() }
+    val payerInfoValidator: PayerInfoValidator by lazy { PayerInfoValidator() }
     val paymentValidator: PaymentValidator by lazy { PaymentValidator() }
 
     // ========================================
@@ -240,7 +247,9 @@ object AppModule {
         createPatientUseCase = createPatientUseCase,
         markPatientInactiveUseCase = markPatientInactiveUseCase,
         reactivatePatientUseCase = reactivatePatientUseCase,
-        updatePatientUseCase = updatePatientUseCase
+        updatePatientUseCase = updatePatientUseCase,
+        payerInfoRepository = payerInfoRepository,
+        payerInfoValidator = payerInfoValidator
     )
 
     fun provideAppointmentViewModel(): AppointmentViewModel = AppointmentViewModel(

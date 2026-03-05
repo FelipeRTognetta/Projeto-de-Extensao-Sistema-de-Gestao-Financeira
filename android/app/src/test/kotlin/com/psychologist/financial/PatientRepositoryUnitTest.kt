@@ -69,9 +69,13 @@ class PatientRepositoryUnitTest {
         lastAppointmentDate = null
     )
 
+    @Mock
+    private lateinit var mockPayerInfoDao: com.psychologist.financial.data.database.PayerInfoDao
+
     @Before
     fun setUp() {
         whenever(mockDatabase.patientDao()).thenReturn(mockPatientDao)
+        whenever(mockDatabase.payerInfoDao()).thenReturn(mockPayerInfoDao)
         repository = PatientRepository(database = mockDatabase)
     }
 
@@ -164,7 +168,7 @@ class PatientRepositoryUnitTest {
     @Test
     fun `searchPatients returns matching patients`() = runTest {
         val entities = listOf(makePatientEntity(1L, "João Silva"))
-        whenever(mockPatientDao.searchPatients(any())).thenReturn(entities)
+        whenever(mockPatientDao.searchPatientsByName(any())).thenReturn(entities)
 
         val result = repository.searchPatients("João")
 
