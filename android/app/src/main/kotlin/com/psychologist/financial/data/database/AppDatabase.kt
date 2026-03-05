@@ -10,6 +10,7 @@ import com.psychologist.financial.data.entities.AppointmentEntity
 import com.psychologist.financial.data.entities.PatientEntity
 import com.psychologist.financial.data.entities.PayerInfoEntity
 import com.psychologist.financial.data.entities.PaymentEntity
+import com.psychologist.financial.data.entities.PaymentAppointmentCrossRef
 import com.psychologist.financial.utils.Constants
 import android.util.Log
 import com.psychologist.financial.services.DatabaseEncryptionManager
@@ -47,6 +48,7 @@ import com.psychologist.financial.services.SecureKeyStore
         PatientEntity::class,
         AppointmentEntity::class,
         PaymentEntity::class,
+        PaymentAppointmentCrossRef::class,
         PayerInfoEntity::class,
     ],
     version = Constants.DATABASE_VERSION,
@@ -166,7 +168,7 @@ abstract class AppDatabase : RoomDatabase() {
                 Constants.DATABASE_NAME
             )
                 .openHelperFactory(SupportFactory(passphraseBytes))
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .addCallback(databaseCallback)
                 .apply {
                     // Configuration options
@@ -198,7 +200,7 @@ abstract class AppDatabase : RoomDatabase() {
                 Constants.DATABASE_NAME
             )
                 .openHelperFactory(SupportFactory(encryptionKey))
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .addCallback(databaseCallback)
                 .apply {
                     setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)

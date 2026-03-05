@@ -2,7 +2,10 @@ package com.psychologist.financial.data.repositories
 
 import com.psychologist.financial.data.database.AppDatabase
 import com.psychologist.financial.data.database.PaymentDao
+import com.psychologist.financial.data.entities.AppointmentEntity
+import com.psychologist.financial.data.entities.PaymentAppointmentCrossRef
 import com.psychologist.financial.data.entities.PaymentEntity
+import com.psychologist.financial.domain.models.Appointment
 import com.psychologist.financial.domain.models.Payment
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -21,14 +24,14 @@ import java.time.LocalDate
  * - Uses PaymentDao for database operations
  * - Maps Entity ↔ Domain model bidirectionally
  * - Provides reactive (Flow) and sync APIs
- * - Enforces business logic constraints
+ * - Manages junction table for many-to-many payment-appointment relationships
  *
  * Responsibilities:
  * - CRUD operations (Create, Read, Update, Delete)
  * - Patient-specific payment queries
- * - Status filtering (PAID/PENDING)
  * - Date range filtering
- * - Balance calculations (Amount Due Now, Total Outstanding)
+ * - Junction table operations (link/unlink appointments)
+ * - Balance calculations (Total amount paid)
  * - Entity ↔ Model mapping
  * - Transaction management
  *
@@ -37,38 +40,40 @@ import java.time.LocalDate
  * - Automatically reused and collected by UI layers
  * - Updates trigger automatically when data changes
  *
- * Balance Calculations:
- * - Amount Due Now: SUM(amount) WHERE status = 'PAID'
- * - Total Outstanding: SUM(amount) WHERE status = 'PENDING'
- * - Total Received: SUM(amount) WHERE status = 'PAID' (same as due now)
+ * Many-to-Many Relationships:
+ * - Junction Table: payment_appointments
+ * - One payment can cover multiple appointments
+ * - One appointment can only be covered by one payment (business rule)
+ *
+ * Migration note (v2→v3):
+ * - Removed: status and paymentMethod fields
+ * - Changed: appointmentId FK → many-to-many junction table
+ * - All payments are implicitly PAID (status field removed)
  *
  * Usage Example:
  * ```kotlin
- * // Get all patient payments (reactive)
- * paymentRepository.getByPatientFlow(patientId).collect { payments ->
- *     updatePaymentList(payments)
+ * // Get all patient payments with linked appointments (reactive)
+ * paymentRepository.getByPatientWithAppointments(patientId).collect { paymentsWithAppointments ->
+ *     updatePaymentList(paymentsWithAppointments)
  * }
  *
- * // Insert new payment
+ * // Insert new payment with multiple appointments
  * val paymentId = paymentRepository.insert(
  *     patientId = 1L,
- *     appointmentId = null,
  *     amount = BigDecimal("150.00"),
- *     status = "PAID",
- *     paymentMethod = "TRANSFER",
  *     paymentDate = LocalDate.now()
  * )
+ * paymentRepository.linkAppointment(paymentId, 10L)
+ * paymentRepository.linkAppointment(paymentId, 11L)
  *
- * // Get balance calculations
- * val amountDueNow = paymentRepository.getAmountDueNow(patientId)
- * val totalOutstanding = paymentRepository.getTotalOutstanding(patientId)
- *
- * // Get payments for date range
- * val monthPayments = paymentRepository.getByPatientAndDateRange(
- *     patientId = 1L,
- *     startDate = LocalDate.now().withDayOfMonth(1),
- *     endDate = LocalDate.now().withDayOfMonth(1).plusMonths(1).minusDays(1)
+ * // Or use atomic createPaymentWithAppointments
+ * paymentRepository.createPaymentWithAppointments(
+ *     payment = Payment(patientId = 1L, amount = BigDecimal("150.00"), ...),
+ *     appointmentIds = listOf(10L, 11L)
  * )
+ *
+ * // Get unpaid appointments for payment form
+ * val unpaidAppointments = paymentRepository.getUnpaidAppointmentsForPatient(patientId)
  * ```
  */
 class PaymentRepository(
@@ -81,30 +86,23 @@ class PaymentRepository(
     // ========================================
 
     /**
-     * Insert new payment
+     * Insert new payment (without appointments)
+     *
+     * Use linkAppointment() or createPaymentWithAppointments() to add appointment links.
      *
      * @param patientId Patient ID
-     * @param appointmentId Optional appointment ID
      * @param amount Payment amount
-     * @param status Payment status (PAID or PENDING)
-     * @param paymentMethod Payment method (CASH, TRANSFER, etc.)
      * @param paymentDate Payment date
      * @return ID of inserted payment
      */
     suspend fun insert(
         patientId: Long,
-        appointmentId: Long? = null,
         amount: BigDecimal,
-        status: String,
-        paymentMethod: String,
         paymentDate: LocalDate
     ): Long {
         val entity = PaymentEntity(
             patientId = patientId,
-            appointmentId = appointmentId,
             amount = amount,
-            status = status,
-            paymentMethod = paymentMethod,
             paymentDate = paymentDate
         )
         return paymentDao.insert(entity)
@@ -118,6 +116,33 @@ class PaymentRepository(
      */
     suspend fun insertEntity(entity: PaymentEntity): Long {
         return paymentDao.insert(entity)
+    }
+
+    /**
+     * Create payment with multiple appointment links (atomic operation)
+     *
+     * Inserts payment and all junction table rows in a single transaction.
+     * Ensures data consistency between payment and its appointments.
+     *
+     * @param payment Payment to create
+     * @param appointmentIds List of appointment IDs to link
+     * @return ID of inserted payment
+     */
+    suspend fun createPaymentWithAppointments(
+        payment: Payment,
+        appointmentIds: List<Long>
+    ): Long {
+        val entity = payment.toEntity()
+        val paymentId = paymentDao.insert(entity)
+
+        // Link all appointments
+        appointmentIds.forEach { appointmentId ->
+            paymentDao.insertAppointmentLink(
+                PaymentAppointmentCrossRef(paymentId, appointmentId)
+            )
+        }
+
+        return paymentId
     }
 
     // ========================================
@@ -164,27 +189,6 @@ class PaymentRepository(
     }
 
     /**
-     * Get count of payments by status
-     *
-     * @param status Payment status
-     * @return Number of payments
-     */
-    suspend fun countByStatus(status: String): Int {
-        return paymentDao.countByStatus(status)
-    }
-
-    /**
-     * Get count of payments for patient by status
-     *
-     * @param patientId Patient ID
-     * @param status Payment status
-     * @return Number of payments
-     */
-    suspend fun countByPatientAndStatus(patientId: Long, status: String): Int {
-        return paymentDao.countByPatientAndStatus(patientId, status)
-    }
-
-    /**
      * Get count of payments in date range
      *
      * @param startDate Start date
@@ -220,6 +224,25 @@ class PaymentRepository(
     }
 
     /**
+     * Get all payments with linked appointments (read model)
+     *
+     * Includes the list of appointment IDs for each payment via junction table.
+     * Ordered by most recent payment date first.
+     *
+     * @return Flow of payments with linked appointments
+     */
+    fun getAllWithAppointments(): Flow<List<PaymentWithDetails>> {
+        return paymentDao.getAllWithAppointments().map { paymentWithAppointments ->
+            paymentWithAppointments.map { pa ->
+                PaymentWithDetails(
+                    payment = pa.payment.toDomain(),
+                    appointments = pa.appointments.map { it.toDomain() }
+                )
+            }
+        }
+    }
+
+    /**
      * Get payments for patient
      *
      * @param patientId Patient ID
@@ -242,48 +265,22 @@ class PaymentRepository(
     }
 
     /**
-     * Get payments by status
+     * Get payments for patient with linked appointments (read model)
      *
-     * @param status Payment status
-     * @return Payments with status
-     */
-    suspend fun getByStatus(status: String): List<Payment> {
-        return paymentDao.getByStatus(status).map { it.toDomain() }
-    }
-
-    /**
-     * Get payments by status as Flow (reactive)
-     *
-     * @param status Payment status
-     * @return Flow of payments with status
-     */
-    fun getByStatusFlow(status: String): Flow<List<Payment>> {
-        return paymentDao.getByStatusFlow(status).map { entities ->
-            entities.map { it.toDomain() }
-        }
-    }
-
-    /**
-     * Get payments for patient by status
+     * Includes the list of appointments for each payment.
+     * Ordered by most recent payment date first.
      *
      * @param patientId Patient ID
-     * @param status Payment status
-     * @return Patient's payments with status
+     * @return Flow of patient's payments with linked appointments
      */
-    suspend fun getByPatientAndStatus(patientId: Long, status: String): List<Payment> {
-        return paymentDao.getByPatientAndStatus(patientId, status).map { it.toDomain() }
-    }
-
-    /**
-     * Get payments for patient by status as Flow (reactive)
-     *
-     * @param patientId Patient ID
-     * @param status Payment status
-     * @return Flow of patient's payments with status
-     */
-    fun getByPatientAndStatusFlow(patientId: Long, status: String): Flow<List<Payment>> {
-        return paymentDao.getByPatientAndStatusFlow(patientId, status).map { entities ->
-            entities.map { it.toDomain() }
+    fun getByPatientWithAppointments(patientId: Long): Flow<List<PaymentWithDetails>> {
+        return paymentDao.getByPatientWithAppointments(patientId).map { paymentWithAppointments ->
+            paymentWithAppointments.map { pa ->
+                PaymentWithDetails(
+                    payment = pa.payment.toDomain(),
+                    appointments = pa.appointments.map { it.toDomain() }
+                )
+            }
         }
     }
 
@@ -319,59 +316,6 @@ class PaymentRepository(
     }
 
     /**
-     * Get payments for patient by status and date range
-     *
-     * @param patientId Patient ID
-     * @param status Payment status
-     * @param startDate Start date
-     * @param endDate End date
-     * @return Payments matching all criteria
-     */
-    suspend fun getByPatientStatusAndDateRange(
-        patientId: Long,
-        status: String,
-        startDate: LocalDate,
-        endDate: LocalDate
-    ): List<Payment> {
-        return paymentDao.getByPatientStatusAndDateRange(patientId, status, startDate, endDate)
-            .map { it.toDomain() }
-    }
-
-    /**
-     * Get payments linked to appointment
-     *
-     * @param appointmentId Appointment ID
-     * @return Payments for appointment
-     */
-    suspend fun getByAppointment(appointmentId: Long): List<Payment> {
-        return paymentDao.getByAppointment(appointmentId).map { it.toDomain() }
-    }
-
-    /**
-     * Get unlinked payments for patient
-     *
-     * @param patientId Patient ID
-     * @return Payments without appointment link
-     */
-    suspend fun getUnlinkedByPatient(patientId: Long): List<Payment> {
-        return paymentDao.getUnlinkedByPatient(patientId).map { it.toDomain() }
-    }
-
-    /**
-     * Get overdue pending payments for patient
-     *
-     * @param patientId Patient ID
-     * @param currentDate Current date for comparison
-     * @return Overdue payments
-     */
-    suspend fun getPastDueByPatient(
-        patientId: Long,
-        currentDate: LocalDate = LocalDate.now()
-    ): List<Payment> {
-        return paymentDao.getPastDueByPatient(patientId, currentDate).map { it.toDomain() }
-    }
-
-    /**
      * Get recent payments for patient
      *
      * @param patientId Patient ID
@@ -380,6 +324,50 @@ class PaymentRepository(
      */
     suspend fun getRecentByPatient(patientId: Long, limit: Int = 10): List<Payment> {
         return paymentDao.getRecentByPatient(patientId, limit).map { it.toDomain() }
+    }
+
+    // ========================================
+    // Appointment Linking Operations
+    // ========================================
+
+    /**
+     * Link payment to appointment (junction table insert)
+     *
+     * Creates an association between payment and appointment.
+     * A payment can cover multiple appointments; use repeatedly to add more.
+     *
+     * @param paymentId Payment ID
+     * @param appointmentId Appointment ID to link
+     */
+    suspend fun linkAppointment(paymentId: Long, appointmentId: Long) {
+        paymentDao.insertAppointmentLink(
+            PaymentAppointmentCrossRef(paymentId, appointmentId)
+        )
+    }
+
+    /**
+     * Delete all appointment links for a payment
+     *
+     * Removes all associations between payment and its appointments.
+     *
+     * @param paymentId Payment ID
+     */
+    suspend fun unlinkAllAppointments(paymentId: Long) {
+        paymentDao.deleteAppointmentLinksByPayment(paymentId)
+    }
+
+    /**
+     * Get unpaid (unlinked) appointments for patient
+     *
+     * Returns appointments that have no payment link in the junction table.
+     * Useful for payment form to show available appointments to link.
+     *
+     * @param patientId Patient ID
+     * @return List of unpaid appointments
+     */
+    suspend fun getUnpaidAppointmentsForPatient(patientId: Long): List<Appointment> {
+        return paymentDao.getUnpaidAppointmentsByPatient(patientId)
+            .map { it.toDomain() }
     }
 
     // ========================================
@@ -405,49 +393,14 @@ class PaymentRepository(
         paymentDao.update(entity)
     }
 
-    /**
-     * Mark payment as paid
-     *
-     * @param paymentId Payment ID
-     */
-    suspend fun markAsPaid(paymentId: Long) {
-        paymentDao.markAsPaid(paymentId)
-    }
-
-    /**
-     * Mark payment as pending
-     *
-     * @param paymentId Payment ID
-     */
-    suspend fun markAsPending(paymentId: Long) {
-        paymentDao.markAsPending(paymentId)
-    }
-
-    /**
-     * Link payment to appointment
-     *
-     * @param paymentId Payment ID
-     * @param appointmentId Appointment ID
-     */
-    suspend fun linkToAppointment(paymentId: Long, appointmentId: Long) {
-        paymentDao.linkToAppointment(paymentId, appointmentId)
-    }
-
-    /**
-     * Unlink payment from appointment
-     *
-     * @param paymentId Payment ID
-     */
-    suspend fun unlinkFromAppointment(paymentId: Long) {
-        paymentDao.unlinkFromAppointment(paymentId)
-    }
-
     // ========================================
     // Delete Operations
     // ========================================
 
     /**
      * Delete payment
+     *
+     * Cascade delete removes all junction rows (appointment links) automatically.
      *
      * @param payment Payment to delete
      */
@@ -489,9 +442,9 @@ class PaymentRepository(
     // ========================================
 
     /**
-     * Get total amount paid
+     * Get total amount paid (sum of all payments for patient)
      *
-     * Sum of all PAID payments for patient.
+     * All payments are PAID (status field removed).
      *
      * @param patientId Patient ID
      * @return Total paid amount
@@ -508,51 +461,6 @@ class PaymentRepository(
      */
     fun getTotalAmountPaidFlow(patientId: Long): Flow<BigDecimal> {
         return paymentDao.getTotalAmountPaidFlow(patientId)
-    }
-
-    /**
-     * Get amount due now
-     *
-     * Sum of all PAID payments (accounting perspective).
-     *
-     * @param patientId Patient ID
-     * @return Amount due now
-     */
-    suspend fun getAmountDueNow(patientId: Long): BigDecimal {
-        return paymentDao.getAmountDueNow(patientId)
-    }
-
-    /**
-     * Get total outstanding
-     *
-     * Sum of all PENDING payments.
-     *
-     * @param patientId Patient ID
-     * @return Total outstanding amount
-     */
-    suspend fun getTotalOutstanding(patientId: Long): BigDecimal {
-        return paymentDao.getTotalOutstanding(patientId)
-    }
-
-    /**
-     * Get total outstanding as Flow (reactive)
-     *
-     * @param patientId Patient ID
-     * @return Flow of total outstanding amount
-     */
-    fun getTotalOutstandingFlow(patientId: Long): Flow<BigDecimal> {
-        return paymentDao.getTotalOutstandingFlow(patientId)
-    }
-
-    /**
-     * Get total amount by payment method
-     *
-     * @param patientId Patient ID
-     * @param method Payment method
-     * @return Total amount for method
-     */
-    suspend fun getTotalByMethod(patientId: Long, method: String): BigDecimal {
-        return paymentDao.getTotalByMethod(patientId, method)
     }
 
     /**
@@ -608,6 +516,9 @@ class PaymentRepository(
     /**
      * Convert PaymentEntity to domain Payment
      *
+     * Removes status and paymentMethod fields (removed in v3 migration).
+     * Does not include appointment IDs (use DAO read models for that).
+     *
      * @receiver Entity
      * @return Domain model
      */
@@ -615,17 +526,17 @@ class PaymentRepository(
         return Payment(
             id = id,
             patientId = patientId,
-            appointmentId = appointmentId,
             amount = amount,
-            status = status,
-            paymentMethod = paymentMethod,
             paymentDate = paymentDate,
-            createdDate = createdDate
+            createdDate = createdDate,
+            appointmentIds = emptyList() // Use getAllWithAppointments() for appointments
         )
     }
 
     /**
      * Convert domain Payment to PaymentEntity
+     *
+     * Appointments are managed separately via junction table.
      *
      * @receiver Domain model
      * @return Entity
@@ -634,12 +545,41 @@ class PaymentRepository(
         return PaymentEntity(
             id = id,
             patientId = patientId,
-            appointmentId = appointmentId,
             amount = amount,
-            status = status,
-            paymentMethod = paymentMethod,
             paymentDate = paymentDate,
             createdDate = createdDate
         )
     }
+
+    /**
+     * Convert AppointmentEntity to domain Appointment
+     *
+     * @receiver Entity
+     * @return Domain model
+     */
+    private fun AppointmentEntity.toDomain(): Appointment {
+        return Appointment(
+            id = id,
+            patientId = patientId,
+            date = date,
+            timeStart = timeStart,
+            durationMinutes = durationMinutes,
+            notes = notes,
+            createdDate = createdDate
+        )
+    }
 }
+
+/**
+ * Payment with linked appointments (read model)
+ *
+ * Combines payment data with its associated appointments loaded from junction table.
+ * Used for payment list screens that need to display appointment details.
+ *
+ * @param payment Payment domain model
+ * @param appointments List of linked appointments
+ */
+data class PaymentWithDetails(
+    val payment: Payment,
+    val appointments: List<Appointment>
+)

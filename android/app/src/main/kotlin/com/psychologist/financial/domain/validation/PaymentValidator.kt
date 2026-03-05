@@ -1,6 +1,7 @@
 package com.psychologist.financial.domain.validation
 
 import android.util.Log
+import com.psychologist.financial.domain.models.Payment
 import java.math.BigDecimal
 import java.time.LocalDate
 
@@ -8,11 +9,14 @@ import java.time.LocalDate
  * Validator for Payment data
  *
  * Enforces business rules for payment recording:
- * - Amount: BigDecimal, positive, max 999999.99
- * - Payment Date: Valid LocalDate, cannot be in future
- * - Payment Method: Required, valid method (Dinheiro, Débito, Crédito, Pix, Cheque, Outro)
- * - Payment Status: PAID or PENDING
- * - Patient Status: Only ACTIVE patients can have payments created
+ * - Amount: BigDecimal, positive, > 0, max 999999.99
+ * - Patient ID: > 0 (required)
+ * - Appointment IDs: Optional list, all IDs must be > 0 if provided
+ *
+ * Migration note (v2→v3):
+ * - Removed: Payment method and status validation (no longer fields in Payment model)
+ * - All payments are now implicitly PAID (status field removed)
+ * - Appointment linking is via junction table (many-to-many)
  *
  * Architecture:
  * - Validation layer (domain)
@@ -21,9 +25,9 @@ import java.time.LocalDate
  * - Used by use cases before repository operations
  *
  * Validation Flow:
- * 1. PaymentValidator checks format/constraints
+ * 1. PaymentValidator.validate(payment: Payment) checks domain constraints
  * 2. Use case applies validator
- * 3. Repository checks related data (patient existence, appointment if linked)
+ * 3. Repository checks related data (patient existence, appointment validity)
  * 4. Database enforces constraints
  * (Defense in depth)
  *
@@ -31,16 +35,18 @@ import java.time.LocalDate
  * ```kotlin
  * val validator = PaymentValidator()
  *
- * val errors = validator.validateNewPayment(
+ * val payment = Payment(
+ *     id = 0L,
+ *     patientId = 1L,
  *     amount = BigDecimal("150.00"),
  *     paymentDate = LocalDate.of(2024, 3, 15),
- *     method = "Débito",
- *     status = "PAID",
- *     patientStatus = "ACTIVE"
+ *     appointmentIds = listOf(10L, 11L)
  * )
  *
- * if (errors.isNotEmpty()) {
- *     showErrors(errors)
+ * val result = validator.validate(payment)
+ *
+ * if (!result.isValid) {
+ *     showErrors(result.errors)
  * } else {
  *     createPayment()
  * }
@@ -59,341 +65,121 @@ class PaymentValidator {
         // Validation constants
         private val AMOUNT_MIN = BigDecimal("0.01")
         private val AMOUNT_MAX = BigDecimal("999999.99")
-        private val VALID_METHODS = setOf(
-            "Dinheiro", "Débito", "Crédito", "Pix", "Cheque", "Outro",
-            "dinheiro", "débito", "crédito", "pix", "cheque", "outro"
-        )
-        private val VALID_STATUSES = setOf("PAID", "PENDING", "Pago", "Pendente")
     }
 
     /**
-     * Validate new payment data
+     * Validate payment domain model
      *
-     * Checks all required fields for new payment creation.
-     * Returns list of validation errors (empty if valid).
+     * Checks all required fields and business rules for payment creation.
+     * Returns ValidationResult with isValid flag and error list.
      *
-     * @param amount Payment amount in BigDecimal
-     * @param paymentDate Date of payment
-     * @param method Payment method (e.g., "Débito", "Crédito", "Pix")
-     * @param status Payment status (PAID or PENDING)
-     * @param patientStatus Patient status (to prevent payments for inactive)
-     * @return List of ValidationError (empty if valid)
-     *
-     * Example:
-     * ```kotlin
-     * val errors = validator.validateNewPayment(
-     *     amount = BigDecimal("150.00"),
-     *     paymentDate = LocalDate.of(2024, 3, 15),
-     *     method = "Débito",
-     *     status = "PAID",
-     *     patientStatus = "ACTIVE"
-     * )
-     * ```
+     * @param payment Payment to validate
+     * @return ValidationResult containing isValid flag and errors list
      */
-    fun validateNewPayment(
-        amount: BigDecimal?,
-        paymentDate: LocalDate,
-        method: String,
-        status: String,
-        patientStatus: String = "ACTIVE"
-    ): List<ValidationError> {
-        val errors = mutableListOf<ValidationError>()
-
-        // Validate patient status first (blocking check)
-        validatePatientStatus(patientStatus).let { errors.addAll(it) }
+    fun validate(payment: Payment): ValidationResult {
+        val errors = mutableListOf<String>()
 
         // Validate amount
-        validateAmount(amount).let { errors.addAll(it) }
+        validateAmount(payment.amount).let { errors.addAll(it) }
 
-        // Validate payment date
-        validatePaymentDate(paymentDate).let { errors.addAll(it) }
+        // Validate patient ID
+        validatePatientId(payment.patientId).let { errors.addAll(it) }
 
-        // Validate method
-        validateMethod(method).let { errors.addAll(it) }
-
-        // Validate status
-        validateStatus(status).let { errors.addAll(it) }
+        // Validate appointment IDs (optional, but if provided, must be valid)
+        validateAppointmentIds(payment.appointmentIds).let { errors.addAll(it) }
 
         if (errors.isNotEmpty()) {
             Log.w(TAG, "Validation failed: ${errors.size} errors")
         }
 
-        return errors
+        return ValidationResult(
+            isValid = errors.isEmpty(),
+            errors = errors
+        )
     }
 
     /**
      * Validate payment amount
      *
      * Rules:
-     * - Required (not null, not empty)
      * - Must be positive (> 0)
      * - Minimum: 0.01
      * - Maximum: 999999.99
-     * - Must have valid decimal precision (max 2 decimal places)
      *
      * @param amount Amount to validate
-     * @return List of errors (empty if valid)
+     * @return List of error messages (empty if valid)
      */
-    fun validateAmount(amount: BigDecimal?): List<ValidationError> {
-        val errors = mutableListOf<ValidationError>()
+    private fun validateAmount(amount: BigDecimal): List<String> {
+        val errors = mutableListOf<String>()
 
-        // Required
-        if (amount == null) {
-            errors.add(ValidationError(
-                field = "amount",
-                message = "Valor é obrigatório"
-            ))
-            return errors
-        }
-
-        // Positive
+        // Must be positive
         if (amount <= BigDecimal.ZERO) {
-            errors.add(ValidationError(
-                field = "amount",
-                message = "Valor deve ser maior que zero"
-            ))
-        }
-
-        // Minimum amount
-        if (amount < AMOUNT_MIN) {
-            errors.add(ValidationError(
-                field = "amount",
-                message = "Valor mínimo é ${AMOUNT_MIN.toPlainString()}"
-            ))
+            errors.add("Valor deve ser maior que zero")
         }
 
         // Maximum amount
         if (amount > AMOUNT_MAX) {
-            errors.add(ValidationError(
-                field = "amount",
-                message = "Valor não pode exceder ${AMOUNT_MAX.toPlainString()}"
-            ))
-        }
-
-        // Decimal precision check (max 2 decimal places)
-        val scale = amount.scale()
-        if (scale > 2) {
-            errors.add(ValidationError(
-                field = "amount",
-                message = "Valor pode ter no máximo 2 casas decimais"
-            ))
+            errors.add("Valor não pode exceder R\$ ${AMOUNT_MAX.toPlainString()}")
         }
 
         return errors
     }
 
     /**
-     * Validate payment date
+     * Validate patient ID
      *
      * Rules:
-     * - Required (not null)
-     * - Cannot be in future (payments are recorded for past/current transactions)
-     * - Must be a valid LocalDate
+     * - Must be positive (> 0)
      *
-     * Note: Past dates are allowed for entering historical payment data
-     *
-     * @param paymentDate Date to validate
-     * @return List of errors (empty if valid)
+     * @param patientId Patient ID to validate
+     * @return List of error messages (empty if valid)
      */
-    fun validatePaymentDate(paymentDate: LocalDate): List<ValidationError> {
-        val errors = mutableListOf<ValidationError>()
+    private fun validatePatientId(patientId: Long): List<String> {
+        val errors = mutableListOf<String>()
 
-        val today = LocalDate.now()
-
-        // Cannot be in future
-        if (paymentDate.isAfter(today)) {
-            errors.add(ValidationError(
-                field = "paymentDate",
-                message = "Data do pagamento não pode ser no futuro"
-            ))
+        if (patientId <= 0) {
+            errors.add("Paciente inválido")
         }
 
         return errors
     }
 
     /**
-     * Validate payment method
+     * Validate appointment IDs
      *
      * Rules:
-     * - Required (not null, not empty)
-     * - Must be one of valid methods (Dinheiro, Débito, Crédito, Pix, Cheque, Outro)
-     * - Case-insensitive
+     * - Optional (list can be empty)
+     * - If provided, all IDs must be positive (> 0)
      *
-     * @param method Method to validate
-     * @return List of errors (empty if valid)
+     * @param appointmentIds List of appointment IDs to validate
+     * @return List of error messages (empty if valid)
      */
-    fun validateMethod(method: String): List<ValidationError> {
-        val errors = mutableListOf<ValidationError>()
+    private fun validateAppointmentIds(appointmentIds: List<Long>): List<String> {
+        val errors = mutableListOf<String>()
 
-        val trimmed = method.trim()
-
-        // Required
-        if (trimmed.isEmpty()) {
-            errors.add(ValidationError(
-                field = "method",
-                message = "Método de pagamento é obrigatório"
-            ))
-            return errors
-        }
-
-        // Valid method
-        if (!VALID_METHODS.contains(trimmed)) {
-            errors.add(ValidationError(
-                field = "method",
-                message = "Método de pagamento inválido. Opções: Dinheiro, Débito, Crédito, Pix, Cheque, Outro"
-            ))
+        // Check each appointment ID is positive
+        val invalidIds = appointmentIds.filter { it <= 0 }
+        if (invalidIds.isNotEmpty()) {
+            errors.add("IDs de consulta inválidos: $invalidIds")
         }
 
         return errors
     }
-
-    /**
-     * Validate payment status
-     *
-     * Rules:
-     * - Required (not null, not empty)
-     * - Must be PAID or PENDING
-     * - Case-insensitive
-     *
-     * @param status Status to validate
-     * @return List of errors (empty if valid)
-     */
-    fun validateStatus(status: String): List<ValidationError> {
-        val errors = mutableListOf<ValidationError>()
-
-        val trimmed = status.trim().uppercase()
-
-        // Required
-        if (trimmed.isEmpty()) {
-            errors.add(ValidationError(
-                field = "status",
-                message = "Status de pagamento é obrigatório"
-            ))
-            return errors
-        }
-
-        // Valid status
-        if (trimmed !in setOf("PAID", "PENDING")) {
-            errors.add(ValidationError(
-                field = "status",
-                message = "Status deve ser 'Pago' ou 'Pendente'"
-            ))
-        }
-
-        return errors
-    }
-
-    /**
-     * Validate patient status
-     *
-     * Business rule: Only ACTIVE patients can have new payments created.
-     * Prevents accidental payment recording for inactive/archived patients.
-     *
-     * @param patientStatus Patient status (e.g., "ACTIVE", "INACTIVE")
-     * @return List of errors (empty if valid)
-     */
-    fun validatePatientStatus(patientStatus: String): List<ValidationError> {
-        val status = patientStatus.trim().uppercase()
-
-        // Only ACTIVE patients can have payments
-        if (status != "ACTIVE") {
-            return listOf(ValidationError(
-                field = "patientStatus",
-                message = "Não é possível criar pagamento para paciente inativo"
-            ))
-        }
-
-        return emptyList()
-    }
-
-    /**
-     * Validate payment update (same as new, but with id)
-     *
-     * For future use when implementing payment edit.
-     *
-     * @param paymentId Current payment ID
-     * @param amount Updated amount
-     * @param paymentDate Updated date
-     * @param method Updated method
-     * @param status Updated status
-     * @param patientStatus Patient status
-     * @return List of errors (empty if valid)
-     */
-    fun validateUpdate(
-        paymentId: Long,
-        amount: BigDecimal?,
-        paymentDate: LocalDate,
-        method: String,
-        status: String,
-        patientStatus: String = "ACTIVE"
-    ): List<ValidationError> {
-        require(paymentId > 0) { "Payment must be saved (id > 0) to update" }
-
-        // Use same validation as new payment
-        return validateNewPayment(amount, paymentDate, method, status, patientStatus)
-    }
 }
 
 /**
- * Validate payment amount quickly
+ * Validation result data class
  *
- * @param amount Amount to check
- * @return true if amount is valid
+ * Encapsulates validation outcome with validity flag and error messages.
+ *
+ * @param isValid true if validation passed, false otherwise
+ * @param errors List of error messages (empty if valid)
  */
-fun isValidPaymentAmount(amount: BigDecimal?): Boolean {
-    if (amount == null) return false
-    return amount > BigDecimal.ZERO &&
-            amount >= BigDecimal("0.01") &&
-            amount <= BigDecimal("999999.99") &&
-            amount.scale() <= 2
-}
+data class ValidationResult(
+    val isValid: Boolean,
+    val errors: List<String>
+)
 
-/**
- * Validate payment date quickly
- *
- * @param date Date to check
- * @return true if date is valid (not in future)
- */
-fun isValidPaymentDate(date: LocalDate): Boolean {
-    return !date.isAfter(LocalDate.now())
-}
-
-/**
- * Validate payment method quickly
- *
- * @param method Method to check
- * @return true if method is valid
- */
-fun isValidPaymentMethod(method: String?): Boolean {
-    if (method.isNullOrEmpty()) return false
-    val validMethods = setOf(
-        "Dinheiro", "Débito", "Crédito", "Pix", "Cheque", "Outro",
-        "dinheiro", "débito", "crédito", "pix", "cheque", "outro"
-    )
-    return validMethods.contains(method.trim())
-}
-
-/**
- * Validate payment status quickly
- *
- * @param status Status to check
- * @return true if status is valid (PAID or PENDING)
- */
-fun isValidPaymentStatus(status: String?): Boolean {
-    if (status.isNullOrEmpty()) return false
-    val trimmed = status.trim().uppercase()
-    return trimmed in setOf("PAID", "PENDING")
-}
-
-/**
- * Validate patient status for payment creation
- *
- * @param patientStatus Patient status string
- * @return true if patient is active and can have payments
- */
-fun canCreatePaymentForPatient(patientStatus: String): Boolean {
-    return patientStatus.trim().uppercase() == "ACTIVE"
-}
 
 /**
  * Format payment amount as currency string
