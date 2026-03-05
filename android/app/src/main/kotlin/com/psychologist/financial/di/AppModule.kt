@@ -11,6 +11,7 @@ import com.psychologist.financial.data.repositories.PatientRepository
 import com.psychologist.financial.data.repositories.PayerInfoRepository
 import com.psychologist.financial.data.repositories.PaymentRepository
 import com.psychologist.financial.domain.usecases.CreateAppointmentUseCase
+import com.psychologist.financial.domain.usecases.GetAllAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.UpdateAppointmentUseCase
 import com.psychologist.financial.domain.usecases.CreatePatientUseCase
 import com.psychologist.financial.domain.usecases.CreatePaymentUseCase
@@ -19,6 +20,7 @@ import com.psychologist.financial.domain.usecases.GetAllPatientsUseCase
 import com.psychologist.financial.domain.usecases.GetDashboardMetricsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientPaymentsUseCase
+import com.psychologist.financial.domain.usecases.GetAllPaymentsUseCase
 import com.psychologist.financial.domain.usecases.GetUnpaidAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.MarkPatientInactiveUseCase
 import com.psychologist.financial.domain.usecases.ReactivatePatientUseCase
@@ -210,6 +212,10 @@ object AppModule {
         GetPatientAppointmentsUseCase(appointmentRepository)
     }
 
+    val getAllAppointmentsUseCase: GetAllAppointmentsUseCase by lazy {
+        GetAllAppointmentsUseCase(appointmentRepository)
+    }
+
     val createAppointmentUseCase: CreateAppointmentUseCase by lazy {
         CreateAppointmentUseCase(appointmentRepository)
     }
@@ -228,6 +234,10 @@ object AppModule {
 
     val getUnpaidAppointmentsUseCase: GetUnpaidAppointmentsUseCase by lazy {
         GetUnpaidAppointmentsUseCase(appointmentRepository)
+    }
+
+    val getAllPaymentsUseCase: GetAllPaymentsUseCase by lazy {
+        GetAllPaymentsUseCase(paymentRepository)
     }
 
     val getDashboardMetricsUseCase: GetDashboardMetricsUseCase by lazy {
@@ -261,14 +271,16 @@ object AppModule {
         repository = appointmentRepository,
         getPatientAppointmentsUseCase = getPatientAppointmentsUseCase,
         createAppointmentUseCase = createAppointmentUseCase,
-        updateAppointmentUseCase = updateAppointmentUseCase
+        updateAppointmentUseCase = updateAppointmentUseCase,
+        getAllAppointmentsUseCase = getAllAppointmentsUseCase
     )
 
     fun providePaymentViewModel(): PaymentViewModel = PaymentViewModel(
         createPaymentUseCase = createPaymentUseCase,
         getUnpaidAppointmentsUseCase = getUnpaidAppointmentsUseCase,
         repository = paymentRepository,
-        getPatientPaymentsUseCase = getPatientPaymentsUseCase
+        getPatientPaymentsUseCase = getPatientPaymentsUseCase,
+        getAllPaymentsUseCase = getAllPaymentsUseCase
     )
 
     fun provideDashboardViewModel(): DashboardViewModel = DashboardViewModel(

@@ -1,5 +1,6 @@
 package com.psychologist.financial.viewmodel
 
+import com.psychologist.financial.data.repositories.PaymentWithDetails
 import com.psychologist.financial.domain.models.Appointment
 import com.psychologist.financial.domain.models.Payment
 import java.time.LocalDate
@@ -56,6 +57,28 @@ object PaymentViewState {
         }
 
         data class Error(val message: String) : DetailState()
+    }
+
+    // ========================================
+    // Global Payment List State
+    // ========================================
+
+    /**
+     * Global payment list state (all patients, bottom-nav tab).
+     */
+    sealed class GlobalListState {
+        object Loading : GlobalListState()
+
+        data class Success(
+            val payments: List<PaymentWithDetails>
+        ) : GlobalListState() {
+            fun getCount(): Int = payments.size
+            fun isEmpty(): Boolean = payments.isEmpty()
+        }
+
+        object Empty : GlobalListState()
+
+        data class Error(val message: String) : GlobalListState()
     }
 
     // ========================================

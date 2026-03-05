@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.psychologist.financial.data.repositories.PaymentRepository
 import com.psychologist.financial.domain.models.Payment
 import com.psychologist.financial.domain.usecases.CreatePaymentUseCase
+import com.psychologist.financial.domain.usecases.GetAllPaymentsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientPaymentsUseCase
 import com.psychologist.financial.domain.usecases.GetUnpaidAppointmentsUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,7 +36,8 @@ class PaymentViewModel(
     private val createPaymentUseCase: CreatePaymentUseCase,
     private val getUnpaidAppointmentsUseCase: GetUnpaidAppointmentsUseCase,
     private val repository: PaymentRepository? = null,
-    private val getPatientPaymentsUseCase: GetPatientPaymentsUseCase? = null
+    private val getPatientPaymentsUseCase: GetPatientPaymentsUseCase? = null,
+    private val getAllPaymentsUseCase: GetAllPaymentsUseCase? = null
 ) : ViewModel() {
 
     // ========================================
@@ -150,6 +152,41 @@ class PaymentViewModel(
                 _paymentFormState.update { it.copy(isLoading = false, errorMessage = e.message) }
             } catch (e: IllegalStateException) {
                 _paymentFormState.update { it.copy(isLoading = false, errorMessage = e.message) }
+            }
+        }
+    }
+
+    // ========================================
+    // Global Payment List State (bottom-nav tab)
+    // ========================================
+
+    private val _globalListState = MutableStateFlow<PaymentViewState.GlobalListState>(
+        PaymentViewState.GlobalListState.Loading
+    )
+    val globalListState: StateFlow<PaymentViewState.GlobalListState> = _globalListState.asStateFlow()
+
+    /**
+     * Load all payments from all patients (global list tab).
+     * Collects from [GetAllPaymentsUseCase] reactively.
+     * Emits [GlobalListState.Empty] when no payments exist.
+     */
+    fun loadAllPayments() {
+        _globalListState.value = PaymentViewState.GlobalListState.Loading
+        viewModelScope.launch {
+            try {
+                getAllPaymentsUseCase?.execute()?.collect { payments ->
+                    _globalListState.value = if (payments.isEmpty()) {
+                        PaymentViewState.GlobalListState.Empty
+                    } else {
+                        PaymentViewState.GlobalListState.Success(payments)
+                    }
+                } ?: run {
+                    _globalListState.value = PaymentViewState.GlobalListState.Empty
+                }
+            } catch (e: Exception) {
+                _globalListState.value = PaymentViewState.GlobalListState.Error(
+                    message = e.message ?: "Erro ao carregar pagamentos"
+                )
             }
         }
     }

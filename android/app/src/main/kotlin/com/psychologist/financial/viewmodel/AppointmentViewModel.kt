@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.psychologist.financial.data.repositories.AppointmentRepository
 import com.psychologist.financial.domain.models.Appointment
+import com.psychologist.financial.domain.models.AppointmentWithPaymentStatus
 import com.psychologist.financial.domain.models.BillableHoursSummary
 import com.psychologist.financial.domain.usecases.CreateAppointmentUseCase
+import com.psychologist.financial.domain.usecases.GetAllAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.UpdateAppointmentUseCase
 import com.psychologist.financial.services.BillableHoursCalculator
