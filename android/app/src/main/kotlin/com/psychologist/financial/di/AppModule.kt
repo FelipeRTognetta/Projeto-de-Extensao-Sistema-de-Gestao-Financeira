@@ -19,6 +19,7 @@ import com.psychologist.financial.domain.usecases.GetAllPatientsUseCase
 import com.psychologist.financial.domain.usecases.GetDashboardMetricsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientPaymentsUseCase
+import com.psychologist.financial.domain.usecases.GetUnpaidAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.MarkPatientInactiveUseCase
 import com.psychologist.financial.domain.usecases.ReactivatePatientUseCase
 import com.psychologist.financial.domain.usecases.UpdatePatientUseCase
@@ -225,6 +226,10 @@ object AppModule {
         CreatePaymentUseCase(paymentRepository, patientRepository, paymentValidator)
     }
 
+    val getUnpaidAppointmentsUseCase: GetUnpaidAppointmentsUseCase by lazy {
+        GetUnpaidAppointmentsUseCase(appointmentRepository)
+    }
+
     val getDashboardMetricsUseCase: GetDashboardMetricsUseCase by lazy {
         GetDashboardMetricsUseCase(dashboardRepository)
     }
@@ -260,10 +265,10 @@ object AppModule {
     )
 
     fun providePaymentViewModel(): PaymentViewModel = PaymentViewModel(
-        repository = paymentRepository,
-        getPatientPaymentsUseCase = getPatientPaymentsUseCase,
         createPaymentUseCase = createPaymentUseCase,
-        getPatientAppointmentsUseCase = getPatientAppointmentsUseCase
+        getUnpaidAppointmentsUseCase = getUnpaidAppointmentsUseCase,
+        repository = paymentRepository,
+        getPatientPaymentsUseCase = getPatientPaymentsUseCase
     )
 
     fun provideDashboardViewModel(): DashboardViewModel = DashboardViewModel(
