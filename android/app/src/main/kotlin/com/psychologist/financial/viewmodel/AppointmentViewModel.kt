@@ -72,8 +72,71 @@ class AppointmentViewModel(
     private val getPatientAppointmentsUseCase: GetPatientAppointmentsUseCase,
     private val createAppointmentUseCase: CreateAppointmentUseCase,
     private val updateAppointmentUseCase: UpdateAppointmentUseCase,
-    private val billableHoursCalculator: BillableHoursCalculator = BillableHoursCalculator()
+    private val billableHoursCalculator: BillableHoursCalculator = BillableHoursCalculator(),
+    private val getAllAppointmentsUseCase: GetAllAppointmentsUseCase? = null
 ) : ViewModel() {
+
+    // ========================================
+    // Global List State (bottom-nav Consultas tab)
+    // ========================================
+
+    private val _globalListState = MutableStateFlow<AppointmentViewState.GlobalListState>(
+        AppointmentViewState.GlobalListState.Loading
+    )
+    val globalListState: StateFlow<AppointmentViewState.GlobalListState> = _globalListState.asStateFlow()
+
+    private var cachedAllAppointments: List<AppointmentWithPaymentStatus> = emptyList()
+
+    /**
+     * Load all appointments from all patients (global list tab).
+     * Collects from [GetAllAppointmentsUseCase] reactively.
+     * Emits [GlobalListState.Empty] when no appointments exist.
+     */
+    fun loadAllAppointments() {
+        _globalListState.value = AppointmentViewState.GlobalListState.Loading
+        viewModelScope.launch {
+            try {
+                getAllAppointmentsUseCase?.execute()?.collect { appointments ->
+                    cachedAllAppointments = appointments
+                    applyGlobalFilter(AppointmentViewState.AppointmentFilter.ALL)
+                } ?: run {
+                    _globalListState.value = AppointmentViewState.GlobalListState.Empty
+                }
+            } catch (e: Exception) {
+                _globalListState.value = AppointmentViewState.GlobalListState.Error(
+                    message = e.message ?: "Erro ao carregar consultas"
+                )
+            }
+        }
+    }
+
+    /**
+     * Apply a payment-status filter to the cached global appointment list.
+     * Safe to call before [loadAllAppointments] — works on cached data.
+     *
+     * @param filter [AppointmentFilter.ALL], [PENDING], or [PAID]
+     */
+    fun setFilter(filter: AppointmentViewState.AppointmentFilter) {
+        applyGlobalFilter(filter)
+    }
+
+    private fun applyGlobalFilter(filter: AppointmentViewState.AppointmentFilter) {
+        val all = cachedAllAppointments
+        if (all.isEmpty()) {
+            _globalListState.value = AppointmentViewState.GlobalListState.Empty
+            return
+        }
+        val filtered = when (filter) {
+            AppointmentViewState.AppointmentFilter.ALL -> all
+            AppointmentViewState.AppointmentFilter.PENDING -> all.filter { it.hasPendingPayment }
+            AppointmentViewState.AppointmentFilter.PAID -> all.filter { !it.hasPendingPayment }
+        }
+        _globalListState.value = AppointmentViewState.GlobalListState.Success(
+            allAppointments = all,
+            filteredAppointments = filtered,
+            activeFilter = filter
+        )
+    }
 
     // ========================================
     // Appointment List State
