@@ -41,14 +41,10 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
             "ALTER TABLE patient ADD COLUMN nao_pagante INTEGER NOT NULL DEFAULT 0"
         )
 
-        // Unique partial index for CPF: only enforced when cpf is not null,
-        // allowing multiple patients to have no CPF without violating uniqueness.
+        // Unique index for CPF: SQLite treats each NULL as distinct, so multiple
+        // patients with NULL cpf are allowed even with UNIQUE constraint.
         db.execSQL(
-            """
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_cpf
-            ON patient (cpf)
-            WHERE cpf IS NOT NULL
-            """.trimIndent()
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_cpf ON patient (cpf)"
         )
 
         // New table for Responsável Financeiro (payer linked to a non-paying patient).

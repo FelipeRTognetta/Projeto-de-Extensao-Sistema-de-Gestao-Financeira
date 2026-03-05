@@ -65,7 +65,9 @@ import java.time.LocalDateTime
         // Composite index for filtering active patients by registration date
         Index(name = "idx_patient_status_regdate", value = ["status", "registration_date"]),
         // Index for "most recently active patients" query
-        Index(name = "idx_patient_last_appt", value = ["last_appointment_date"], unique = false)
+        Index(name = "idx_patient_last_appt", value = ["last_appointment_date"], unique = false),
+        // Unique index for CPF (SQLite allows multiple NULLs even with UNIQUE)
+        Index(name = "idx_patient_cpf", value = ["cpf"], unique = true)
     ]
 )
 data class PatientEntity(
@@ -210,7 +212,7 @@ data class PatientEntity(
      * and application-level check via PatientDao.isCpfInUse().
      * Display with mask XXX.XXX.XXX-XX applied at UI layer only.
      */
-    @ColumnInfo(name = "cpf")
+    @ColumnInfo(name = "cpf", defaultValue = "NULL")
     val cpf: String? = null,
 
     /**
@@ -218,7 +220,7 @@ data class PatientEntity(
      *
      * Optional free-text field. No structure enforced.
      */
-    @ColumnInfo(name = "endereco")
+    @ColumnInfo(name = "endereco", defaultValue = "NULL")
     val endereco: String? = null,
 
     /**
@@ -228,7 +230,7 @@ data class PatientEntity(
      * Default false — most patients pay directly.
      * Stored as INTEGER (0 = false, 1 = true).
      */
-    @ColumnInfo(name = "nao_pagante")
+    @ColumnInfo(name = "nao_pagante", defaultValue = "0")
     val naoPagante: Boolean = false,
 
     /**

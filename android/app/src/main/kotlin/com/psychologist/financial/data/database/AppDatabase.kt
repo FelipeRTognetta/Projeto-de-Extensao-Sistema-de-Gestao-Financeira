@@ -198,6 +198,7 @@ abstract class AppDatabase : RoomDatabase() {
                 Constants.DATABASE_NAME
             )
                 .openHelperFactory(SupportFactory(encryptionKey))
+                .addMigrations(MIGRATION_1_2)
                 .addCallback(databaseCallback)
                 .apply {
                     setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
