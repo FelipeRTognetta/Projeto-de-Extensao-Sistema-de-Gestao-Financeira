@@ -737,6 +737,7 @@ class PatientViewModel(
      */
     fun submitCreatePatientForm() {
         Log.d(TAG, "Submitting patient creation form")
+        if (!validateForm()) return
         launchSafe {
             _createFormState.value = _createFormState.value.copy(
                 isSubmitting = true
@@ -830,6 +831,7 @@ class PatientViewModel(
      */
     fun submitEditPatientForm(patientId: Long) {
         Log.d(TAG, "Submitting patient edit form for id=$patientId")
+        if (!validateForm()) return
         launchSafe {
             _createFormState.value = _createFormState.value.copy(isSubmitting = true)
 

@@ -102,17 +102,11 @@ class PatientValidator {
         // Validate name
         validateName(name).let { errors.addAll(it) }
 
-        // Validate phone
+        // Validate phone format (if provided)
         validatePhone(phone).let { errors.addAll(it) }
 
-        // Validate email
+        // Validate email format (if provided)
         validateEmail(email).let { errors.addAll(it) }
-
-        // Validate at least one contact
-        validateContactInfo(phone, email).let { errors.addAll(it) }
-
-        // Validate initial consult date
-        validateInitialConsultDate(initialConsultDate).let { errors.addAll(it) }
 
         if (errors.isNotEmpty()) {
             Log.w(TAG, "Validation failed: ${errors.size} errors")

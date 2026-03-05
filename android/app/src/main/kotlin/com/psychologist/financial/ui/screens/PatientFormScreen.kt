@@ -41,7 +41,6 @@ import com.psychologist.financial.ui.components.CpfVisualTransformation
 import com.psychologist.financial.ui.components.ErrorBanner
 import com.psychologist.financial.viewmodel.PatientViewModel
 import com.psychologist.financial.viewmodel.PatientViewState.CreatePatientState
-import java.time.LocalDate
 
 /**
  * Patient creation/edit form screen
@@ -74,7 +73,6 @@ fun PatientFormScreen(
     val formName = viewModel.formName.collectAsState().value
     val formPhone = viewModel.formPhone.collectAsState().value
     val formEmail = viewModel.formEmail.collectAsState().value
-    val formDate = viewModel.formInitialConsultDate.collectAsState().value
     val formCpf = viewModel.formCpf.collectAsState().value
     val formEndereco = viewModel.formEndereco.collectAsState().value
     val formNaoPagante = viewModel.formNaoPagante.collectAsState().value
@@ -158,7 +156,6 @@ fun PatientFormScreen(
                 formName = formName,
                 formPhone = formPhone,
                 formEmail = formEmail,
-                formDate = formDate,
                 formCpf = formCpf,
                 formEndereco = formEndereco,
                 formNaoPagante = formNaoPagante,
@@ -172,7 +169,6 @@ fun PatientFormScreen(
                 onNameChange = { viewModel.setFormName(it) },
                 onPhoneChange = { viewModel.setFormPhone(it) },
                 onEmailChange = { viewModel.setFormEmail(it) },
-                onDateChange = { viewModel.setFormInitialConsultDate(it) },
                 onCpfChange = { viewModel.setFormCpf(it) },
                 onEnderecoChange = { viewModel.setFormEndereco(it) },
                 onNaoPaganteChange = { newValue ->
@@ -207,7 +203,6 @@ private fun FormContent(
     formName: String,
     formPhone: String,
     formEmail: String,
-    formDate: LocalDate,
     formCpf: String,
     formEndereco: String,
     formNaoPagante: Boolean,
@@ -221,7 +216,6 @@ private fun FormContent(
     onNameChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit,
     onEmailChange: (String) -> Unit,
-    onDateChange: (LocalDate) -> Unit,
     onCpfChange: (String) -> Unit,
     onEnderecoChange: (String) -> Unit,
     onNaoPaganteChange: (Boolean) -> Unit,
@@ -354,22 +348,6 @@ private fun FormContent(
             minLines = 2,
             maxLines = 3,
             enabled = !isSubmitting
-        )
-
-        // Date field (TODO: replace with DatePicker)
-        OutlinedTextField(
-            value = formDate.toString(),
-            onValueChange = { },
-            label = { Text("Data da Primeira Consulta *") },
-            modifier = Modifier.fillMaxWidth(),
-            isError = formState.hasFieldError("initialConsultDate"),
-            supportingText = {
-                formState.getFieldError("initialConsultDate")?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error)
-                }
-            },
-            readOnly = true,
-            enabled = false
         )
 
         Spacer(modifier = Modifier.height(8.dp))

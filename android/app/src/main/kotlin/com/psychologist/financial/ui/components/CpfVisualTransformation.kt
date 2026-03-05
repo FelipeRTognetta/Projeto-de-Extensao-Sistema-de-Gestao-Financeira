@@ -55,7 +55,7 @@ class CpfVisualTransformation : VisualTransformation {
                     clamped <= 5 -> clamped + 1
                     clamped <= 8 -> clamped + 2
                     else -> clamped + 3
-                }
+                }.coerceAtMost(out.length)
             }
 
             override fun transformedToOriginal(offset: Int): Int {
