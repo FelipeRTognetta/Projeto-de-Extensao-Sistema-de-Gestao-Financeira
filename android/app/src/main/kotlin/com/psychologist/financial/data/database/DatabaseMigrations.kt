@@ -155,19 +155,19 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
 
         // Step 5: Recreate indices on the new table
         db.execSQL(
-            "CREATE INDEX IF NOT EXISTS idx_payment_patient_id ON payments (patient_id)"
+            "CREATE INDEX IF NOT EXISTS idx_payment_patient_id ON payments (patient_id ASC)"
         )
         db.execSQL(
             """
             CREATE INDEX IF NOT EXISTS idx_payment_patient_date
-            ON payments (patient_id, payment_date)
+            ON payments (patient_id ASC, payment_date DESC)
             """.trimIndent()
         )
         db.execSQL(
-            "CREATE INDEX IF NOT EXISTS idx_payment_date ON payments (payment_date)"
+            "CREATE INDEX IF NOT EXISTS idx_payment_date ON payments (payment_date ASC)"
         )
         db.execSQL(
-            "CREATE INDEX IF NOT EXISTS idx_payment_created_date ON payments (created_date)"
+            "CREATE INDEX IF NOT EXISTS idx_payment_created_date ON payments (created_date DESC)"
         )
     }
 }
