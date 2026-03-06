@@ -221,20 +221,24 @@ fun parsePaymentAmount(amountString: String?): BigDecimal? {
 
         // Normalize format: remove thousands separator and normalize decimal
         val normalized = when {
-            // Format: 1.500,00 (Brazilian - thousands with dot, decimal with comma)
-            trimmed.contains(",") && trimmed.lastIndexOf(".") > trimmed.lastIndexOf(",") -> {
+            // Format: 1.500,00 (Brazilian - comma is decimal, dot is thousands)
+            // Detected by: last "," comes after last "." → comma is the decimal separator
+            trimmed.contains(",") && trimmed.contains(".") &&
+                    trimmed.lastIndexOf(",") > trimmed.lastIndexOf(".") -> {
                 trimmed.replace(".", "").replace(",", ".")
             }
-            // Format: 1,500.00 (US - thousands with comma, decimal with dot)
-            trimmed.contains(",") && (trimmed.lastIndexOf(",") > trimmed.lastIndexOf(".") || !trimmed.contains(".")) -> {
+            // Format: 1,500.00 (US - dot is decimal, comma is thousands)
+            // Detected by: last "." comes after last "," → dot is the decimal separator
+            trimmed.contains(",") && trimmed.contains(".") &&
+                    trimmed.lastIndexOf(".") > trimmed.lastIndexOf(",") -> {
                 trimmed.replace(",", "")
             }
-            // Format: 1.500 (ambiguous - assume thousands)
-            trimmed.contains(".") && trimmed.count { it == '.' } == 1 && trimmed.lastIndexOf(".") > trimmed.length - 4 -> {
-                trimmed
+            // Format: 150,00 (Brazilian no thousands separator - only comma = decimal)
+            trimmed.contains(",") && !trimmed.contains(".") -> {
+                trimmed.replace(",", ".")
             }
-            // Format: 150.00 or 150,00 (already normalized or single occurrence)
-            else -> trimmed.replace(",", ".")
+            // Format: 150.00 (already normalized decimal)
+            else -> trimmed
         }
 
         return BigDecimal(normalized)

@@ -8,7 +8,6 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import com.psychologist.financial.data.entities.AppointmentEntity
-import com.psychologist.financial.domain.models.AppointmentWithPaymentStatus
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
@@ -489,22 +488,15 @@ interface AppointmentDao {
      *
      * @return Flow of all appointments with derived payment status
      */
-    @Transaction
     @Query("""
         SELECT
-            a.id,
-            a.patient_id,
-            a.date,
-            a.time_start,
-            a.duration_minutes,
-            a.notes,
-            a.created_date,
+            a.*,
             (payment_appointments.payment_id IS NULL) as has_pending_payment
         FROM appointments a
         LEFT JOIN payment_appointments ON a.id = payment_appointments.appointment_id
         ORDER BY a.date DESC, a.time_start DESC
     """)
-    fun getAllWithPaymentStatus(): Flow<List<AppointmentWithPaymentStatus>>
+    fun getAllWithPaymentStatus(): Flow<List<AppointmentWithStatusResult>>
 
     /**
      * Get unpaid (unlinked) appointments for patient

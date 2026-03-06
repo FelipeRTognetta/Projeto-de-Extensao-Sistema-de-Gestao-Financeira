@@ -149,6 +149,31 @@ interface PaymentDao {
     fun countByDateRangeFlow(startDate: LocalDate, endDate: LocalDate): Flow<Int>
 
     // ========================================
+    // Aggregate Queries (global, no status filter — all payments are PAID)
+    // ========================================
+
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payment_date >= :startDate AND payment_date <= :endDate")
+    suspend fun getSumByDateRange(startDate: LocalDate, endDate: LocalDate): BigDecimal
+
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payment_date >= :startDate AND payment_date <= :endDate")
+    fun getSumByDateRangeFlow(startDate: LocalDate, endDate: LocalDate): Flow<BigDecimal>
+
+    @Query("SELECT COALESCE(AVG(amount), 0) FROM payments WHERE payment_date >= :startDate AND payment_date <= :endDate")
+    suspend fun getAverageByDateRange(startDate: LocalDate, endDate: LocalDate): BigDecimal
+
+    @Query("SELECT COALESCE(AVG(amount), 0) FROM payments WHERE payment_date >= :startDate AND payment_date <= :endDate")
+    fun getAverageByDateRangeFlow(startDate: LocalDate, endDate: LocalDate): Flow<BigDecimal>
+
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM payments")
+    suspend fun getSum(): BigDecimal
+
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM payments")
+    fun getSumFlow(): Flow<BigDecimal>
+
+    @Query("SELECT COALESCE(AVG(amount), 0) FROM payments")
+    suspend fun getAverage(): BigDecimal
+
+    // ========================================
     // Read Operations - Lists
     // ========================================
 

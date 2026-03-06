@@ -61,13 +61,11 @@ class DashboardRepositoryUnitTest {
         revenue: BigDecimal = BigDecimal("3000.00"),
         patients: Int = 10,
         avgFee: BigDecimal = BigDecimal("250.00"),
-        outstanding: BigDecimal = BigDecimal("500.00"),
         transactions: Int = 12
     ) {
-        whenever(mockPaymentDao.getSumByStatusAndDateRange(any(), any(), any())).thenReturn(revenue)
+        whenever(mockPaymentDao.getSumByDateRange(any(), any())).thenReturn(revenue)
         whenever(mockPatientDao.countByStatus(PatientStatus.ACTIVE.name)).thenReturn(patients)
-        whenever(mockPaymentDao.getAverageByStatusAndDateRange(any(), any(), any())).thenReturn(avgFee)
-        whenever(mockPaymentDao.getSumByStatus("PENDING")).thenReturn(outstanding)
+        whenever(mockPaymentDao.getAverageByDateRange(any(), any())).thenReturn(avgFee)
         whenever(mockPaymentDao.countByDateRange(any(), any())).thenReturn(transactions)
     }
 
@@ -85,7 +83,7 @@ class DashboardRepositoryUnitTest {
         assertEquals(BigDecimal("3000.00"), metrics.totalRevenue)
         assertEquals(10, metrics.activePatients)
         assertEquals(BigDecimal("250.00"), metrics.averageFee)
-        assertEquals(BigDecimal("500.00"), metrics.outstandingBalance)
+        assertEquals(BigDecimal.ZERO, metrics.outstandingBalance) // v3: always 0
         assertEquals(12, metrics.totalTransactions)
     }
 
@@ -132,7 +130,7 @@ class DashboardRepositoryUnitTest {
 
     @Test
     fun `getTotalRevenueForMonth delegates to DAO`() = runTest {
-        whenever(mockPaymentDao.getSumByStatusAndDateRange(any(), any(), any()))
+        whenever(mockPaymentDao.getSumByDateRange(any(), any()))
             .thenReturn(BigDecimal("4500.00"))
 
         val revenue = repository.getTotalRevenueForMonth(march2025)
@@ -141,12 +139,11 @@ class DashboardRepositoryUnitTest {
     }
 
     @Test
-    fun `getOutstandingBalance delegates to DAO`() = runTest {
-        whenever(mockPaymentDao.getSumByStatus("PENDING")).thenReturn(BigDecimal("750.00"))
-
+    fun `getOutstandingBalance always returns zero`() = runTest {
+        // v3: no pending payments — outstanding is always 0
         val balance = repository.getOutstandingBalance()
 
-        assertEquals(BigDecimal("750.00"), balance)
+        assertEquals(BigDecimal.ZERO, balance)
     }
 
     @Test
@@ -160,7 +157,7 @@ class DashboardRepositoryUnitTest {
 
     @Test
     fun `getAverageFeeForMonth delegates to DAO`() = runTest {
-        whenever(mockPaymentDao.getAverageByStatusAndDateRange(any(), any(), any()))
+        whenever(mockPaymentDao.getAverageByDateRange(any(), any()))
             .thenReturn(BigDecimal("300.00"))
 
         val avg = repository.getAverageFeeForMonth(march2025)
@@ -173,19 +170,19 @@ class DashboardRepositoryUnitTest {
     // ========================================
 
     @Test
-    fun `getCollectionRateForMonth calculates correctly`() = runTest {
-        // Revenue: 3000, Outstanding: 1000, Total: 4000, Rate = 75%
-        whenever(mockPaymentDao.getSumByStatusAndDateRange(any(), any(), any()))
-            .thenReturn(BigDecimal("3000.00"), BigDecimal("1000.00"))
+    fun `getCollectionRateForMonth returns 100 when revenue exists`() = runTest {
+        // v3: outstanding = 0, so rate = revenue / revenue = 100%
+        whenever(mockPaymentDao.getSumByDateRange(any(), any()))
+            .thenReturn(BigDecimal("3000.00"))
 
         val rate = repository.getCollectionRateForMonth(march2025)
 
-        assertEquals(75, rate)
+        assertEquals(100, rate)
     }
 
     @Test
     fun `getCollectionRateForMonth returns zero when no revenue`() = runTest {
-        whenever(mockPaymentDao.getSumByStatusAndDateRange(any(), any(), any()))
+        whenever(mockPaymentDao.getSumByDateRange(any(), any()))
             .thenReturn(BigDecimal.ZERO)
 
         val rate = repository.getCollectionRateForMonth(march2025)
@@ -194,13 +191,12 @@ class DashboardRepositoryUnitTest {
     }
 
     @Test
-    fun `getOverallCollectionRate calculates from all time totals`() = runTest {
-        // All-time revenue: 6000, outstanding: 2000, total: 8000, rate = 75%
-        whenever(mockPaymentDao.getSumByStatus("PAID")).thenReturn(BigDecimal("6000.00"))
-        whenever(mockPaymentDao.getSumByStatus("PENDING")).thenReturn(BigDecimal("2000.00"))
+    fun `getOverallCollectionRate returns 100 when all time revenue exists`() = runTest {
+        // v3: outstanding = 0, so rate = 100% whenever revenue > 0
+        whenever(mockPaymentDao.getSum()).thenReturn(BigDecimal("6000.00"))
 
         val rate = repository.getOverallCollectionRate()
 
-        assertEquals(75, rate)
+        assertEquals(100, rate)
     }
 }

@@ -211,27 +211,22 @@ class MetricsAggregator {
      * ```
      */
     fun calculateRevenue(payments: List<Payment>): BigDecimal {
-        return payments
-            .filter { it.isPaid }
-            .fold(BigDecimal.ZERO) { acc, payment ->
-                acc + payment.amount
-            }
+        return payments.fold(BigDecimal.ZERO) { acc, payment ->
+            acc + payment.amount
+        }
     }
 
     /**
      * Calculate outstanding balance
      *
-     * Sum of all PENDING payments (not month-specific).
+     * Always zero — no pending payments in new model.
      *
      * @param payments All payments
-     * @return Outstanding balance
+     * @return BigDecimal.ZERO
      */
+    @Suppress("UNUSED_PARAMETER")
     fun calculateOutstanding(payments: List<Payment>): BigDecimal {
-        return payments
-            .filter { it.isPending }
-            .fold(BigDecimal.ZERO) { acc, payment ->
-                acc + payment.amount
-            }
+        return BigDecimal.ZERO
     }
 
     /**
@@ -272,17 +267,13 @@ class MetricsAggregator {
      * ```
      */
     fun calculateAverageFee(payments: List<Payment>): BigDecimal {
-        val paidPayments = payments.filter { it.isPaid }
+        if (payments.isEmpty()) return BigDecimal.ZERO
 
-        if (paidPayments.isEmpty()) {
-            return BigDecimal.ZERO
-        }
-
-        val totalRevenue = paidPayments.fold(BigDecimal.ZERO) { acc, payment ->
+        val totalRevenue = payments.fold(BigDecimal.ZERO) { acc, payment ->
             acc + payment.amount
         }
 
-        return totalRevenue / BigDecimal(paidPayments.size)
+        return totalRevenue / BigDecimal(payments.size)
     }
 
     /**
@@ -294,9 +285,7 @@ class MetricsAggregator {
      * @return FeeStatistics
      */
     fun calculateFeeStatistics(payments: List<Payment>): FeeStatistics {
-        val paidPayments = payments.filter { it.isPaid }
-
-        if (paidPayments.isEmpty()) {
+        if (payments.isEmpty()) {
             return FeeStatistics(
                 minFee = BigDecimal.ZERO,
                 maxFee = BigDecimal.ZERO,
@@ -306,8 +295,8 @@ class MetricsAggregator {
             )
         }
 
-        val amounts = paidPayments.map { it.amount }.sorted()
-        val avg = calculateAverageFee(paidPayments)
+        val amounts = payments.map { it.amount }.sorted()
+        val avg = calculateAverageFee(payments)
 
         val median = if (amounts.size % 2 == 0) {
             (amounts[amounts.size / 2 - 1] + amounts[amounts.size / 2]) / BigDecimal(2)
@@ -320,7 +309,7 @@ class MetricsAggregator {
             maxFee = amounts.last(),
             averageFee = avg,
             medianFee = median,
-            count = paidPayments.size
+            count = payments.size
         )
     }
 
@@ -359,7 +348,6 @@ class MetricsAggregator {
                 }
 
                 val revenue = weekPayments
-                    .filter { it.isPaid }
                     .fold(BigDecimal.ZERO) { acc, p -> acc + p.amount }
 
                 weeklyMetrics[week] = WeeklyMetrics(
@@ -455,11 +443,10 @@ class MetricsAggregator {
      */
     fun filterPaymentsByStatusAndMonth(
         payments: List<Payment>,
-        status: String,
+        @Suppress("UNUSED_PARAMETER") status: String,
         yearMonth: YearMonth
     ): List<Payment> {
         return filterPaymentsByMonth(payments, yearMonth)
-            .filter { it.status == status }
     }
 
     // ========================================
@@ -475,39 +462,43 @@ class MetricsAggregator {
      */
     fun countTransactionsByStatus(
         payments: List<Payment>,
-        status: String
+        @Suppress("UNUSED_PARAMETER") status: String
     ): Int {
-        return payments.count { it.status == status }
+        return payments.size
     }
 
     /**
      * Get transaction count by payment method
      *
+     * paymentMethod field removed in v3 migration — returns 0.
+     *
      * @param payments Payments to analyze
      * @param method Payment method
-     * @return Count of transactions
+     * @return 0
      */
+    @Suppress("UNUSED_PARAMETER")
     fun countTransactionsByMethod(
         payments: List<Payment>,
         method: String
     ): Int {
-        return payments.count { it.paymentMethod == method }
+        return 0
     }
 
     /**
      * Get revenue by payment method
      *
+     * paymentMethod field removed in v3 migration — returns ZERO.
+     *
      * @param payments Payments to analyze
      * @param method Payment method
-     * @return Total for method
+     * @return BigDecimal.ZERO
      */
+    @Suppress("UNUSED_PARAMETER")
     fun getRevenueByMethod(
         payments: List<Payment>,
         method: String
     ): BigDecimal {
-        return payments
-            .filter { it.paymentMethod == method && it.isPaid }
-            .fold(BigDecimal.ZERO) { acc, p -> acc + p.amount }
+        return BigDecimal.ZERO
     }
 }
 

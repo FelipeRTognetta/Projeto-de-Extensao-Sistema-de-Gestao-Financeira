@@ -56,15 +56,11 @@ class PaymentRepositoryUnitTest {
     private fun makePaymentEntity(
         id: Long,
         patientId: Long = 1L,
-        status: String = Payment.STATUS_PAID,
         amount: BigDecimal = BigDecimal("150.00")
     ) = com.psychologist.financial.data.entities.PaymentEntity(
         id = id,
         patientId = patientId,
-        appointmentId = null,
         amount = amount,
-        status = status,
-        paymentMethod = Payment.METHOD_PIX,
         paymentDate = yesterday
     )
 
@@ -111,32 +107,6 @@ class PaymentRepositoryUnitTest {
     }
 
     // ========================================
-    // getByPatientAndStatus() Tests
-    // ========================================
-
-    @Test
-    fun `getByPatientAndStatus returns only paid payments`() = runTest {
-        val paidEntities = listOf(makePaymentEntity(1L, status = Payment.STATUS_PAID))
-        whenever(mockPaymentDao.getByPatientAndStatus(1L, Payment.STATUS_PAID))
-            .thenReturn(paidEntities)
-
-        val result = repository.getByPatientAndStatus(1L, Payment.STATUS_PAID)
-
-        assertEquals(1, result.size)
-        assertTrue(result[0].isPaid)
-    }
-
-    @Test
-    fun `getByPatientAndStatus returns empty when status not matching`() = runTest {
-        whenever(mockPaymentDao.getByPatientAndStatus(1L, Payment.STATUS_PENDING))
-            .thenReturn(emptyList())
-
-        val result = repository.getByPatientAndStatus(1L, Payment.STATUS_PENDING)
-
-        assertTrue(result.isEmpty())
-    }
-
-    // ========================================
     // Count Tests
     // ========================================
 
@@ -147,15 +117,6 @@ class PaymentRepositoryUnitTest {
         val count = repository.countByPatient(patientId = 1L)
 
         assertEquals(6, count)
-    }
-
-    @Test
-    fun `countByPatientAndStatus delegates to DAO`() = runTest {
-        whenever(mockPaymentDao.countByPatientAndStatus(1L, Payment.STATUS_PAID)).thenReturn(4)
-
-        val count = repository.countByPatientAndStatus(1L, Payment.STATUS_PAID)
-
-        assertEquals(4, count)
     }
 
     // ========================================
@@ -170,26 +131,6 @@ class PaymentRepositoryUnitTest {
         val total = repository.getTotalAmountPaid(patientId = 1L)
 
         assertEquals(BigDecimal("500.00"), total)
-    }
-
-    @Test
-    fun `getAmountDueNow delegates to DAO`() = runTest {
-        whenever(mockPaymentDao.getAmountDueNow(1L))
-            .thenReturn(BigDecimal("200.00"))
-
-        val amount = repository.getAmountDueNow(patientId = 1L)
-
-        assertNotNull(amount)
-    }
-
-    @Test
-    fun `getTotalOutstanding delegates to DAO`() = runTest {
-        whenever(mockPaymentDao.getTotalOutstanding(1L))
-            .thenReturn(BigDecimal("150.00"))
-
-        val outstanding = repository.getTotalOutstanding(patientId = 1L)
-
-        assertEquals(BigDecimal("150.00"), outstanding)
     }
 
     // ========================================

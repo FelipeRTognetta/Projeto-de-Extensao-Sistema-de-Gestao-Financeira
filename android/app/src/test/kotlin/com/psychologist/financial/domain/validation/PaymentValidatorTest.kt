@@ -57,7 +57,7 @@ class PaymentValidatorTest {
 
         assert(!result.isValid) { "Zero amount should fail validation" }
         assert(result.errors.isNotEmpty()) { "Should have validation errors" }
-        assert(result.errors.any { it.contains("amount") || it.contains("valor") }) {
+        assert(result.errors.any { it.lowercase().contains("valor") || it.lowercase().contains("amount") }) {
             "Should have amount validation error"
         }
     }
@@ -150,7 +150,7 @@ class PaymentValidatorTest {
         val result = validator.validate(payment)
 
         assert(!result.isValid) { "Zero patient ID should fail" }
-        assert(result.errors.any { it.contains("patient") || it.contains("paciente") }) {
+        assert(result.errors.any { it.lowercase().contains("paciente") || it.lowercase().contains("patient") }) {
             "Should have patient validation error"
         }
     }

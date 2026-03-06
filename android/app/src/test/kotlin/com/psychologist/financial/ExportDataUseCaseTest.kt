@@ -88,8 +88,6 @@ class ExportDataUseCaseTest {
             id = 1L,
             patientId = 1L,
             amount = BigDecimal("150.00"),
-            status = Payment.STATUS_PAID,
-            paymentMethod = Payment.METHOD_PIX,
             paymentDate = LocalDate.now().minusDays(1)
         )
     )
@@ -172,7 +170,7 @@ class ExportDataUseCaseTest {
         )
 
         assertTrue(result.success)
-        assertEquals(3, result.totalRecords)
+        assertEquals(4, result.totalRecords)
     }
 
     @Test

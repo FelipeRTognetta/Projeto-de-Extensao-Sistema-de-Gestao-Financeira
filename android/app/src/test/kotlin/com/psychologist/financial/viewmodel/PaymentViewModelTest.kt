@@ -6,11 +6,13 @@ import com.psychologist.financial.domain.models.Payment
 import com.psychologist.financial.domain.usecases.CreatePaymentUseCase
 import com.psychologist.financial.domain.usecases.GetUnpaidAppointmentsUseCase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -33,10 +35,13 @@ import java.time.LocalTime
  *
  * Run with: ./gradlew testDebugUnitTest --tests PaymentViewModelTest
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class PaymentViewModelTest {
 
     @get:Rule
     val instantTaskExecutorRule = InstantTaskExecutorRule()
+
+    private val testDispatcher = StandardTestDispatcher()
 
     @Mock
     private lateinit var createPaymentUseCase: CreatePaymentUseCase
@@ -73,8 +78,13 @@ class PaymentViewModelTest {
     @Before
     fun setUp() {
         MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(StandardTestDispatcher())
+        Dispatchers.setMain(testDispatcher)
         viewModel = PaymentViewModel(createPaymentUseCase, getUnpaidAppointmentsUseCase)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
     }
 
     // ========================================
@@ -89,6 +99,7 @@ class PaymentViewModelTest {
 
         // Act
         viewModel.loadAvailableAppointments(1L)
+        testDispatcher.scheduler.advanceUntilIdle()
 
         // Assert
         val state = viewModel.paymentFormState.value
@@ -206,6 +217,7 @@ class PaymentViewModelTest {
         )).thenReturn(1L)
 
         viewModel.loadAvailableAppointments(1L)
+        testDispatcher.scheduler.advanceUntilIdle()
         viewModel.updateAmount("150.00")
         viewModel.updatePaymentDate(LocalDate.now())
         viewModel.toggleAppointmentSelection(10L)
@@ -213,6 +225,7 @@ class PaymentViewModelTest {
 
         // Act
         viewModel.submitForm(patientId = 1L)
+        testDispatcher.scheduler.advanceUntilIdle()
 
         // Assert
         val state = viewModel.paymentFormState.value

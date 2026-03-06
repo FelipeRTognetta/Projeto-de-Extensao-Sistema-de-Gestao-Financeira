@@ -456,11 +456,11 @@ class AppointmentRepository(
      * @return Flow of all appointments with payment status
      */
     fun getAllWithPaymentStatus(): Flow<List<AppointmentWithPaymentStatus>> {
-        return appointmentDao.getAllWithPaymentStatus().map { appointmentWithStatusList ->
-            appointmentWithStatusList.map { aws ->
+        return appointmentDao.getAllWithPaymentStatus().map { results ->
+            results.map { result ->
                 AppointmentWithPaymentStatus(
-                    appointment = aws.appointment.toDomain(),
-                    hasPendingPayment = aws.hasPendingPayment
+                    appointment = result.appointment.toDomain(),
+                    hasPendingPayment = result.hasPendingPayment
                 )
             }
         }

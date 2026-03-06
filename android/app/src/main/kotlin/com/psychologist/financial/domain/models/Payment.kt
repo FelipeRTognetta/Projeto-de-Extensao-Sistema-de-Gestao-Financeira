@@ -233,16 +233,3 @@ data class Payment(
     }
 }
 
-/**
- * Extension function to calculate total amount
- *
- * Sums amount across all payments.
- *
- * @receiver List of payments
- * @return Total amount
- */
-fun List<Payment>.getTotalAmount(): BigDecimal {
-    return fold(BigDecimal.ZERO) { acc, payment ->
-        acc + payment.amount
-    }
-}

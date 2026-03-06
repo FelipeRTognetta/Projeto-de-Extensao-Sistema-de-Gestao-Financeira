@@ -101,16 +101,14 @@ class CsvExportService {
 
         FileWriter(file).use { writer ->
             // Write header
-            writer.append("ID,ID Paciente,ID Atendimento,Valor,Status,Método,Data Pagamento,Data Registro\n")
+            writer.append("ID,ID Paciente,IDs Atendimentos,Valor,Data Pagamento,Data Registro\n")
 
             // Write data
             payments.forEach { payment ->
                 writer.append("${payment.id},")
                 writer.append("${payment.patientId},")
-                writer.append("${payment.appointmentId ?: ""},")
+                writer.append("\"${payment.appointmentIds.joinToString("|")}\",")
                 writer.append("${payment.amount},")
-                writer.append("${payment.status},")
-                writer.append("${payment.paymentMethod},")
                 writer.append("${payment.paymentDate},")
                 writer.append("${payment.createdDate}\n")
             }

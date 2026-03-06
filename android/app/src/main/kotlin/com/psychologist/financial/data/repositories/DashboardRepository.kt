@@ -79,25 +79,17 @@ class DashboardRepository(
         val startDate = yearMonth.atDay(1)
         val endDate = yearMonth.atEndOfMonth()
 
-        // Get revenue (sum of paid payments)
-        val totalRevenue = paymentDao.getSumByStatusAndDateRange(
-            status = "PAID",
-            startDate = startDate,
-            endDate = endDate
-        )
+        // Get revenue (sum of all payments — all payments are PAID)
+        val totalRevenue = paymentDao.getSumByDateRange(startDate, endDate)
 
         // Get active patient count
         val activePatients = patientDao.countByStatus(PatientStatus.ACTIVE.name)
 
-        // Get average fee (average of paid payments)
-        val averageFee = paymentDao.getAverageByStatusAndDateRange(
-            status = "PAID",
-            startDate = startDate,
-            endDate = endDate
-        )
+        // Get average fee (average of all payments in month)
+        val averageFee = paymentDao.getAverageByDateRange(startDate, endDate)
 
-        // Get outstanding balance (sum of all pending payments)
-        val outstandingBalance = paymentDao.getSumByStatus(status = "PENDING")
+        // No pending payments in new model — outstanding is always zero
+        val outstandingBalance = BigDecimal.ZERO
 
         // Get transaction count for month
         val totalTransactions = paymentDao.countByDateRange(startDate, endDate)
@@ -199,18 +191,17 @@ class DashboardRepository(
 
         // Combine multiple flows for automatic updates
         return combine(
-            paymentDao.getSumByStatusAndDateRangeFlow("PAID", startDate, endDate),
+            paymentDao.getSumByDateRangeFlow(startDate, endDate),
             patientDao.countByStatusFlow(PatientStatus.ACTIVE.name),
-            paymentDao.getAverageByStatusAndDateRangeFlow("PAID", startDate, endDate),
-            paymentDao.getSumByStatusFlow("PENDING"),
+            paymentDao.getAverageByDateRangeFlow(startDate, endDate),
             paymentDao.countByDateRangeFlow(startDate, endDate)
-        ) { revenue, patients, avgFee, outstanding, transactions ->
+        ) { revenue, patients, avgFee, transactions ->
             DashboardMetrics(
                 yearMonth = yearMonth,
                 totalRevenue = revenue,
                 activePatients = patients,
                 averageFee = avgFee,
-                outstandingBalance = outstanding,
+                outstandingBalance = BigDecimal.ZERO,
                 totalTransactions = transactions
             )
         }
@@ -243,11 +234,7 @@ class DashboardRepository(
         val startDate = yearMonth.atDay(1)
         val endDate = yearMonth.atEndOfMonth()
 
-        return paymentDao.getSumByStatusAndDateRange(
-            status = "PAID",
-            startDate = startDate,
-            endDate = endDate
-        )
+        return paymentDao.getSumByDateRange(startDate, endDate)
     }
 
     /**
@@ -260,18 +247,18 @@ class DashboardRepository(
         val startDate = yearMonth.atDay(1)
         val endDate = yearMonth.atEndOfMonth()
 
-        return paymentDao.getSumByStatusAndDateRangeFlow("PAID", startDate, endDate)
+        return paymentDao.getSumByDateRangeFlow(startDate, endDate)
     }
 
     /**
      * Get total revenue across all months
      *
-     * Sum of all PAID payments.
+     * Sum of all payments (all are PAID).
      *
      * @return Total revenue
      */
     suspend fun getTotalRevenueAllTime(): BigDecimal {
-        return paymentDao.getSumByStatus("PAID")
+        return paymentDao.getSum()
     }
 
     // ========================================
@@ -281,40 +268,38 @@ class DashboardRepository(
     /**
      * Get outstanding balance
      *
-     * Sum of all PENDING payments (not month-specific).
+     * Always zero — no pending payments in new model.
      *
-     * @return Outstanding balance
+     * @return BigDecimal.ZERO
      */
     suspend fun getOutstandingBalance(): BigDecimal {
-        return paymentDao.getSumByStatus("PENDING")
+        return BigDecimal.ZERO
     }
 
     /**
      * Get outstanding balance as Flow (reactive)
      *
-     * @return Flow of outstanding amount
+     * Always emits zero — no pending payments in new model.
+     *
+     * @return Flow of outstanding amount (always ZERO)
      */
     fun getOutstandingBalanceFlow(): Flow<BigDecimal> {
-        return paymentDao.getSumByStatusFlow("PENDING")
+        return paymentDao.getSumFlow().let { flow ->
+            kotlinx.coroutines.flow.flow { emit(BigDecimal.ZERO) }
+        }
     }
 
     /**
      * Get outstanding balance for month
      *
-     * Sum of PENDING payments recorded in the month.
+     * Always zero — no pending payments in new model.
      *
      * @param yearMonth Month to calculate for
-     * @return Outstanding for month
+     * @return BigDecimal.ZERO
      */
+    @Suppress("UNUSED_PARAMETER")
     suspend fun getOutstandingForMonth(yearMonth: YearMonth): BigDecimal {
-        val startDate = yearMonth.atDay(1)
-        val endDate = yearMonth.atEndOfMonth()
-
-        return paymentDao.getSumByStatusAndDateRange(
-            status = "PENDING",
-            startDate = startDate,
-            endDate = endDate
-        )
+        return BigDecimal.ZERO
     }
 
     // ========================================
@@ -375,11 +360,7 @@ class DashboardRepository(
         val startDate = yearMonth.atDay(1)
         val endDate = yearMonth.atEndOfMonth()
 
-        return paymentDao.getAverageByStatusAndDateRange(
-            status = "PAID",
-            startDate = startDate,
-            endDate = endDate
-        )
+        return paymentDao.getAverageByDateRange(startDate, endDate)
     }
 
     /**
@@ -392,22 +373,18 @@ class DashboardRepository(
         val startDate = yearMonth.atDay(1)
         val endDate = yearMonth.atEndOfMonth()
 
-        return paymentDao.getAverageByStatusAndDateRangeFlow(
-            "PAID",
-            startDate,
-            endDate
-        )
+        return paymentDao.getAverageByDateRangeFlow(startDate, endDate)
     }
 
     /**
      * Get overall average fee
      *
-     * Average of all PAID payments.
+     * Average of all payments.
      *
      * @return Average amount
      */
     suspend fun getAverageFeeAllTime(): BigDecimal {
-        return paymentDao.getAverageByStatus("PAID")
+        return paymentDao.getAverage()
     }
 
     // ========================================
@@ -443,31 +420,28 @@ class DashboardRepository(
     /**
      * Get paid transaction count for month
      *
-     * Count of PAID payments in month.
+     * All payments are PAID — returns count of all payments in month.
      *
      * @param yearMonth Month to calculate for
-     * @return Paid transaction count
+     * @return Transaction count
      */
     suspend fun getPaidTransactionCountForMonth(yearMonth: YearMonth): Int {
         val startDate = yearMonth.atDay(1)
         val endDate = yearMonth.atEndOfMonth()
-
-        return paymentDao.countByStatusAndDateRange("PAID", startDate, endDate)
+        return paymentDao.countByDateRange(startDate, endDate)
     }
 
     /**
      * Get pending transaction count for month
      *
-     * Count of PENDING payments in month.
+     * Always zero — no pending payments in new model.
      *
      * @param yearMonth Month to calculate for
-     * @return Pending transaction count
+     * @return 0
      */
+    @Suppress("UNUSED_PARAMETER")
     suspend fun getPendingTransactionCountForMonth(yearMonth: YearMonth): Int {
-        val startDate = yearMonth.atDay(1)
-        val endDate = yearMonth.atEndOfMonth()
-
-        return paymentDao.countByStatusAndDateRange("PENDING", startDate, endDate)
+        return 0
     }
 
     // ========================================

@@ -4,9 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,7 +19,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -34,7 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.psychologist.financial.domain.models.Payment
-import com.psychologist.financial.ui.components.BalanceSummary
 import com.psychologist.financial.ui.components.PaymentListItem
 import com.psychologist.financial.viewmodel.PaymentViewModel
 import com.psychologist.financial.viewmodel.PaymentViewState
@@ -87,14 +83,9 @@ fun PaymentListScreen(
     onSelectPayment: (Long) -> Unit = { }
 ) {
     val listState = viewModel.paymentListState.collectAsState().value
-    val balanceState = viewModel.balanceState.collectAsState().value
-    val statusFilter = viewModel.statusFilter.collectAsState().value
-    val allPayments = viewModel.allPayments.collectAsState().value
 
-    // Load payments and balance when screen opens
     LaunchedEffect(patientId) {
         viewModel.loadPatientPayments(patientId)
-        viewModel.loadBalance(patientId)
     }
 
     Scaffold(
@@ -149,30 +140,14 @@ fun PaymentListScreen(
                 }
 
                 is PaymentViewState.ListState.Success -> {
-                    // Payment list
                     PaymentListContent(
                         payments = listState.payments,
-                        balance = balanceState.balance,
-                        statusFilter = statusFilter,
-                        onStatusFilterChange = { viewModel.setStatusFilter(it) },
                         onSelectPayment = onSelectPayment
                     )
                 }
 
                 is PaymentViewState.ListState.Empty -> {
-                    if (allPayments.isEmpty()) {
-                        // Truly no payments for this patient
-                        EmptyPaymentsContent(onAddPayment = onAddPayment)
-                    } else {
-                        // Payments exist but none match the current filter
-                        PaymentListContent(
-                            payments = emptyList(),
-                            balance = balanceState.balance,
-                            statusFilter = statusFilter,
-                            onStatusFilterChange = { viewModel.setStatusFilter(it) },
-                            onSelectPayment = onSelectPayment
-                        )
-                    }
+                    EmptyPaymentsContent(onAddPayment = onAddPayment)
                 }
 
                 is PaymentViewState.ListState.Error -> {
@@ -193,92 +168,21 @@ fun PaymentListScreen(
 @Composable
 private fun PaymentListContent(
     payments: List<Payment>,
-    balance: com.psychologist.financial.domain.models.PatientBalance,
-    statusFilter: PaymentViewState.PaymentStatusFilter,
-    onStatusFilterChange: (PaymentViewState.PaymentStatusFilter) -> Unit,
     onSelectPayment: (Long) -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize()
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Balance summary card
-        BalanceSummary(balance = balance)
-
-        // Status filter chips
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            PaymentViewState.PaymentStatusFilter.entries.forEach { filter ->
-                Surface(
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-                    color = if (statusFilter == filter) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    TextButton(
-                        onClick = { onStatusFilterChange(filter) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = when (filter) {
-                                PaymentViewState.PaymentStatusFilter.ALL -> "Todos"
-                                PaymentViewState.PaymentStatusFilter.PAID -> "Pagos"
-                                PaymentViewState.PaymentStatusFilter.PENDING -> "Pendentes"
-                                PaymentViewState.PaymentStatusFilter.OVERDUE -> "Vencidos"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (statusFilter == filter) {
-                                MaterialTheme.colorScheme.onPrimary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        // Payment list or filtered-empty message
-        if (payments.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Nenhum pagamento neste filtro.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(24.dp)
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(
-                    items = payments,
-                    key = { it.id }
-                ) { payment ->
-                    PaymentListItem(
-                        payment = payment,
-                        onClick = { onSelectPayment(payment.id) }
-                    )
-                }
-            }
+        items(
+            items = payments,
+            key = { it.id }
+        ) { payment ->
+            PaymentListItem(
+                payment = payment,
+                onClick = { onSelectPayment(payment.id) }
+            )
         }
     }
 }
