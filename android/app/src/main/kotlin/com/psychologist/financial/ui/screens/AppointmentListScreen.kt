@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,11 +29,15 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.psychologist.financial.domain.models.Appointment
+import com.psychologist.financial.domain.models.AppointmentWithPaymentStatus
 import com.psychologist.financial.ui.components.AppointmentListItem
 import com.psychologist.financial.viewmodel.AppointmentViewModel
 import com.psychologist.financial.viewmodel.AppointmentViewState
@@ -82,10 +88,182 @@ fun AppointmentListScreen(
     onAddAppointment: () -> Unit,
     onSelectAppointment: (Long) -> Unit = { }
 ) {
-    val listState = viewModel.appointmentListState.collectAsState().value
-    val billableHours = viewModel.billableHoursSummary.collectAsState().value
+    val isGlobalView = patientId == 0L
 
-    // Load appointments when screen opens
+    if (isGlobalView) {
+        GlobalAppointmentListScreen(
+            viewModel = viewModel,
+            onSelectAppointment = onSelectAppointment
+        )
+    } else {
+        PatientAppointmentListScreen(
+            viewModel = viewModel,
+            patientId = patientId,
+            patientName = patientName,
+            onBack = onBack,
+            onAddAppointment = onAddAppointment,
+            onSelectAppointment = onSelectAppointment
+        )
+    }
+}
+
+@Composable
+private fun GlobalAppointmentListScreen(
+    viewModel: AppointmentViewModel,
+    onSelectAppointment: (Long) -> Unit
+) {
+    val globalState = viewModel.globalListState.collectAsState().value
+
+    LaunchedEffect(Unit) {
+        viewModel.loadAllAppointments()
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Consultas") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            when (globalState) {
+                is AppointmentViewState.GlobalListState.Loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+
+                is AppointmentViewState.GlobalListState.Success -> {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        LazyRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            item {
+                                FilterChip(
+                                    selected = globalState.activeFilter == AppointmentViewState.AppointmentFilter.ALL,
+                                    onClick = { viewModel.setFilter(AppointmentViewState.AppointmentFilter.ALL) },
+                                    label = { Text("Todas") }
+                                )
+                            }
+                            item {
+                                FilterChip(
+                                    selected = globalState.activeFilter == AppointmentViewState.AppointmentFilter.PENDING,
+                                    onClick = { viewModel.setFilter(AppointmentViewState.AppointmentFilter.PENDING) },
+                                    label = { Text("Com pendência") }
+                                )
+                            }
+                            item {
+                                FilterChip(
+                                    selected = globalState.activeFilter == AppointmentViewState.AppointmentFilter.PAID,
+                                    onClick = { viewModel.setFilter(AppointmentViewState.AppointmentFilter.PAID) },
+                                    label = { Text("Sem pendência") }
+                                )
+                            }
+                        }
+
+                        if (globalState.filteredAppointments.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Nenhuma consulta encontrada para este filtro.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentPadding = PaddingValues(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(
+                                    items = globalState.filteredAppointments,
+                                    key = { it.appointment.id }
+                                ) { appointmentWithStatus ->
+                                    AppointmentListItem(
+                                        appointmentWithStatus = appointmentWithStatus,
+                                        onClick = { onSelectAppointment(appointmentWithStatus.appointment.id) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                is AppointmentViewState.GlobalListState.Empty -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Nenhuma Consulta",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Para registrar uma consulta, acesse o perfil do paciente.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+
+                is AppointmentViewState.GlobalListState.Error -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = globalState.message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PatientAppointmentListScreen(
+    viewModel: AppointmentViewModel,
+    patientId: Long,
+    patientName: String,
+    onBack: () -> Unit,
+    onAddAppointment: () -> Unit,
+    onSelectAppointment: (Long) -> Unit
+) {
+    val listState = viewModel.appointmentListState.collectAsState().value
+    var showOnlyPending by remember { mutableStateOf(false) }
+
     LaunchedEffect(patientId) {
         viewModel.loadPatientAppointments(patientId)
     }
@@ -117,15 +295,11 @@ fun AppointmentListScreen(
             )
         },
         floatingActionButton = {
-            // Only show FAB when viewing a specific patient (patientId > 0)
-            // In global view (patientId = 0), appointments must be created from patient profile
-            if (patientId > 0L) {
-                FloatingActionButton(
-                    onClick = onAddAppointment,
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(Icons.Default.Add, "Adicionar Consulta")
-                }
+            FloatingActionButton(
+                onClick = onAddAppointment,
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Default.Add, "Adicionar Consulta")
             }
         }
     ) { paddingValues ->
@@ -136,34 +310,28 @@ fun AppointmentListScreen(
         ) {
             when (listState) {
                 is AppointmentViewState.ListState.Loading -> {
-                    // Loading state
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
                 }
 
                 is AppointmentViewState.ListState.Success -> {
-                    // Appointment list
                     AppointmentListContent(
                         appointments = listState.appointments,
-                        billableHoursSummary = billableHours,
+                        showOnlyPending = showOnlyPending,
+                        onFilterChange = { showOnlyPending = it },
                         onSelectAppointment = onSelectAppointment
                     )
                 }
 
                 is AppointmentViewState.ListState.Empty -> {
-                    // Empty state
                     EmptyAppointmentsContent(
                         onAddAppointment = onAddAppointment,
-                        isGlobalView = patientId == 0L
+                        isGlobalView = false
                     )
                 }
 
                 is AppointmentViewState.ListState.Error -> {
-                    // Error state
                     ErrorAppointmentsContent(
                         message = listState.message,
                         onBack = onBack
@@ -175,114 +343,70 @@ fun AppointmentListScreen(
 }
 
 /**
- * Appointment list content
+ * Appointment list content with filter chips
  */
 @Composable
 private fun AppointmentListContent(
-    appointments: List<Appointment>,
-    billableHoursSummary: com.psychologist.financial.domain.models.BillableHoursSummary?,
+    appointments: List<AppointmentWithPaymentStatus>,
+    showOnlyPending: Boolean,
+    onFilterChange: (Boolean) -> Unit,
     onSelectAppointment: (Long) -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // Billable hours summary card
-        if (billableHoursSummary != null) {
-            BillableHoursSummaryCard(summary = billableHoursSummary)
-        }
+    val filtered = if (showOnlyPending) appointments.filter { it.hasPendingPayment } else appointments
 
-        // Appointment list
-        LazyColumn(
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Filter chips
+        LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(
-                items = appointments,
-                key = { it.id }
-            ) { appointment ->
-                AppointmentListItem(
-                    appointment = appointment,
-                    onClick = { onSelectAppointment(appointment.id) }
+            item {
+                FilterChip(
+                    selected = !showOnlyPending,
+                    onClick = { onFilterChange(false) },
+                    label = { Text("Todos") }
+                )
+            }
+            item {
+                FilterChip(
+                    selected = showOnlyPending,
+                    onClick = { onFilterChange(true) },
+                    label = { Text("Pagamento em aberto") }
                 )
             }
         }
-    }
-}
 
-/**
- * Billable hours summary card
- */
-@Composable
-private fun BillableHoursSummaryCard(
-    summary: com.psychologist.financial.domain.models.BillableHoursSummary
-) {
-    androidx.compose.material3.Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        colors = androidx.compose.material3.CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "Resumo de Consultas",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-
-            androidx.compose.foundation.layout.Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+        if (filtered.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "${summary.totalSessions}",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = "Total de Consultas",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                    )
-                }
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = summary.getFormattedTotalHours(),
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = "Horas",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                    )
-                }
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = summary.getFormattedAverageSessionHours(),
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = "Média",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                Text(
+                    text = "Nenhuma consulta com pagamento pendente.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(
+                    items = filtered,
+                    key = { it.appointment.id }
+                ) { appointmentWithStatus ->
+                    AppointmentListItem(
+                        appointmentWithStatus = appointmentWithStatus,
+                        onClick = { onSelectAppointment(appointmentWithStatus.appointment.id) }
                     )
                 }
             }

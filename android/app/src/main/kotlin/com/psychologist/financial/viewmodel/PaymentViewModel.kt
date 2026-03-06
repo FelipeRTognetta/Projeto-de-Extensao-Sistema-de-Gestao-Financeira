@@ -55,11 +55,51 @@ class PaymentViewModel(
      */
     fun loadAvailableAppointments(patientId: Long) {
         viewModelScope.launch {
-            _paymentFormState.update { it.copy(isLoading = true) }
+            // Reset to a clean state before loading a new form
+            _paymentFormState.value = PaymentViewState.PaymentFormState(isLoading = true)
             try {
                 getUnpaidAppointmentsUseCase.execute(patientId).collect { appointments ->
                     _paymentFormState.update {
                         it.copy(availableAppointments = appointments, isLoading = false)
+                    }
+                }
+            } catch (e: Exception) {
+                _paymentFormState.update { it.copy(isLoading = false, errorMessage = e.message) }
+            }
+        }
+    }
+
+    /**
+     * Load an existing payment into the form for editing.
+     * Pre-fills amount, date, and pre-selects all linked appointments.
+     * Also loads unpaid appointments so the user can add/remove links.
+     *
+     * @param paymentId Payment ID to edit
+     * @param patientId Patient ID (to load unpaid appointments)
+     */
+    fun loadPaymentForEdit(paymentId: Long, patientId: Long) {
+        viewModelScope.launch {
+            _paymentFormState.value = PaymentViewState.PaymentFormState(isLoading = true)
+            try {
+                val details = repository?.getByIdWithAppointments(paymentId)
+                val linkedAppointments = details?.appointments ?: emptyList()
+                val linkedIds = linkedAppointments.map { it.id }.toSet()
+
+                val amountText = details?.payment?.amount
+                    ?.toPlainString()
+                    ?.replace(".", ",")
+                    ?: ""
+
+                getUnpaidAppointmentsUseCase.execute(patientId).collect { unpaid ->
+                    _paymentFormState.update {
+                        it.copy(
+                            availableAppointments = unpaid,
+                            linkedAppointments = linkedAppointments,
+                            selectedAppointmentIds = linkedIds,
+                            amountText = amountText,
+                            paymentDate = details?.payment?.paymentDate ?: java.time.LocalDate.now(),
+                            isLoading = false
+                        )
                     }
                 }
             } catch (e: Exception) {

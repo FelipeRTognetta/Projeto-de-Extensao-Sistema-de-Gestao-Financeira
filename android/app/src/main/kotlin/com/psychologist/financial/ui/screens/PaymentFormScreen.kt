@@ -71,14 +71,18 @@ fun PaymentFormScreen(
 ) {
     val formState by viewModel.paymentFormState.collectAsState()
 
-    LaunchedEffect(patientId) {
-        viewModel.loadAvailableAppointments(patientId)
+    LaunchedEffect(paymentId) {
+        if (paymentId != null) {
+            viewModel.loadPaymentForEdit(paymentId, patientId)
+        } else {
+            viewModel.loadAvailableAppointments(patientId)
+        }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Novo Pagamento") },
+                title = { Text(if (paymentId != null) "Editar Pagamento" else "Novo Pagamento") },
                 navigationIcon = {
                     IconButton(onClick = onCancel) {
                         Icon(Icons.Default.ArrowBack, "Voltar")
@@ -169,19 +173,31 @@ private fun PaymentFormContent(
                 )
             }
 
-            // Amount field
+            // Amount field — implicit cents: digits enter right-to-left, always 2 decimal places
             OutlinedTextField(
                 value = formState.amountText,
-                onValueChange = onAmountChange,
+                onValueChange = { newValue ->
+                    val digits = newValue.filter { it.isDigit() }.trimStart('0')
+                    if (digits.isEmpty()) {
+                        onAmountChange("")
+                        return@OutlinedTextField
+                    }
+                    // Limit to 9 digits (R$ 9.999.999,99)
+                    val limited = digits.takeLast(9).padStart(3, '0')
+                    val intPart = limited.dropLast(2).trimStart('0').ifEmpty { "0" }
+                    val decPart = limited.takeLast(2)
+                    onAmountChange("$intPart,$decPart")
+                },
                 label = { Text("Valor *") },
                 modifier = Modifier.fillMaxWidth(),
                 isError = formState.errorMessage != null && formState.amountText.isBlank(),
                 keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Decimal,
+                    keyboardType = KeyboardType.Number,
                     imeAction = ImeAction.Next
                 ),
                 enabled = !formState.isLoading,
-                placeholder = { Text("Ex: 150.00") }
+                placeholder = { Text("0,00") },
+                prefix = { Text("R$ ") }
             )
 
             // Date field
@@ -201,9 +217,10 @@ private fun PaymentFormContent(
                 enabled = !formState.isLoading
             )
 
-            // Appointment checklist
+            // Appointment checklist — linked (pre-selected) + unpaid (available)
             AppointmentChecklist(
-                appointments = formState.availableAppointments,
+                linkedAppointments = formState.linkedAppointments,
+                availableAppointments = formState.availableAppointments,
                 selectedIds = formState.selectedAppointmentIds,
                 onToggle = onToggleAppointment,
                 enabled = !formState.isLoading
@@ -256,22 +273,27 @@ private fun PaymentFormContent(
 
 @Composable
 private fun AppointmentChecklist(
-    appointments: List<Appointment>,
+    linkedAppointments: List<Appointment>,
+    availableAppointments: List<Appointment>,
     selectedIds: Set<Long>,
     onToggle: (Long) -> Unit,
     enabled: Boolean
 ) {
     val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+    // De-duplicate: linked + available without repeats
+    val linkedIds = linkedAppointments.map { it.id }.toSet()
+    val extraAvailable = availableAppointments.filter { it.id !in linkedIds }
+    val allAppointments = linkedAppointments + extraAvailable
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-            text = "Consultas sem pagamento",
+            text = "Consultas vinculadas",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 4.dp)
         )
 
-        if (appointments.isEmpty()) {
+        if (allAppointments.isEmpty()) {
             Text(
                 text = "Nenhuma consulta pendente para este paciente.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -279,7 +301,7 @@ private fun AppointmentChecklist(
                 modifier = Modifier.padding(vertical = 8.dp)
             )
         } else {
-            appointments.forEach { appointment ->
+            allAppointments.forEach { appointment ->
                 AppointmentCheckRow(
                     appointment = appointment,
                     isSelected = selectedIds.contains(appointment.id),
@@ -318,7 +340,7 @@ private fun AppointmentCheckRow(
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                text = "${appointment.displayTime} · ${appointment.durationMinutes}min",
+                text = appointment.displayTime,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

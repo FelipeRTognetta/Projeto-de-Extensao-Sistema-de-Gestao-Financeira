@@ -526,4 +526,14 @@ interface PaymentDao {
         ORDER BY date DESC, time_start DESC
     """)
     suspend fun getUnpaidAppointmentsByPatient(patientId: Long): List<AppointmentEntity>
+
+    /**
+     * Get a single payment with its linked appointments.
+     *
+     * @param paymentId Payment ID
+     * @return Payment with appointments or null
+     */
+    @Transaction
+    @Query("SELECT * FROM payments WHERE id = :paymentId")
+    suspend fun getByIdWithAppointments(paymentId: Long): PaymentWithAppointments?
 }

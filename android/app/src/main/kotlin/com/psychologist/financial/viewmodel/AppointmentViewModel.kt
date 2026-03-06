@@ -169,7 +169,7 @@ class AppointmentViewModel(
     private val _formDate = MutableStateFlow(LocalDate.now())
     val formDate: StateFlow<LocalDate> = _formDate.asStateFlow()
 
-    private val _formTime = MutableStateFlow(LocalTime.of(14, 0))
+    private val _formTime = MutableStateFlow(LocalTime.now().withSecond(0).withNano(0))
     val formTime: StateFlow<LocalTime> = _formTime.asStateFlow()
 
     private val _formDuration = MutableStateFlow(60)
@@ -200,7 +200,7 @@ class AppointmentViewModel(
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val appointments = getPatientAppointmentsUseCase.execute(patientId)
+                val appointments = repository.getByPatientWithPaymentStatus(patientId)
 
                 if (appointments.isEmpty()) {
                     _appointmentListState.value = AppointmentViewState.ListState.Empty
@@ -209,7 +209,7 @@ class AppointmentViewModel(
                         appointments = appointments
                     )
                     // Calculate billable hours
-                    updateBillableHoursSummary(appointments, patientId)
+                    updateBillableHoursSummary(appointments.map { it.appointment }, patientId)
                 }
             } catch (e: Exception) {
                 _appointmentListState.value = AppointmentViewState.ListState.Error(
@@ -238,6 +238,7 @@ class AppointmentViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val appointments = getPatientAppointmentsUseCase.getUpcomingAppointments(patientId)
+                    .map { AppointmentWithPaymentStatus(it, hasPendingPayment = false) }
 
                 if (appointments.isEmpty()) {
                     _appointmentListState.value = AppointmentViewState.ListState.Empty
@@ -265,6 +266,7 @@ class AppointmentViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val appointments = getPatientAppointmentsUseCase.getPastAppointments(patientId)
+                    .map { AppointmentWithPaymentStatus(it, hasPendingPayment = false) }
 
                 if (appointments.isEmpty()) {
                     _appointmentListState.value = AppointmentViewState.ListState.Empty
@@ -301,7 +303,7 @@ class AppointmentViewModel(
                     patientId = patientId,
                     startDate = startDate,
                     endDate = endDate
-                )
+                ).map { AppointmentWithPaymentStatus(it, hasPendingPayment = false) }
 
                 if (appointments.isEmpty()) {
                     _appointmentListState.value = AppointmentViewState.ListState.Empty
@@ -400,7 +402,7 @@ class AppointmentViewModel(
      */
     fun resetForm() {
         _formDate.value = LocalDate.now()
-        _formTime.value = LocalTime.of(14, 0)
+        _formTime.value = LocalTime.now().withSecond(0).withNano(0)
         _formDuration.value = 60
         _formNotes.value = ""
         _createFormState.value = AppointmentViewState.CreateAppointmentState()

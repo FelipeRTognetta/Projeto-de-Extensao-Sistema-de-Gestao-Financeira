@@ -159,6 +159,14 @@ class PaymentRepository(
         return paymentDao.getById(id)?.toDomain()
     }
 
+    suspend fun getByIdWithAppointments(id: Long): PaymentWithDetails? {
+        val result = paymentDao.getByIdWithAppointments(id) ?: return null
+        return PaymentWithDetails(
+            payment = result.payment.toDomain(),
+            appointments = result.appointments.map { it.toDomain() }
+        )
+    }
+
     /**
      * Check if payment exists
      *

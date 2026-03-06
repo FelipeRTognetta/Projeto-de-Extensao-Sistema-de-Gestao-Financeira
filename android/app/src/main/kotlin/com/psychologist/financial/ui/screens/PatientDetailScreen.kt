@@ -36,6 +36,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -135,9 +136,11 @@ fun PatientDetailScreen(
                 }
 
                 is DetailState.Success -> {
+                    val pendingIds by viewModel.pendingPatientIds.collectAsState()
                     // Patient detail content
                     PatientDetailContent(
                         patient = detailState.patient,
+                        hasPendingPayments = detailState.patient.id in pendingIds,
                         viewModel = viewModel,
                         onEdit = { onEdit(patientId) },
                         onNavigateToAppointments = {
@@ -177,6 +180,7 @@ fun PatientDetailScreen(
 @Composable
 private fun PatientDetailContent(
     patient: Patient,
+    hasPendingPayments: Boolean = false,
     viewModel: PatientViewModel,
     onEdit: () -> Unit,
     onNavigateToAppointments: () -> Unit = {},
@@ -192,7 +196,7 @@ private fun PatientDetailContent(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Header with avatar and name
-        PatientHeader(patient)
+        PatientHeader(patient = patient, hasPendingPayments = hasPendingPayments)
 
         // Contact information
         ContactCard(patient)
@@ -267,7 +271,7 @@ private fun PatientDetailContent(
  * Patient header with avatar and name
  */
 @Composable
-private fun PatientHeader(patient: Patient) {
+private fun PatientHeader(patient: Patient, hasPendingPayments: Boolean = false) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -324,6 +328,22 @@ private fun PatientHeader(patient: Patient) {
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
             )
+        }
+
+        if (hasPendingPayments) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer
+            ) {
+                Text(
+                    text = "Pagamento em aberto",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
         }
     }
 }

@@ -100,6 +100,7 @@ object PaymentViewState {
      */
     data class PaymentFormState(
         val availableAppointments: List<Appointment> = emptyList(),
+        val linkedAppointments: List<Appointment> = emptyList(),
         val selectedAppointmentIds: Set<Long> = emptySet(),
         val amountText: String = "",
         val paymentDate: LocalDate = LocalDate.now(),

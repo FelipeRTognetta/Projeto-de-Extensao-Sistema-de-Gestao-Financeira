@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.psychologist.financial.data.repositories.PaymentWithDetails
 import com.psychologist.financial.domain.models.Payment
 import com.psychologist.financial.ui.components.PaymentListItem
 import com.psychologist.financial.viewmodel.PaymentViewModel
@@ -82,6 +83,122 @@ fun PaymentListScreen(
     onAddPayment: () -> Unit,
     onSelectPayment: (Long) -> Unit = { }
 ) {
+    if (patientId == 0L) {
+        GlobalPaymentListScreen(viewModel = viewModel)
+    } else {
+        PatientPaymentListScreen(
+            viewModel = viewModel,
+            patientId = patientId,
+            patientName = patientName,
+            onBack = onBack,
+            onAddPayment = onAddPayment,
+            onSelectPayment = onSelectPayment
+        )
+    }
+}
+
+@Composable
+private fun GlobalPaymentListScreen(viewModel: PaymentViewModel) {
+    val globalState = viewModel.globalListState.collectAsState().value
+
+    LaunchedEffect(Unit) {
+        viewModel.loadAllPayments()
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Pagamentos") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            when (globalState) {
+                is PaymentViewState.GlobalListState.Loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+
+                is PaymentViewState.GlobalListState.Success -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(
+                            items = globalState.payments,
+                            key = { it.payment.id }
+                        ) { paymentWithDetails ->
+                            PaymentListItem(
+                                paymentWithDetails = paymentWithDetails,
+                                onClick = {}
+                            )
+                        }
+                    }
+                }
+
+                is PaymentViewState.GlobalListState.Empty -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "Nenhum Pagamento",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Nenhum pagamento registrado ainda.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+
+                is PaymentViewState.GlobalListState.Error -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = globalState.message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PatientPaymentListScreen(
+    viewModel: PaymentViewModel,
+    patientId: Long,
+    patientName: String,
+    onBack: () -> Unit,
+    onAddPayment: () -> Unit,
+    onSelectPayment: (Long) -> Unit
+) {
     val listState = viewModel.paymentListState.collectAsState().value
 
     LaunchedEffect(patientId) {
@@ -130,11 +247,7 @@ fun PaymentListScreen(
         ) {
             when (listState) {
                 is PaymentViewState.ListState.Loading -> {
-                    // Loading state
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
                 }
@@ -151,7 +264,6 @@ fun PaymentListScreen(
                 }
 
                 is PaymentViewState.ListState.Error -> {
-                    // Error state
                     ErrorPaymentsContent(
                         message = listState.message,
                         onBack = onBack

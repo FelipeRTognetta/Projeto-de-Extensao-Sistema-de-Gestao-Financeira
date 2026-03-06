@@ -481,6 +481,30 @@ class AppointmentRepository(
         return appointmentDao.getUnpaidByPatient(patientId).map { it.toDomain() }
     }
 
+    /**
+     * Get all appointments for patient with payment status.
+     *
+     * @param patientId Patient ID
+     * @return List of appointments with derived payment status
+     */
+    suspend fun getByPatientWithPaymentStatus(patientId: Long): List<AppointmentWithPaymentStatus> {
+        return appointmentDao.getByPatientWithPaymentStatus(patientId).map { result ->
+            AppointmentWithPaymentStatus(
+                appointment = result.appointment.toDomain(),
+                hasPendingPayment = result.hasPendingPayment
+            )
+        }
+    }
+
+    /**
+     * Get patient IDs that have at least one unpaid appointment.
+     *
+     * @return Flow of patient ID set with pending payments
+     */
+    fun getPatientIdsWithPendingPayments(): Flow<Set<Long>> {
+        return appointmentDao.getPatientIdsWithPendingPaymentsFlow().map { it.toSet() }
+    }
+
     // ========================================
     // Mapping Functions
     // ========================================

@@ -51,10 +51,10 @@ object AppointmentViewState {
         /**
          * Appointments loaded successfully
          *
-         * @param appointments List of appointments
+         * @param appointments List of appointments with payment status
          */
         data class Success(
-            val appointments: List<Appointment>
+            val appointments: List<AppointmentWithPaymentStatus>
         ) : ListState() {
             /**
              * Get appointment count
@@ -72,8 +72,8 @@ object AppointmentViewState {
              * @param isPast true for past, false for upcoming
              * @return Filtered appointments
              */
-            fun filterByStatus(isPast: Boolean): List<Appointment> {
-                return appointments.filter { it.isPast == isPast }
+            fun filterByStatus(isPast: Boolean): List<AppointmentWithPaymentStatus> {
+                return appointments.filter { it.appointment.isPast == isPast }
             }
         }
 

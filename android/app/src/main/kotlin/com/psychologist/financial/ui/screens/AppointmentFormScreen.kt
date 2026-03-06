@@ -84,7 +84,6 @@ fun AppointmentFormScreen(
     val formState = viewModel.createFormState.collectAsState().value
     val formDate = viewModel.formDate.collectAsState().value
     val formTime = viewModel.formTime.collectAsState().value
-    val formDuration = viewModel.formDuration.collectAsState().value
     val formNotes = viewModel.formNotes.collectAsState().value
     val isSubmitting = formState.isSubmitting
 
@@ -258,27 +257,6 @@ fun AppointmentFormScreen(
                 readOnly = true,
                 enabled = !isSubmitting,
                 interactionSource = timeInteractionSource
-            )
-
-            // Duration field
-            OutlinedTextField(
-                value = formDuration.toString(),
-                onValueChange = { newValue ->
-                    newValue.toIntOrNull()?.let { viewModel.setFormDuration(it) }
-                },
-                label = { Text("Duração (minutos) *") },
-                modifier = Modifier.fillMaxWidth(),
-                isError = formState.hasFieldError("duration"),
-                supportingText = {
-                    formState.getFieldError("duration")?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    } ?: Text("Mínimo 5 min, máximo 480 min (8h)")
-                },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Next
-                ),
-                enabled = !isSubmitting
             )
 
             // Notes field

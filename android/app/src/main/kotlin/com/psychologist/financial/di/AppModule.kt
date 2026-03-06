@@ -264,7 +264,8 @@ object AppModule {
         reactivatePatientUseCase = reactivatePatientUseCase,
         updatePatientUseCase = updatePatientUseCase,
         payerInfoRepository = payerInfoRepository,
-        payerInfoValidator = payerInfoValidator
+        payerInfoValidator = payerInfoValidator,
+        appointmentRepository = appointmentRepository
     )
 
     fun provideAppointmentViewModel(): AppointmentViewModel = AppointmentViewModel(

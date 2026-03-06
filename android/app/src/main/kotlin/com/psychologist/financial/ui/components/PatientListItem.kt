@@ -64,7 +64,8 @@ import java.time.LocalDateTime
 fun PatientListItem(
     patient: Patient,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hasPendingPayments: Boolean = false
 ) {
     Card(
         modifier = modifier
@@ -159,11 +160,30 @@ fun PatientListItem(
                 }
             }
 
-            // Status badge
-            StatusBadge(
-                status = patient.status,
-                modifier = Modifier.padding(start = 8.dp)
-            )
+            // Pending payment chip + status badge
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (hasPendingPayments) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    ) {
+                        Text(
+                            text = "Pgto. em aberto",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+                StatusBadge(
+                    status = patient.status,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
         }
     }
 }
