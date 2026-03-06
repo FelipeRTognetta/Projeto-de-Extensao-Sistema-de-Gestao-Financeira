@@ -140,6 +140,7 @@ private fun GlobalPaymentListScreen(viewModel: PaymentViewModel) {
                         ) { paymentWithDetails ->
                             PaymentListItem(
                                 paymentWithDetails = paymentWithDetails,
+                                patientName = paymentWithDetails.patientName,
                                 onClick = {}
                             )
                         }

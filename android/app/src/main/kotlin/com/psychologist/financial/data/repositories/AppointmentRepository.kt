@@ -460,7 +460,8 @@ class AppointmentRepository(
             results.map { result ->
                 AppointmentWithPaymentStatus(
                     appointment = result.appointment.toDomain(),
-                    hasPendingPayment = result.hasPendingPayment
+                    hasPendingPayment = result.hasPendingPayment,
+                    patientName = result.patientName
                 )
             }
         }
@@ -491,7 +492,8 @@ class AppointmentRepository(
         return appointmentDao.getByPatientWithPaymentStatus(patientId).map { result ->
             AppointmentWithPaymentStatus(
                 appointment = result.appointment.toDomain(),
-                hasPendingPayment = result.hasPendingPayment
+                hasPendingPayment = result.hasPendingPayment,
+                patientName = result.patientName
             )
         }
     }

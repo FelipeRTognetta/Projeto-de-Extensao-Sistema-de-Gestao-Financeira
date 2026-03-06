@@ -491,8 +491,10 @@ interface AppointmentDao {
     @Query("""
         SELECT
             a.*,
-            (a.id NOT IN (SELECT appointment_id FROM payment_appointments)) as has_pending_payment
+            (a.id NOT IN (SELECT appointment_id FROM payment_appointments)) as has_pending_payment,
+            p.name as patient_name
         FROM appointments a
+        JOIN patient p ON a.patient_id = p.id
         ORDER BY a.date DESC, a.time_start DESC
     """)
     fun getAllWithPaymentStatus(): Flow<List<AppointmentWithStatusResult>>
@@ -530,8 +532,10 @@ interface AppointmentDao {
     @Query("""
         SELECT
             a.*,
-            (a.id NOT IN (SELECT appointment_id FROM payment_appointments)) as has_pending_payment
+            (a.id NOT IN (SELECT appointment_id FROM payment_appointments)) as has_pending_payment,
+            p.name as patient_name
         FROM appointments a
+        JOIN patient p ON a.patient_id = p.id
         WHERE a.patient_id = :patientId
         ORDER BY a.date DESC, a.time_start DESC
     """)

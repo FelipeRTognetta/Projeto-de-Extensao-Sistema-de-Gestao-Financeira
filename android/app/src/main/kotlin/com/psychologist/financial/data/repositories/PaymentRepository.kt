@@ -240,11 +240,12 @@ class PaymentRepository(
      * @return Flow of payments with linked appointments
      */
     fun getAllWithAppointments(): Flow<List<PaymentWithDetails>> {
-        return paymentDao.getAllWithAppointments().map { paymentWithAppointments ->
+        return paymentDao.getAllWithAppointmentsAndPatient().map { paymentWithAppointments ->
             paymentWithAppointments.map { pa ->
                 PaymentWithDetails(
                     payment = pa.payment.toDomain(),
-                    appointments = pa.appointments.map { it.toDomain() }
+                    appointments = pa.appointments.map { it.toDomain() },
+                    patientName = pa.patientName
                 )
             }
         }
@@ -589,5 +590,6 @@ class PaymentRepository(
  */
 data class PaymentWithDetails(
     val payment: Payment,
-    val appointments: List<Appointment>
+    val appointments: List<Appointment>,
+    val patientName: String = ""
 )

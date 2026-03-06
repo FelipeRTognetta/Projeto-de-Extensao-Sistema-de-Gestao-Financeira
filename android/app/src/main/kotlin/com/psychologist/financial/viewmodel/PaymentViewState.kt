@@ -105,6 +105,7 @@ object PaymentViewState {
         val amountText: String = "",
         val paymentDate: LocalDate = LocalDate.now(),
         val isLoading: Boolean = false,
-        val errorMessage: String? = null
+        val errorMessage: String? = null,
+        val editingPaymentId: Long? = null
     )
 }

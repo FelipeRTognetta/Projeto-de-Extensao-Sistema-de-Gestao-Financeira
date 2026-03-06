@@ -98,7 +98,8 @@ class PaymentViewModel(
                             selectedAppointmentIds = linkedIds,
                             amountText = amountText,
                             paymentDate = details?.payment?.paymentDate ?: java.time.LocalDate.now(),
-                            isLoading = false
+                            isLoading = false,
+                            editingPaymentId = paymentId
                         )
                     }
                 }
@@ -171,15 +172,31 @@ class PaymentViewModel(
 
         _paymentFormState.update { it.copy(isLoading = true, errorMessage = null) }
 
+        val editingId = state.editingPaymentId
+
         viewModelScope.launch {
             try {
-                val payment = Payment(
-                    id = 0L,
-                    patientId = patientId,
-                    amount = amount,
-                    paymentDate = state.paymentDate
-                )
-                createPaymentUseCase.createPayment(payment, state.selectedAppointmentIds.toList())
+                if (editingId != null) {
+                    val payment = Payment(
+                        id = editingId,
+                        patientId = patientId,
+                        amount = amount,
+                        paymentDate = state.paymentDate
+                    )
+                    repository?.update(payment)
+                    repository?.unlinkAllAppointments(editingId)
+                    state.selectedAppointmentIds.forEach { appointmentId ->
+                        repository?.linkAppointment(editingId, appointmentId)
+                    }
+                } else {
+                    val payment = Payment(
+                        id = 0L,
+                        patientId = patientId,
+                        amount = amount,
+                        paymentDate = state.paymentDate
+                    )
+                    createPaymentUseCase.createPayment(payment, state.selectedAppointmentIds.toList())
+                }
                 _paymentFormState.update {
                     it.copy(
                         isLoading = false,

@@ -1,5 +1,6 @@
 package com.psychologist.financial.data.database
 
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Junction
 import androidx.room.Relation
@@ -48,6 +49,31 @@ import com.psychologist.financial.data.entities.PaymentEntity
 data class PaymentWithAppointments(
     @Embedded
     val payment: PaymentEntity,
+
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "id",
+        associateBy = Junction(
+            value = PaymentAppointmentCrossRef::class,
+            parentColumn = "payment_id",
+            entityColumn = "appointment_id"
+        )
+    )
+    val appointments: List<AppointmentEntity> = emptyList()
+)
+
+/**
+ * Room read model: Payment + patient name + linked Appointments.
+ *
+ * Used by [PaymentDao.getAllWithAppointmentsAndPatient] to include the patient
+ * name from a JOIN on the parent query, alongside the @Relation appointments.
+ */
+data class PaymentWithAppointmentsAndPatient(
+    @Embedded
+    val payment: PaymentEntity,
+
+    @ColumnInfo(name = "patient_name")
+    val patientName: String = "",
 
     @Relation(
         parentColumn = "id",

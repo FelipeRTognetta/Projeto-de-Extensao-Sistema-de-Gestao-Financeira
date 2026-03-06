@@ -483,6 +483,15 @@ interface PaymentDao {
      */
     @Transaction
     @Query("""
+        SELECT payments.*, pat.name as patient_name
+        FROM payments
+        JOIN patient pat ON payments.patient_id = pat.id
+        ORDER BY payments.payment_date DESC, payments.created_date DESC
+    """)
+    fun getAllWithAppointmentsAndPatient(): Flow<List<PaymentWithAppointmentsAndPatient>>
+
+    @Transaction
+    @Query("""
         SELECT * FROM payments
         ORDER BY payment_date DESC, created_date DESC
     """)

@@ -17,5 +17,6 @@ import com.psychologist.financial.data.entities.AppointmentEntity
  */
 data class AppointmentWithStatusResult(
     @Embedded val appointment: AppointmentEntity,
-    @ColumnInfo(name = "has_pending_payment") val hasPendingPayment: Boolean
+    @ColumnInfo(name = "has_pending_payment") val hasPendingPayment: Boolean,
+    @ColumnInfo(name = "patient_name") val patientName: String = ""
 )

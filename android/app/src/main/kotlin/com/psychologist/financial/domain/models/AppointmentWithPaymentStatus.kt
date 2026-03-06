@@ -47,5 +47,6 @@ package com.psychologist.financial.domain.models
  */
 data class AppointmentWithPaymentStatus(
     val appointment: Appointment,
-    val hasPendingPayment: Boolean
+    val hasPendingPayment: Boolean,
+    val patientName: String = ""
 )
