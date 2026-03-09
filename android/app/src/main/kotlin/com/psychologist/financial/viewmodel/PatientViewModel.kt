@@ -2,6 +2,7 @@ package com.psychologist.financial.viewmodel
 
 import android.util.Log
 import androidx.lifecycle.viewModelScope
+import com.psychologist.financial.data.repositories.AppointmentRepository
 import com.psychologist.financial.data.repositories.PayerInfoRepository
 import com.psychologist.financial.domain.models.Patient
 import com.psychologist.financial.domain.usecases.CreatePatientUseCase
@@ -15,9 +16,12 @@ import com.psychologist.financial.viewmodel.PatientViewState.DetailState
 import com.psychologist.financial.viewmodel.PatientViewState.ListState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -83,12 +87,29 @@ class PatientViewModel(
     private val reactivatePatientUseCase: ReactivatePatientUseCase,
     private val updatePatientUseCase: UpdatePatientUseCase,
     private val payerInfoRepository: PayerInfoRepository? = null,
-    private val payerInfoValidator: PayerInfoValidator = PayerInfoValidator()
+    private val payerInfoValidator: PayerInfoValidator = PayerInfoValidator(),
+    private val appointmentRepository: AppointmentRepository? = null
 ) : BaseViewModel() {
 
     private companion object {
         private const val TAG = "PatientViewModel"
     }
+
+    // ========================================
+    // Pending Payments State
+    // ========================================
+
+    /**
+     * Set of patient IDs that have at least one appointment with no payment link.
+     * Emits an empty set when appointmentRepository is not provided.
+     */
+    val pendingPatientIds: StateFlow<Set<Long>> = (
+        appointmentRepository?.getPatientIdsWithPendingPayments() ?: flowOf(emptySet())
+    ).stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptySet()
+    )
 
     // ========================================
     // Patient List State
@@ -364,7 +385,14 @@ class PatientViewModel(
                 .firstOrNull { it.id == patientId }
 
             if (patient != null) {
-                _patientDetailState.value = DetailState.Success(patient)
+                // Load payerInfo separately if naoPagante — getAllPatients() does not join payerInfoDao
+                val patientWithPayer = if (patient.naoPagante) {
+                    val payerInfo = payerInfoRepository?.getPayerInfoByPatientId(patientId)
+                    patient.copy(payerInfo = payerInfo)
+                } else {
+                    patient
+                }
+                _patientDetailState.value = DetailState.Success(patientWithPayer)
             } else {
                 setError("Paciente não encontrado")
                 _patientDetailState.value = DetailState.Error("Paciente não encontrado")
@@ -745,11 +773,12 @@ class PatientViewModel(
 
             val result = createPatientUseCase.execute(
                 name = _formName.value,
-                phone = _formPhone.value,
-                email = _formEmail.value,
+                phone = _formPhone.value.ifBlank { null },
+                email = _formEmail.value.ifBlank { null },
                 initialConsultDate = _formInitialConsultDate.value,
                 cpf = _formCpf.value.ifBlank { null },
-                endereco = _formEndereco.value.ifBlank { null }
+                endereco = _formEndereco.value.ifBlank { null },
+                naoPagante = _formNaoPagante.value
             )
 
             when (result) {
@@ -842,7 +871,8 @@ class PatientViewModel(
                 email = _formEmail.value.ifBlank { null },
                 initialConsultDate = _formInitialConsultDate.value,
                 cpf = _formCpf.value.ifBlank { null },
-                endereco = _formEndereco.value.ifBlank { null }
+                endereco = _formEndereco.value.ifBlank { null },
+                naoPagante = _formNaoPagante.value
             )
 
             when (result) {

@@ -85,22 +85,17 @@ class BalanceCalculator {
      * @return PatientBalance with all metrics
      */
     fun calculateBalance(payments: List<Payment>): PatientBalance {
-        val paidPayments = payments.filter { it.isPaid }
-        val pendingPayments = payments.filter { it.isPending }
-
-        val totalReceived = paidPayments.fold(BigDecimal.ZERO) { acc, payment ->
-            acc + payment.amount
-        }
-        val totalOutstanding = pendingPayments.fold(BigDecimal.ZERO) { acc, payment ->
+        // All payments are PAID — no pending concept
+        val totalReceived = payments.fold(BigDecimal.ZERO) { acc, payment ->
             acc + payment.amount
         }
 
         return PatientBalance(
             amountDueNow = totalReceived,
-            totalOutstanding = totalOutstanding,
+            totalOutstanding = BigDecimal.ZERO,
             totalReceived = totalReceived,
-            paidPaymentsCount = paidPayments.size,
-            pendingPaymentsCount = pendingPayments.size,
+            paidPaymentsCount = payments.size,
+            pendingPaymentsCount = 0,
             totalPaymentsCount = payments.size
         )
     }
@@ -114,11 +109,9 @@ class BalanceCalculator {
      * @return Amount due now
      */
     fun calculateAmountDueNow(payments: List<Payment>): BigDecimal {
-        return payments
-            .filter { it.isPaid }
-            .fold(BigDecimal.ZERO) { acc, payment ->
-                acc + payment.amount
-            }
+        return payments.fold(BigDecimal.ZERO) { acc, payment ->
+            acc + payment.amount
+        }
     }
 
     /**
@@ -130,11 +123,7 @@ class BalanceCalculator {
      * @return Total outstanding amount
      */
     fun calculateTotalOutstanding(payments: List<Payment>): BigDecimal {
-        return payments
-            .filter { it.isPending }
-            .fold(BigDecimal.ZERO) { acc, payment ->
-                acc + payment.amount
-            }
+        return BigDecimal.ZERO
     }
 
     /**
@@ -287,7 +276,6 @@ class BalanceCalculator {
         payments: List<Payment>
     ): Map<YearMonth, BigDecimal> {
         return payments
-            .filter { it.isPaid }
             .groupBy { YearMonth.from(it.paymentDate) }
             .mapValues { (_, monthPayments) ->
                 monthPayments.fold(BigDecimal.ZERO) { acc, payment ->
@@ -300,21 +288,16 @@ class BalanceCalculator {
     /**
      * Get outstanding by month
      *
+     * Always empty — no pending payments in new model.
+     *
      * @param payments List of payments
-     * @return Map of month to outstanding amount
+     * @return Empty map
      */
+    @Suppress("UNUSED_PARAMETER")
     fun calculateMonthlyOutstandingBreakdown(
         payments: List<Payment>
     ): Map<YearMonth, BigDecimal> {
-        return payments
-            .filter { it.isPending }
-            .groupBy { YearMonth.from(it.paymentDate) }
-            .mapValues { (_, monthPayments) ->
-                monthPayments.fold(BigDecimal.ZERO) { acc, payment ->
-                    acc + payment.amount
-                }
-            }
-            .toSortedMap()
+        return emptyMap()
     }
 
     // ========================================
@@ -329,60 +312,38 @@ class BalanceCalculator {
      * @return Total amount for method
      */
     fun calculateByMethod(
-        payments: List<Payment>,
-        method: String
+        @Suppress("UNUSED_PARAMETER") payments: List<Payment>,
+        @Suppress("UNUSED_PARAMETER") method: String
     ): BigDecimal {
-        return payments
-            .filter { it.paymentMethod == method }
-            .fold(BigDecimal.ZERO) { acc, payment ->
-                acc + payment.amount
-            }
+        return BigDecimal.ZERO
     }
 
     /**
      * Get breakdown by payment method
      *
-     * Useful for understanding payment channels.
+     * paymentMethod field removed in v3 migration — returns empty map.
      *
      * @param payments List of payments
-     * @return Map of method to total amount
+     * @return Empty map
      */
+    @Suppress("UNUSED_PARAMETER")
     fun calculateMethodBreakdown(payments: List<Payment>): Map<String, BigDecimal> {
-        return payments
-            .groupBy { it.paymentMethod }
-            .mapValues { (_, methodPayments) ->
-                methodPayments.fold(BigDecimal.ZERO) { acc, payment ->
-                    acc + payment.amount
-                }
-            }
-            .toSortedMap()
+        return emptyMap()
     }
 
     /**
      * Get breakdown by method and status
      *
+     * paymentMethod and status removed in v3 migration — returns empty map.
+     *
      * @param payments List of payments
-     * @return Map of method to paid and pending amounts
+     * @return Empty map
      */
+    @Suppress("UNUSED_PARAMETER")
     fun calculateMethodStatusBreakdown(
         payments: List<Payment>
     ): Map<String, Pair<BigDecimal, BigDecimal>> {
-        return payments
-            .groupBy { it.paymentMethod }
-            .mapValues { (_, methodPayments) ->
-                val paid = methodPayments
-                    .filter { it.isPaid }
-                    .fold(BigDecimal.ZERO) { acc, payment ->
-                        acc + payment.amount
-                    }
-                val pending = methodPayments
-                    .filter { it.isPending }
-                    .fold(BigDecimal.ZERO) { acc, payment ->
-                        acc + payment.amount
-                    }
-                paid to pending
-            }
-            .toSortedMap()
+        return emptyMap()
     }
 
     // ========================================
@@ -398,22 +359,15 @@ class BalanceCalculator {
      * @return BalanceSummary with all metrics
      */
     fun calculateBalanceSummary(payments: List<Payment>): BalanceSummary {
-        val paidPayments = payments.filter { it.isPaid }
-        val pendingPayments = payments.filter { it.isPending }
-        val overduePayments = payments.filter { it.isPastDue }
+        // All payments are PAID — no pending/overdue concept
+        val totalReceived = payments.fold(BigDecimal.ZERO) { acc, payment ->
+            acc + payment.amount
+        }
+        val totalOutstanding = BigDecimal.ZERO
+        val totalOverdue = BigDecimal.ZERO
 
-        val totalReceived = paidPayments.fold(BigDecimal.ZERO) { acc, payment ->
-            acc + payment.amount
-        }
-        val totalOutstanding = pendingPayments.fold(BigDecimal.ZERO) { acc, payment ->
-            acc + payment.amount
-        }
-        val totalOverdue = overduePayments.fold(BigDecimal.ZERO) { acc, payment ->
-            acc + payment.amount
-        }
-
-        val paidCount = paidPayments.size
-        val pendingCount = pendingPayments.size
+        val paidCount = payments.size
+        val pendingCount = 0
         val totalCount = payments.size
 
         val averagePayment = if (totalCount > 0) {
@@ -437,7 +391,7 @@ class BalanceCalculator {
             totalOverdue = totalOverdue,
             paidCount = paidCount,
             pendingCount = pendingCount,
-            overdueCount = overduePayments.size,
+            overdueCount = 0,
             totalCount = totalCount,
             averagePayment = averagePayment,
             minPayment = minPayment,
@@ -466,41 +420,33 @@ class BalanceCalculator {
      * @return Average paid amount
      */
     fun calculateAveragePaidAmount(payments: List<Payment>): BigDecimal {
-        val paid = payments.filter { it.isPaid }
-        if (paid.isEmpty()) return BigDecimal.ZERO
-        return paid.fold(BigDecimal.ZERO) { acc, payment ->
-            acc + payment.amount
-        } / BigDecimal(paid.size)
+        return calculateAveragePayment(payments)
     }
 
     /**
      * Calculate average outstanding (PENDING payments average)
      *
+     * Always zero — no pending payments in new model.
+     *
      * @param payments List of payments
-     * @return Average pending amount
+     * @return BigDecimal.ZERO
      */
+    @Suppress("UNUSED_PARAMETER")
     fun calculateAveragePendingAmount(payments: List<Payment>): BigDecimal {
-        val pending = payments.filter { it.isPending }
-        if (pending.isEmpty()) return BigDecimal.ZERO
-        return pending.fold(BigDecimal.ZERO) { acc, payment ->
-            acc + payment.amount
-        } / BigDecimal(pending.size)
+        return BigDecimal.ZERO
     }
 
     /**
      * Calculate overdue amount
      *
-     * Sum of all PENDING payments with payment_date in past.
+     * Always zero — no pending payments in new model.
      *
      * @param payments List of payments
-     * @return Overdue amount
+     * @return BigDecimal.ZERO
      */
+    @Suppress("UNUSED_PARAMETER")
     fun calculateOverdueAmount(payments: List<Payment>): BigDecimal {
-        return payments
-            .filter { it.isPastDue }
-            .fold(BigDecimal.ZERO) { acc, payment ->
-                acc + payment.amount
-            }
+        return BigDecimal.ZERO
     }
 
     /**
@@ -512,9 +458,7 @@ class BalanceCalculator {
      * @return Collection rate (0-100)
      */
     fun calculateCollectionRate(payments: List<Payment>): Int {
-        if (payments.isEmpty()) return 0
-        val paidCount = payments.count { it.isPaid }
-        return (paidCount * 100) / payments.size
+        return if (payments.isEmpty()) 0 else 100
     }
 
     /**

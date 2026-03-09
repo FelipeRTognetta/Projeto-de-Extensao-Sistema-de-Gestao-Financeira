@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -18,51 +18,32 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.psychologist.financial.ui.theme.WarningColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.psychologist.financial.data.repositories.PaymentWithDetails
 import com.psychologist.financial.domain.models.Payment
+import java.time.format.DateTimeFormatter
 
 /**
  * Payment list item card
  *
- * Displays payment summary in a card format.
- * Shows amount, date, status, method, and optional appointment link.
+ * Displays payment summary: amount, patient name, date, and linked appointments.
+ * No status or method fields (removed in v3).
  *
- * Layout:
- * ```
- * ┌─────────────────────────────────┐
- * │ R$ 150,00  │  Pago    │  Débito │
- * │ 15/03/2024 | Pix                │
- * └─────────────────────────────────┘
- * ```
- *
- * Features:
- * - Amount display with currency
- * - Status badge (paid/pending/overdue)
- * - Payment method display
- * - Date display
- * - Color-coded status indicators
- * - Click handler for selection
- * - Material 3 styling
- * - Responsive layout
- *
- * Example:
- * ```kotlin
- * PaymentListItem(
- *     payment = payment,
- *     onClick = { navigateToDetail(payment.id) }
- * )
- * ```
- *
- * @param payment Payment data to display
+ * @param paymentWithDetails Payment with linked appointments
+ * @param patientName Patient name for display
  * @param onClick Callback when item is tapped
  */
 @Composable
 fun PaymentListItem(
-    payment: Payment,
-    onClick: () -> Unit
+    paymentWithDetails: PaymentWithDetails,
+    patientName: String = "",
+    onClick: () -> Unit = {}
 ) {
+    val payment = paymentWithDetails.payment
+    val appointments = paymentWithDetails.appointments
+    val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -70,109 +51,88 @@ fun PaymentListItem(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp
-        )
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Header: Amount, Status, Method
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = payment.displayAmount,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Text(
-                        text = payment.getMethodDisplay(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-
-                // Status badge
-                Surface(
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
-                    color = when {
-                        payment.isPaid -> MaterialTheme.colorScheme.tertiary
-                        payment.isPastDue -> MaterialTheme.colorScheme.error
-                        else -> WarningColor
-                    },
-                    contentColor = when {
-                        payment.isPaid -> MaterialTheme.colorScheme.onTertiary
-                        payment.isPastDue -> MaterialTheme.colorScheme.onError
-                        else -> MaterialTheme.colorScheme.onError
+                    // Patient name (top, same position as appointment card)
+                    if (patientName.isNotEmpty()) {
+                        Text(
+                            text = patientName,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
-                ) {
-                    Text(
-                        text = payment.getStatusLabel(),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                }
-            }
 
-            // Divider
-            androidx.compose.material3.HorizontalDivider(
-                modifier = Modifier.padding(vertical = 4.dp),
-                thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.outlineVariant
-            )
-
-            // Footer: Date and appointment info
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DateRange,
-                        contentDescription = null,
-                        modifier = Modifier.padding(0.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = payment.getFormattedDate(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // Appointment indicator if linked
-                if (payment.isLinkedToAppointment) {
+                    // Payment date
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.AttachMoney,
+                            imageVector = Icons.Default.DateRange,
                             contentDescription = null,
-                            modifier = Modifier.padding(0.dp),
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Consulta",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
+                            text = payment.paymentDate.format(dateFormatter),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
+
+                    // Linked appointments
+                    if (appointments.isNotEmpty()) {
+                        val appointmentDates = appointments.joinToString(", ") {
+                            it.date.format(DateTimeFormatter.ofPattern("dd/MM"))
+                        }
+                        val label = if (appointments.size == 1) {
+                            "1 consulta: $appointmentDates"
+                        } else {
+                            "${appointments.size} consultas: $appointmentDates"
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Event,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
+                // Amount badge (right side, mirrors pending badge style)
+                Surface(
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ) {
+                    Text(
+                        text = payment.displayAmount,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
                 }
             }
         }
@@ -180,60 +140,17 @@ fun PaymentListItem(
 }
 
 /**
- * Compact payment list item (alternative)
- *
- * Condensed version for summary/timeline views.
- *
- * Layout:
- * ```
- * R$ 150,00 | Pago | 15/03
- * ```
- *
- * @param payment Payment data to display
- * @param onClick Callback when item is tapped
+ * Legacy overload accepting a plain Payment (no appointments).
+ * Used by patient-scoped payment lists.
  */
 @Composable
-fun CompactPaymentListItem(
+fun PaymentListItem(
     payment: Payment,
-    onClick: () -> Unit
+    onClick: () -> Unit = {}
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = payment.displayAmount,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Text(
-                text = payment.getFormattedDate(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-        }
-
-        Surface(
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
-            color = when {
-                payment.isPaid -> MaterialTheme.colorScheme.tertiary
-                payment.isPastDue -> MaterialTheme.colorScheme.error
-                else -> WarningColor
-            }
-        ) {
-            Text(
-                text = payment.getStatusLabel(),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-            )
-        }
-    }
+    PaymentListItem(
+        paymentWithDetails = PaymentWithDetails(payment = payment, appointments = emptyList()),
+        patientName = "",
+        onClick = onClick
+    )
 }

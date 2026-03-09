@@ -3,6 +3,7 @@ package com.psychologist.financial.domain.usecases
 import com.psychologist.financial.data.repositories.PaymentRepository
 import com.psychologist.financial.domain.models.Payment
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -108,7 +109,7 @@ class GetPatientPaymentsUseCase(
      * @return Paid payments (most recent first)
      */
     suspend fun getPaidPayments(patientId: Long): List<Payment> {
-        return repository.getByPatientAndStatus(patientId, Payment.STATUS_PAID)
+        return repository.getByPatient(patientId)
     }
 
     /**
@@ -118,42 +119,46 @@ class GetPatientPaymentsUseCase(
      * @return Flow of paid payments
      */
     fun getPaidPaymentsFlow(patientId: Long): Flow<List<Payment>> {
-        return repository.getByPatientAndStatusFlow(patientId, Payment.STATUS_PAID)
+        return repository.getByPatientFlow(patientId)
     }
 
     /**
      * Get pending payments (outstanding)
      *
-     * Useful for viewing unpaid invoices and calculating outstanding balance.
+     * Always empty — no pending payments in new model (all payments are PAID).
      *
      * @param patientId Patient ID
-     * @return Pending payments (most recent first)
+     * @return Empty list
      */
+    @Suppress("UNUSED_PARAMETER")
     suspend fun getPendingPayments(patientId: Long): List<Payment> {
-        return repository.getByPatientAndStatus(patientId, Payment.STATUS_PENDING)
+        return emptyList()
     }
 
     /**
      * Get pending payments as Flow (reactive)
      *
+     * Always emits empty list — no pending payments in new model.
+     *
      * @param patientId Patient ID
-     * @return Flow of pending payments
+     * @return Flow emitting empty list
      */
+    @Suppress("UNUSED_PARAMETER")
     fun getPendingPaymentsFlow(patientId: Long): Flow<List<Payment>> {
-        return repository.getByPatientAndStatusFlow(patientId, Payment.STATUS_PENDING)
+        return flow { emit(emptyList()) }
     }
 
     /**
      * Get overdue pending payments
      *
-     * Payments with status PENDING and payment_date in past.
-     * Useful for showing delinquent accounts.
+     * Always empty — no pending payments in new model.
      *
      * @param patientId Patient ID
-     * @return Overdue pending payments
+     * @return Empty list
      */
+    @Suppress("UNUSED_PARAMETER")
     suspend fun getOverduePayments(patientId: Long): List<Payment> {
-        return repository.getPastDueByPatient(patientId).filter { it.isPending }
+        return emptyList()
     }
 
     // ========================================
@@ -191,16 +196,11 @@ class GetPatientPaymentsUseCase(
      */
     suspend fun getByStatusAndDateRange(
         patientId: Long,
-        status: String,
+        @Suppress("UNUSED_PARAMETER") status: String,
         startDate: LocalDate,
         endDate: LocalDate
     ): List<Payment> {
-        return repository.getByPatientStatusAndDateRange(
-            patientId,
-            status,
-            startDate,
-            endDate
-        )
+        return repository.getByPatientAndDateRange(patientId, startDate, endDate)
     }
 
     /**
@@ -240,7 +240,7 @@ class GetPatientPaymentsUseCase(
         val now = LocalDate.now()
         val startDate = now.withDayOfMonth(1)
         val endDate = now.withDayOfMonth(now.lengthOfMonth())
-        return getByStatusAndDateRange(patientId, Payment.STATUS_PAID, startDate, endDate)
+        return getByDateRange(patientId, startDate, endDate)
     }
 
     /**
@@ -249,12 +249,12 @@ class GetPatientPaymentsUseCase(
      * @param patientId Patient ID
      * @param year Year
      * @param month Month (1-12)
-     * @return Paid payments for month
+     * @return Payments for month (all are paid)
      */
     suspend fun getMonthPaidPayments(patientId: Long, year: Int, month: Int): List<Payment> {
         val startDate = LocalDate.of(year, month, 1)
         val endDate = startDate.withDayOfMonth(startDate.lengthOfMonth())
-        return getByStatusAndDateRange(patientId, Payment.STATUS_PAID, startDate, endDate)
+        return getByDateRange(patientId, startDate, endDate)
     }
 
     /**
@@ -281,7 +281,7 @@ class GetPatientPaymentsUseCase(
      * @return Amount due now
      */
     suspend fun getAmountDueNow(patientId: Long): BigDecimal {
-        return repository.getAmountDueNow(patientId)
+        return repository.getTotalAmountPaid(patientId)
     }
 
     /**
@@ -297,23 +297,27 @@ class GetPatientPaymentsUseCase(
     /**
      * Get total outstanding
      *
-     * Sum of all PENDING payments.
+     * Always zero — no pending payments in new model.
      *
      * @param patientId Patient ID
-     * @return Total outstanding amount
+     * @return BigDecimal.ZERO
      */
+    @Suppress("UNUSED_PARAMETER")
     suspend fun getTotalOutstanding(patientId: Long): BigDecimal {
-        return repository.getTotalOutstanding(patientId)
+        return BigDecimal.ZERO
     }
 
     /**
      * Get total outstanding as reactive stream
      *
+     * Always emits zero — no pending payments in new model.
+     *
      * @param patientId Patient ID
-     * @return Flow of total outstanding
+     * @return Flow emitting ZERO
      */
+    @Suppress("UNUSED_PARAMETER")
     fun getTotalOutstandingFlow(patientId: Long): Flow<BigDecimal> {
-        return repository.getTotalOutstandingFlow(patientId)
+        return flow { emit(BigDecimal.ZERO) }
     }
 
     /**
@@ -406,17 +410,20 @@ class GetPatientPaymentsUseCase(
      * @return Number of paid payments
      */
     suspend fun getPaidCount(patientId: Long): Int {
-        return repository.countByPatientAndStatus(patientId, Payment.STATUS_PAID)
+        return repository.countByPatient(patientId)
     }
 
     /**
      * Get count of pending payments
      *
+     * Always zero — no pending payments in new model.
+     *
      * @param patientId Patient ID
-     * @return Number of pending payments
+     * @return 0
      */
+    @Suppress("UNUSED_PARAMETER")
     suspend fun getPendingCount(patientId: Long): Int {
-        return repository.countByPatientAndStatus(patientId, Payment.STATUS_PENDING)
+        return 0
     }
 
     /**
@@ -463,18 +470,22 @@ class GetPatientPaymentsUseCase(
      * @param patientId Patient ID
      * @return true if patient has outstanding balance
      */
+    @Suppress("UNUSED_PARAMETER")
     suspend fun hasPendingPayments(patientId: Long): Boolean {
-        return getPendingCount(patientId) > 0
+        return false
     }
 
     /**
      * Check if patient has overdue payments
      *
+     * Always false — no pending payments in new model.
+     *
      * @param patientId Patient ID
-     * @return true if patient has overdue pending payments
+     * @return false
      */
+    @Suppress("UNUSED_PARAMETER")
     suspend fun hasOverduePayments(patientId: Long): Boolean {
-        return getOverdueCount(patientId) > 0
+        return false
     }
 
     // ========================================
@@ -492,8 +503,8 @@ class GetPatientPaymentsUseCase(
     suspend fun getGroupedByStatus(patientId: Long): PaymentsByStatus {
         val payments = execute(patientId)
         return PaymentsByStatus(
-            paid = payments.filter { it.isPaid },
-            pending = payments.filter { it.isPending }
+            paid = payments,
+            pending = emptyList()
         )
     }
 
@@ -508,11 +519,11 @@ class GetPatientPaymentsUseCase(
         return PaymentsWithBalance(
             payments = payments,
             totalAmountPaid = getTotalAmountPaid(patientId),
-            totalOutstanding = getTotalOutstanding(patientId),
+            totalOutstanding = BigDecimal.ZERO,
             amountDueNow = getAmountDueNow(patientId),
             paidCount = getPaidCount(patientId),
-            pendingCount = getPendingCount(patientId),
-            overdueCount = getOverdueCount(patientId)
+            pendingCount = 0,
+            overdueCount = 0
         )
     }
 
@@ -551,17 +562,20 @@ class GetPatientPaymentsUseCase(
      * @return Flow of paid count
      */
     fun getPaidCountFlow(patientId: Long): Flow<Int> {
-        return executeFlow(patientId).map { it.filter { p -> p.isPaid }.size }
+        return getCountFlow(patientId)
     }
 
     /**
      * Get pending payments count as reactive stream
      *
+     * Always emits 0 — no pending payments in new model.
+     *
      * @param patientId Patient ID
-     * @return Flow of pending count
+     * @return Flow emitting 0
      */
+    @Suppress("UNUSED_PARAMETER")
     fun getPendingCountFlow(patientId: Long): Flow<Int> {
-        return executeFlow(patientId).map { it.filter { p -> p.isPending }.size }
+        return flow { emit(0) }
     }
 }
 

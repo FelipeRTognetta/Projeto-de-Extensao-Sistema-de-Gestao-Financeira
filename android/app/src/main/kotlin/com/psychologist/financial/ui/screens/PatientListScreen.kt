@@ -136,6 +136,7 @@ fun PatientListScreen(
 
                     listState is ListState.Success -> PatientListContent(
                         patients = listState.patients,
+                        pendingPatientIds = viewModel.pendingPatientIds.collectAsState().value,
                         onPatientClick = onPatientClick,
                         onRefresh = { viewModel.refreshPatients() }
                     )
@@ -184,7 +185,8 @@ private fun LoadingContent() {
  */
 @Composable
 private fun PatientListContent(
-    patients: List<Any>,
+    patients: List<com.psychologist.financial.domain.models.Patient>,
+    pendingPatientIds: Set<Long>,
     onPatientClick: (Long) -> Unit,
     onRefresh: () -> Unit
 ) {
@@ -194,12 +196,13 @@ private fun PatientListContent(
         verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         items(
-            items = patients as List<com.psychologist.financial.domain.models.Patient>,
+            items = patients,
             key = { it.id }
         ) { patient ->
             PatientListItem(
                 patient = patient,
-                onClick = { onPatientClick(patient.id) }
+                onClick = { onPatientClick(patient.id) },
+                hasPendingPayments = patient.id in pendingPatientIds
             )
         }
     }

@@ -116,32 +116,25 @@ class CsvExportServiceTest {
     private val simplePayment = Payment(
         id = 1001,
         patientId = 1,
-        appointmentId = 101,
         amount = BigDecimal("150.00"),
-        status = "PAID",
-        paymentMethod = "PIX",
         paymentDate = LocalDate.of(2025, 2, 20),
-        createdDate = LocalDateTime.of(2025, 2, 20, 14, 35, 0)
+        createdDate = LocalDateTime.of(2025, 2, 20, 14, 35, 0),
+        appointmentIds = listOf(101L)
     )
 
     private val paymentWithLargeDecimal = Payment(
         id = 1002,
         patientId = 2,
-        appointmentId = 102,
         amount = BigDecimal("1250.50"),
-        status = "PENDING",
-        paymentMethod = "CREDIT_CARD",
         paymentDate = LocalDate.of(2025, 2, 21),
-        createdDate = LocalDateTime.of(2025, 2, 21, 10, 5, 0)
+        createdDate = LocalDateTime.of(2025, 2, 21, 10, 5, 0),
+        appointmentIds = listOf(102L)
     )
 
     private val paymentWithMinimalDecimal = Payment(
         id = 1003,
         patientId = 3,
-        appointmentId = null,
         amount = BigDecimal("50.25"),
-        status = "PAID",
-        paymentMethod = "DEBIT_CARD",
         paymentDate = LocalDate.of(2025, 2, 22),
         createdDate = LocalDateTime.of(2025, 2, 22, 15, 20, 0)
     )
@@ -149,10 +142,7 @@ class CsvExportServiceTest {
     private val paymentWithExactAmount = Payment(
         id = 1004,
         patientId = 4,
-        appointmentId = null,
         amount = BigDecimal("100"),
-        status = "PAID",
-        paymentMethod = "TRANSFER",
         paymentDate = LocalDate.of(2025, 2, 23),
         createdDate = LocalDateTime.of(2025, 2, 23, 9, 0, 0)
     )
@@ -185,7 +175,7 @@ class CsvExportServiceTest {
         assertTrue(file.name.endsWith(".csv"))
 
         val content = file.readText()
-        assertTrue(content.contains("name"))
+        assertTrue(content.contains("Nome"))
         assertTrue(content.contains("João Silva"))
     }
 
@@ -200,7 +190,7 @@ class CsvExportServiceTest {
         // Assert
         val lines = file.readLines()
         assertEquals(4, lines.size) // header + 3 patients
-        assertTrue(lines[0].contains("id,name,phone,email,status"))
+        assertTrue(lines[0].contains("ID,Nome,Telefone,Email,Status"))
     }
 
     @Test
@@ -260,7 +250,7 @@ class CsvExportServiceTest {
         assertNotNull(file)
         val lines = file.readLines()
         assertEquals(1, lines.size) // Only header
-        assertTrue(lines[0].contains("name,phone,email"))
+        assertTrue(lines[0].contains("Nome,Telefone,Email"))
     }
 
     // ========================================
@@ -281,7 +271,7 @@ class CsvExportServiceTest {
         assertTrue(file.name.startsWith("appointments"))
 
         val content = file.readText()
-        assertTrue(content.contains("date"))
+        assertTrue(content.contains("Data"))
         assertTrue(content.contains("2025-02-20"))
     }
 
@@ -361,7 +351,7 @@ class CsvExportServiceTest {
         assertTrue(file.name.startsWith("payments"))
 
         val content = file.readText()
-        assertTrue(content.contains("amount"))
+        assertTrue(content.contains("Valor"))
         assertTrue(content.contains("150.00"))
     }
 
@@ -437,36 +427,16 @@ class CsvExportServiceTest {
     }
 
     @Test
-    fun exportPayments_withVariousStatuses_preservesStatus() {
-        // Arrange
+    fun exportPayments_withMultipleStatuses_allPaymentsExported() {
+        // Arrange - v3: all payments are PAID, no status field
         val payments = listOf(simplePayment, paymentWithLargeDecimal)
 
         // Act
         val file = csvService.exportPayments(payments, tempDir)
 
         // Assert
-        val content = file.readText()
-        assertTrue(content.contains("PAID"))
-        assertTrue(content.contains("PENDING"))
-    }
-
-    @Test
-    fun exportPayments_withVariousPaymentMethods_preservesMethod() {
-        // Arrange
-        val payments = listOf(
-            simplePayment,
-            paymentWithLargeDecimal,
-            paymentWithMinimalDecimal
-        )
-
-        // Act
-        val file = csvService.exportPayments(payments, tempDir)
-
-        // Assert
-        val content = file.readText()
-        assertTrue(content.contains("PIX"))
-        assertTrue(content.contains("CREDIT_CARD"))
-        assertTrue(content.contains("DEBIT_CARD"))
+        val lines = file.readLines()
+        assertEquals(3, lines.size) // header + 2 payments
     }
 
     // ========================================
@@ -483,10 +453,10 @@ class CsvExportServiceTest {
 
         // Assert
         val firstLine = file.readLines()[0]
-        assertTrue(firstLine.contains("id"))
-        assertTrue(firstLine.contains("name"))
-        assertTrue(firstLine.contains("phone"))
-        assertTrue(firstLine.contains("email"))
+        assertTrue(firstLine.contains("ID"))
+        assertTrue(firstLine.contains("Nome"))
+        assertTrue(firstLine.contains("Telefone"))
+        assertTrue(firstLine.contains("Email"))
     }
 
     @Test
@@ -573,10 +543,7 @@ class CsvExportServiceTest {
         val zeroPayment = Payment(
             id = 1,
             patientId = 1,
-            appointmentId = null,
             amount = BigDecimal("0.00"),
-            status = "PENDING",
-            paymentMethod = "TRANSFER",
             paymentDate = LocalDate.now(),
             createdDate = LocalDateTime.now()
         )

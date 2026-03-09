@@ -1,6 +1,7 @@
 package com.psychologist.financial.viewmodel
 
 import com.psychologist.financial.domain.models.Appointment
+import com.psychologist.financial.domain.models.AppointmentWithPaymentStatus
 import com.psychologist.financial.domain.usecases.CreateAppointmentUseCase
 
 /**
@@ -50,10 +51,10 @@ object AppointmentViewState {
         /**
          * Appointments loaded successfully
          *
-         * @param appointments List of appointments
+         * @param appointments List of appointments with payment status
          */
         data class Success(
-            val appointments: List<Appointment>
+            val appointments: List<AppointmentWithPaymentStatus>
         ) : ListState() {
             /**
              * Get appointment count
@@ -71,8 +72,8 @@ object AppointmentViewState {
              * @param isPast true for past, false for upcoming
              * @return Filtered appointments
              */
-            fun filterByStatus(isPast: Boolean): List<Appointment> {
-                return appointments.filter { it.isPast == isPast }
+            fun filterByStatus(isPast: Boolean): List<AppointmentWithPaymentStatus> {
+                return appointments.filter { it.appointment.isPast == isPast }
             }
         }
 
@@ -358,11 +359,44 @@ object AppointmentViewState {
     }
 
     // ========================================
+    // Global List State (bottom-nav Consultas tab)
+    // ========================================
+
+    /**
+     * Global appointment list state — all patients, with payment-status filter.
+     */
+    sealed class GlobalListState {
+        object Loading : GlobalListState()
+
+        data class Success(
+            val allAppointments: List<AppointmentWithPaymentStatus>,
+            val filteredAppointments: List<AppointmentWithPaymentStatus>,
+            val activeFilter: AppointmentFilter
+        ) : GlobalListState() {
+            fun getCount(): Int = filteredAppointments.size
+            fun isEmpty(): Boolean = filteredAppointments.isEmpty()
+        }
+
+        object Empty : GlobalListState()
+
+        data class Error(val message: String) : GlobalListState()
+    }
+
+    // ========================================
     // Enums and Supporting Classes
     // ========================================
 
     /**
-     * Appointment list filter
+     * Appointment payment-status filter for the global list screen.
+     */
+    enum class AppointmentFilter {
+        ALL,     // All appointments
+        PENDING, // Only appointments with pending payment (hasPendingPayment = true)
+        PAID     // Only appointments with payment linked (hasPendingPayment = false)
+    }
+
+    /**
+     * Appointment list filter (legacy — patient-specific screen)
      */
     enum class ListFilter {
         ALL,      // All appointments

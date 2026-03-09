@@ -12,7 +12,7 @@ object Constants {
     // Database Constants
     // ================================
     const val DATABASE_NAME = "financial_management.db"
-    const val DATABASE_VERSION = 2
+    const val DATABASE_VERSION = 3
 
     // ================================
     // Authentication Constants

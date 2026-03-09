@@ -2,14 +2,18 @@ package com.psychologist.financial.viewmodel
 
 import android.util.Log
 import androidx.lifecycle.viewModelScope
+import com.psychologist.financial.data.repositories.AppointmentRepository
 import com.psychologist.financial.data.repositories.DashboardRepository
 import com.psychologist.financial.domain.models.MonthlyMetrics
 import com.psychologist.financial.domain.usecases.GetDashboardMetricsUseCase
 import com.psychologist.financial.domain.usecases.MonthComparisonResult
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.YearMonth
 
@@ -64,7 +68,8 @@ import java.time.YearMonth
  */
 class DashboardViewModel(
     private val repository: DashboardRepository,
-    private val useCase: GetDashboardMetricsUseCase
+    private val useCase: GetDashboardMetricsUseCase,
+    private val appointmentRepository: AppointmentRepository? = null
 ) : BaseViewModel() {
 
     private companion object {
@@ -82,6 +87,15 @@ class DashboardViewModel(
      */
     private val _state = MutableStateFlow(DashboardViewState.initialState())
     val state: StateFlow<DashboardViewState.DashboardState> = _state.asStateFlow()
+
+    /** Count of appointments with no linked payment (global, all-time). */
+    val unpaidAppointmentsCount: StateFlow<Int> = (
+        appointmentRepository?.countUnpaidAppointments() ?: flowOf(0)
+    ).stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = 0
+    )
 
     /**
      * Selected month state

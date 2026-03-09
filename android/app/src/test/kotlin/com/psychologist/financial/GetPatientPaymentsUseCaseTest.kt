@@ -45,21 +45,10 @@ class GetPatientPaymentsUseCaseTest {
     private val today = LocalDate.now()
     private val yesterday = today.minusDays(1)
 
-    private fun makePaidPayment(id: Long, amount: BigDecimal = BigDecimal("150.00")) = Payment(
+    private fun makePayment(id: Long, amount: BigDecimal = BigDecimal("150.00")) = Payment(
         id = id,
         patientId = 1L,
         amount = amount,
-        status = Payment.STATUS_PAID,
-        paymentMethod = Payment.METHOD_TRANSFER,
-        paymentDate = yesterday
-    )
-
-    private fun makePendingPayment(id: Long, amount: BigDecimal = BigDecimal("100.00")) = Payment(
-        id = id,
-        patientId = 1L,
-        amount = amount,
-        status = Payment.STATUS_PENDING,
-        paymentMethod = Payment.METHOD_PIX,
         paymentDate = yesterday
     )
 
@@ -74,7 +63,7 @@ class GetPatientPaymentsUseCaseTest {
 
     @Test
     fun `execute returns all payments for patient`() = runTest {
-        val payments = listOf(makePaidPayment(1L), makePendingPayment(2L))
+        val payments = listOf(makePayment(1L), makePayment(2L))
         whenever(mockRepository.getByPatient(1L)).thenReturn(payments)
 
         val result = useCase.execute(patientId = 1L)
@@ -96,34 +85,19 @@ class GetPatientPaymentsUseCaseTest {
     // ========================================
 
     @Test
-    fun `getPaidPayments returns only paid payments`() = runTest {
-        val paidPayments = listOf(makePaidPayment(1L))
-        whenever(mockRepository.getByPatientAndStatus(1L, Payment.STATUS_PAID))
-            .thenReturn(paidPayments)
+    fun `getPaidPayments returns all patient payments`() = runTest {
+        // v3: getPaidPayments delegates to getByPatient (all payments are paid)
+        val payments = listOf(makePayment(1L))
+        whenever(mockRepository.getByPatient(1L)).thenReturn(payments)
 
         val result = useCase.getPaidPayments(patientId = 1L)
 
         assertEquals(1, result.size)
-        assertTrue(result[0].isPaid)
     }
 
     @Test
-    fun `getPendingPayments returns only pending payments`() = runTest {
-        val pendingPayments = listOf(makePendingPayment(1L))
-        whenever(mockRepository.getByPatientAndStatus(1L, Payment.STATUS_PENDING))
-            .thenReturn(pendingPayments)
-
-        val result = useCase.getPendingPayments(patientId = 1L)
-
-        assertEquals(1, result.size)
-        assertTrue(result[0].isPending)
-    }
-
-    @Test
-    fun `getPendingPayments returns empty when no pending`() = runTest {
-        whenever(mockRepository.getByPatientAndStatus(1L, Payment.STATUS_PENDING))
-            .thenReturn(emptyList())
-
+    fun `getPendingPayments always returns empty`() = runTest {
+        // v3: no pending payments concept — always returns empty list
         val result = useCase.getPendingPayments(patientId = 1L)
 
         assertTrue(result.isEmpty())
@@ -135,7 +109,7 @@ class GetPatientPaymentsUseCaseTest {
 
     @Test
     fun `getByDateRange returns payments in range`() = runTest {
-        val payments = listOf(makePaidPayment(1L))
+        val payments = listOf(makePayment(1L))
         whenever(mockRepository.getByPatientAndDateRange(any(), any(), any()))
             .thenReturn(payments)
 
@@ -173,8 +147,9 @@ class GetPatientPaymentsUseCaseTest {
     // ========================================
 
     @Test
-    fun `getAmountDueNow delegates to repository`() = runTest {
-        whenever(mockRepository.getAmountDueNow(1L)).thenReturn(BigDecimal("300.00"))
+    fun `getAmountDueNow delegates to repository getTotalAmountPaid`() = runTest {
+        // v3: getAmountDueNow delegates to getTotalAmountPaid (all payments are paid)
+        whenever(mockRepository.getTotalAmountPaid(1L)).thenReturn(BigDecimal("300.00"))
 
         val amount = useCase.getAmountDueNow(patientId = 1L)
 
@@ -182,12 +157,11 @@ class GetPatientPaymentsUseCaseTest {
     }
 
     @Test
-    fun `getTotalOutstanding delegates to repository`() = runTest {
-        whenever(mockRepository.getTotalOutstanding(1L)).thenReturn(BigDecimal("150.00"))
-
+    fun `getTotalOutstanding always returns zero`() = runTest {
+        // v3: no pending payments — outstanding is always 0
         val outstanding = useCase.getTotalOutstanding(patientId = 1L)
 
-        assertEquals(BigDecimal("150.00"), outstanding)
+        assertEquals(BigDecimal.ZERO, outstanding)
     }
 
     @Test
@@ -213,8 +187,9 @@ class GetPatientPaymentsUseCaseTest {
     }
 
     @Test
-    fun `getPaidCount delegates to repository`() = runTest {
-        whenever(mockRepository.countByPatientAndStatus(1L, Payment.STATUS_PAID)).thenReturn(7)
+    fun `getPaidCount delegates to countByPatient`() = runTest {
+        // v3: getPaidCount uses countByPatient (all payments are paid)
+        whenever(mockRepository.countByPatient(1L)).thenReturn(7)
 
         val count = useCase.getPaidCount(patientId = 1L)
 
@@ -222,12 +197,11 @@ class GetPatientPaymentsUseCaseTest {
     }
 
     @Test
-    fun `getPendingCount delegates to repository`() = runTest {
-        whenever(mockRepository.countByPatientAndStatus(1L, Payment.STATUS_PENDING)).thenReturn(3)
-
+    fun `getPendingCount always returns zero`() = runTest {
+        // v3: no pending payments
         val count = useCase.getPendingCount(patientId = 1L)
 
-        assertEquals(3, count)
+        assertEquals(0, count)
     }
 
     // ========================================
@@ -254,11 +228,10 @@ class GetPatientPaymentsUseCaseTest {
 
     @Test
     fun `hasPendingPayments returns true when pending count greater than zero`() = runTest {
-        whenever(mockRepository.countByPatientAndStatus(1L, Payment.STATUS_PENDING)).thenReturn(2)
-
+        // v3: no pending payments concept — hasPendingPayments always returns false
         val has = useCase.hasPendingPayments(patientId = 1L)
 
-        assertTrue(has)
+        assertFalse(has)
     }
 
     // ========================================
@@ -267,18 +240,17 @@ class GetPatientPaymentsUseCaseTest {
 
     @Test
     fun `getCollectionRate returns correct percentage`() = runTest {
+        // v3: all payments are paid → rate is always 100% when count > 0
         whenever(mockRepository.countByPatient(1L)).thenReturn(10)
-        whenever(mockRepository.countByPatientAndStatus(1L, Payment.STATUS_PAID)).thenReturn(8)
 
         val rate = useCase.getCollectionRate(patientId = 1L)
 
-        assertEquals(80, rate)
+        assertEquals(100, rate)
     }
 
     @Test
     fun `getCollectionRate returns zero when no payments`() = runTest {
         whenever(mockRepository.countByPatient(1L)).thenReturn(0)
-        whenever(mockRepository.countByPatientAndStatus(1L, Payment.STATUS_PAID)).thenReturn(0)
 
         val rate = useCase.getCollectionRate(patientId = 1L)
 
@@ -291,7 +263,7 @@ class GetPatientPaymentsUseCaseTest {
 
     @Test
     fun `executeFlow emits payments reactively`() = runTest {
-        val payments = listOf(makePaidPayment(1L))
+        val payments = listOf(makePayment(1L))
         whenever(mockRepository.getByPatientFlow(1L))
             .thenReturn(flowOf(payments))
 

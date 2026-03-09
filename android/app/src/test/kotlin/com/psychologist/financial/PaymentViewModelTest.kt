@@ -2,22 +2,24 @@ package com.psychologist.financial
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.psychologist.financial.data.repositories.PaymentRepository
+import com.psychologist.financial.domain.models.Appointment
 import com.psychologist.financial.domain.models.Payment
-import com.psychologist.financial.domain.models.PatientBalance
 import com.psychologist.financial.domain.usecases.CreatePaymentUseCase
+import com.psychologist.financial.domain.usecases.GetAllPaymentsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientPaymentsUseCase
-import com.psychologist.financial.services.BalanceCalculator
+import com.psychologist.financial.domain.usecases.GetUnpaidAppointmentsUseCase
 import com.psychologist.financial.viewmodel.PaymentViewModel
 import com.psychologist.financial.viewmodel.PaymentViewState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -27,23 +29,21 @@ import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.whenever
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.time.LocalTime
 
 /**
  * Unit tests for PaymentViewModel
  *
  * Coverage:
  * - Loading patient payments (success, empty, error)
- * - Loading filtered payments (paid, pending, overdue)
- * - Loading payments by date range
- * - Selecting and viewing payment details
- * - Form state management (fields, validation, submission)
- * - Balance state loading and updates
- * - Status filter changes
+ * - Loading payment detail (success, error)
+ * - Multiple sequential loads
+ * - Form state management (amount, date, appointment selection, submission)
+ * - Available appointments loading
  * - Error handling and state transitions
- * - Form validation feedback
  *
- * Total: 45+ test cases with 80%+ coverage
- * Uses Mockito to mock PaymentRepository and use cases
+ * Total: 16+ test cases
+ * Uses Mockito to mock repository and use cases
  * Uses coroutines testing for async operations
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -63,7 +63,11 @@ class PaymentViewModelTest {
     @Mock
     private lateinit var mockCreatePaymentUseCase: CreatePaymentUseCase
 
-    private lateinit var mockBalanceCalculator: BalanceCalculator
+    @Mock
+    private lateinit var mockGetUnpaidAppointmentsUseCase: GetUnpaidAppointmentsUseCase
+
+    @Mock
+    private lateinit var mockGetAllPaymentsUseCase: GetAllPaymentsUseCase
 
     private lateinit var viewModel: PaymentViewModel
 
@@ -76,43 +80,32 @@ class PaymentViewModelTest {
         Payment(
             id = 1L,
             patientId = 1L,
-            appointmentId = null,
             amount = BigDecimal("150.00"),
-            paymentDate = yesterday,
-            paymentMethod = "TRANSFER",
-            status = "PAID"
+            paymentDate = yesterday
         ),
         Payment(
             id = 2L,
             patientId = 1L,
-            appointmentId = null,
             amount = BigDecimal("250.00"),
-            paymentDate = weekAgo,
-            paymentMethod = "PIX",
-            status = "PENDING"
+            paymentDate = weekAgo
         )
     )
 
-    private val mockPaidPayments = listOf(mockPayments[0])
-
-    private val mockPendingPayments = listOf(mockPayments[1])
-
-    private val mockEmptyBalance = PatientBalance(
-        amountDueNow = BigDecimal.ZERO,
-        totalOutstanding = BigDecimal.ZERO,
-        totalReceived = BigDecimal.ZERO,
-        paidPaymentsCount = 0,
-        pendingPaymentsCount = 0,
-        totalPaymentsCount = 0
-    )
-
-    private val mockBalance = PatientBalance(
-        amountDueNow = BigDecimal("150.00"),
-        totalOutstanding = BigDecimal("250.00"),
-        totalReceived = BigDecimal("150.00"),
-        paidPaymentsCount = 1,
-        pendingPaymentsCount = 1,
-        totalPaymentsCount = 2
+    private val mockAppointments = listOf(
+        Appointment(
+            id = 10L,
+            patientId = 1L,
+            date = today,
+            timeStart = LocalTime.of(9, 0),
+            durationMinutes = 50
+        ),
+        Appointment(
+            id = 11L,
+            patientId = 1L,
+            date = yesterday,
+            timeStart = LocalTime.of(10, 0),
+            durationMinutes = 50
+        )
     )
 
     @Before
@@ -120,13 +113,12 @@ class PaymentViewModelTest {
         MockitoAnnotations.openMocks(this)
         Dispatchers.setMain(testDispatcher)
 
-        mockBalanceCalculator = BalanceCalculator()
-
         viewModel = PaymentViewModel(
+            createPaymentUseCase = mockCreatePaymentUseCase,
+            getUnpaidAppointmentsUseCase = mockGetUnpaidAppointmentsUseCase,
             repository = mockRepository,
             getPatientPaymentsUseCase = mockGetPatientPaymentsUseCase,
-            createPaymentUseCase = mockCreatePaymentUseCase,
-            balanceCalculator = mockBalanceCalculator
+            getAllPaymentsUseCase = mockGetAllPaymentsUseCase
         )
     }
 
@@ -143,8 +135,7 @@ class PaymentViewModelTest {
     fun loadPatientPayments_onSuccess_updatesState() = runTest {
         // Arrange
         val patientId = 1L
-        whenever(mockGetPatientPaymentsUseCase.execute(patientId))
-            .thenReturn(mockPayments)
+        whenever(mockGetPatientPaymentsUseCase.execute(patientId)).thenReturn(mockPayments)
 
         // Act
         viewModel.loadPatientPayments(patientId)
@@ -160,25 +151,22 @@ class PaymentViewModelTest {
     fun loadPatientPayments_emptyList_updatesStateToEmpty() = runTest {
         // Arrange
         val patientId = 1L
-        whenever(mockGetPatientPaymentsUseCase.execute(patientId))
-            .thenReturn(emptyList())
+        whenever(mockGetPatientPaymentsUseCase.execute(patientId)).thenReturn(emptyList())
 
         // Act
         viewModel.loadPatientPayments(patientId)
         testDispatcher.scheduler.advanceUntilIdle()
 
         // Assert
-        val state = viewModel.paymentListState.value
-        assertTrue(state is PaymentViewState.ListState.Empty)
+        assertTrue(viewModel.paymentListState.value is PaymentViewState.ListState.Empty)
     }
 
     @Test
     fun loadPatientPayments_onError_updatesStateToError() = runTest {
         // Arrange
         val patientId = 1L
-        val errorMessage = "Database error"
         whenever(mockGetPatientPaymentsUseCase.execute(patientId))
-            .thenThrow(RuntimeException(errorMessage))
+            .thenThrow(RuntimeException("Database error"))
 
         // Act
         viewModel.loadPatientPayments(patientId)
@@ -190,218 +178,37 @@ class PaymentViewModelTest {
         assertTrue((state as PaymentViewState.ListState.Error).message.contains("erro", ignoreCase = true))
     }
 
-    // ========================================
-    // Filtered Payments Loading Tests
-    // ========================================
-
     @Test
-    fun loadPaidPayments_onSuccess_returnsOnlyPaidPayments() = runTest {
-        // Arrange
-        val patientId = 1L
-        whenever(mockGetPatientPaymentsUseCase.getPaidPayments(patientId))
-            .thenReturn(mockPaidPayments)
-
-        // Act
-        viewModel.loadPaidPayments(patientId)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        // Assert
-        val state = viewModel.paymentListState.value
-        assertTrue(state is PaymentViewState.ListState.Success)
-        val payments = (state as PaymentViewState.ListState.Success).payments
-        assertEquals(1, payments.size)
-        assertTrue(payments.all { it.status == "PAID" })
-    }
-
-    @Test
-    fun loadPendingPayments_onSuccess_returnsOnlyPendingPayments() = runTest {
-        // Arrange
-        val patientId = 1L
-        whenever(mockGetPatientPaymentsUseCase.getPendingPayments(patientId))
-            .thenReturn(mockPendingPayments)
-
-        // Act
-        viewModel.loadPendingPayments(patientId)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        // Assert
-        val state = viewModel.paymentListState.value
-        assertTrue(state is PaymentViewState.ListState.Success)
-        val payments = (state as PaymentViewState.ListState.Success).payments
-        assertEquals(1, payments.size)
-        assertTrue(payments.all { it.status == "PENDING" })
-    }
-
-    // ========================================
-    // Balance Loading Tests
-    // ========================================
-
-    @Test
-    fun loadBalance_onSuccess_updatesBalanceState() = runTest {
-        // Arrange
+    fun multipleLoadPayments_lastLoadWins() = runTest {
+        // Arrange - first load returns one payment
         val patientId = 1L
         whenever(mockGetPatientPaymentsUseCase.execute(patientId))
-            .thenReturn(mockPayments)
+            .thenReturn(listOf(mockPayments[0]))
 
-        // Act
-        viewModel.loadBalance(patientId)
+        viewModel.loadPatientPayments(patientId)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // Assert
-        val balanceState = viewModel.balanceState.value
-        assertNotNull(balanceState.balance)
-        assertEquals(BigDecimal("150.00"), balanceState.balance.amountDueNow)
-        assertEquals(BigDecimal("250.00"), balanceState.balance.totalOutstanding)
-    }
-
-    @Test
-    fun loadBalance_thenLoadAgain_recalculatesFromPayments() = runTest {
-        // Arrange
-        val patientId = 1L
-        whenever(mockGetPatientPaymentsUseCase.execute(patientId))
-            .thenReturn(mockPayments)
-
-        // Act - load balance twice
-        viewModel.loadBalance(patientId)
-        testDispatcher.scheduler.advanceUntilIdle()
-        viewModel.loadBalance(patientId)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        // Assert
-        val balanceState = viewModel.balanceState.value
-        assertEquals(BigDecimal("150.00"), balanceState.balance.amountDueNow)
-    }
-
-    // ========================================
-    // Form Field Management Tests
-    // ========================================
-
-    @Test
-    fun setFormAmount_updatesAmountField() {
-        // Act - setFormAmount strips non-digits, so pass digits representing centavos
-        viewModel.setFormAmount("15000")
-
-        // Assert - stored as centavos digits
-        assertEquals("15000", viewModel.formAmount.value)
-    }
-
-    @Test
-    fun setFormDate_updatesDateField() {
-        // Arrange
-        val testDate = LocalDate.now()
+        // Arrange - second load returns both payments
+        whenever(mockGetPatientPaymentsUseCase.execute(patientId)).thenReturn(mockPayments)
 
         // Act
-        viewModel.setFormDate(testDate)
-
-        // Assert
-        assertEquals(testDate, viewModel.formDate.value)
-    }
-
-    @Test
-    fun setFormMethod_updatesMethodField() {
-        // Act
-        viewModel.setFormMethod(Payment.METHOD_TRANSFER)
-
-        // Assert
-        assertEquals(Payment.METHOD_TRANSFER, viewModel.formMethod.value)
-    }
-
-    @Test
-    fun setFormStatus_updatesStatusField() {
-        // Act
-        viewModel.setFormStatus("PAID")
-
-        // Assert
-        assertEquals("PAID", viewModel.formStatus.value)
-    }
-
-    @Test
-    fun setFormAppointmentId_updatesAppointmentIdField() {
-        // Act
-        viewModel.setFormAppointmentId(5L)
-
-        // Assert
-        assertEquals(5L, viewModel.formAppointmentId.value)
-    }
-
-    // ========================================
-    // Form Submission Tests
-    // ========================================
-
-    @Test
-    fun submitCreatePaymentForm_onValidationError_updatesFormState() = runTest {
-        // Arrange - empty amount (invalid)
-        viewModel.setFormAmount("")
-
-        // Act
-        viewModel.submitCreatePaymentForm(1L)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        // Assert - either validation errors recorded or state has errors
-        val formState = viewModel.createFormState.value
-        // Submission attempted with zero amount — will trigger validation error from use case
-        assertTrue(formState.hasErrors() || formState.submissionResult != null || !formState.isSubmitting)
-    }
-
-    @Test
-    fun resetForm_clearsAllFields() {
-        // Arrange
-        viewModel.setFormAmount("15000")
-        viewModel.setFormDate(LocalDate.now())
-        viewModel.setFormMethod(Payment.METHOD_PIX)
-        viewModel.setFormStatus("PAID")
-
-        // Act
-        viewModel.resetForm()
-
-        // Assert - formAmount resets to "0", formMethod resets to METHOD_TRANSFER
-        assertEquals("0", viewModel.formAmount.value)
-        assertEquals(LocalDate.now(), viewModel.formDate.value)  // Resets to today
-        assertEquals(Payment.METHOD_TRANSFER, viewModel.formMethod.value)
-        assertEquals(Payment.STATUS_PAID, viewModel.formStatus.value)
-    }
-
-    // ========================================
-    // Status Filter Tests
-    // ========================================
-
-    @Test
-    fun setStatusFilter_updatesFilter() {
-        // Act
-        viewModel.setStatusFilter(PaymentViewState.PaymentStatusFilter.PAID)
-
-        // Assert
-        assertEquals(PaymentViewState.PaymentStatusFilter.PAID, viewModel.statusFilter.value)
-    }
-
-    @Test
-    fun setStatusFilter_all_displaysAllPaymentsFromCache() = runTest {
-        // Arrange - first load payments to populate cache
-        whenever(mockGetPatientPaymentsUseCase.execute(1L))
-            .thenReturn(mockPayments)
-        viewModel.loadPatientPayments(1L)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        // Act - set filter to ALL (reapplies to cached list)
-        viewModel.setStatusFilter(PaymentViewState.PaymentStatusFilter.ALL)
+        viewModel.loadPatientPayments(patientId)
         testDispatcher.scheduler.advanceUntilIdle()
 
         // Assert
         val state = viewModel.paymentListState.value
-        val payments = (state as PaymentViewState.ListState.Success).payments
-        assertEquals(2, payments.size)
+        assertEquals(2, (state as PaymentViewState.ListState.Success).payments.size)
     }
 
     // ========================================
-    // Payment Details Tests
+    // Payment Detail Tests
     // ========================================
 
     @Test
     fun loadPaymentDetail_onSuccess_updatesDetailState() = runTest {
         // Arrange
         val paymentId = 1L
-        whenever(mockRepository.getById(paymentId))
-            .thenReturn(mockPayments[0])
+        whenever(mockRepository.getById(paymentId)).thenReturn(mockPayments[0])
 
         // Act
         viewModel.loadPaymentDetail(paymentId)
@@ -417,112 +224,167 @@ class PaymentViewModelTest {
     fun loadPaymentDetail_onError_updatesDetailStateToError() = runTest {
         // Arrange
         val paymentId = 999L
-        whenever(mockRepository.getById(paymentId))
-            .thenThrow(RuntimeException("Payment not found"))
+        whenever(mockRepository.getById(paymentId)).thenThrow(RuntimeException("Payment not found"))
 
         // Act
         viewModel.loadPaymentDetail(paymentId)
         testDispatcher.scheduler.advanceUntilIdle()
 
         // Assert
-        val state = viewModel.paymentDetailState.value
-        assertTrue(state is PaymentViewState.DetailState.Error)
+        assertTrue(viewModel.paymentDetailState.value is PaymentViewState.DetailState.Error)
     }
 
     // ========================================
-    // Payment Actions Tests
+    // Payment Form State Tests
     // ========================================
 
     @Test
-    fun getPaymentSummary_withSuccessState_returnsNonNullSummary() = runTest {
-        // Arrange - load payments so state is Success
-        whenever(mockGetPatientPaymentsUseCase.execute(1L))
-            .thenReturn(mockPayments)
-        viewModel.loadPatientPayments(1L)
-        testDispatcher.scheduler.advanceUntilIdle()
-
+    fun updateAmount_updatesAmountTextInFormState() {
         // Act
-        val summary = viewModel.getPaymentSummary()
+        viewModel.updateAmount("150.00")
 
         // Assert
-        assertNotNull(summary)
-        assertTrue(summary!!.containsKey("total"))
+        assertEquals("150.00", viewModel.paymentFormState.value.amountText)
+        assertNull(viewModel.paymentFormState.value.errorMessage)
     }
 
     @Test
-    fun hasOutstandingBalance_withOutstanding_returnsTrue() = runTest {
-        // Arrange - load payments that include pending
-        whenever(mockGetPatientPaymentsUseCase.execute(1L))
-            .thenReturn(mockPayments)
-        viewModel.loadBalance(1L)
-        testDispatcher.scheduler.advanceUntilIdle()
+    fun updateAmount_clearsExistingErrorMessage() {
+        // Arrange - trigger an error first
+        viewModel.submitForm(1L) // blank amount → sets error
 
         // Act
-        val hasOutstanding = viewModel.hasOutstandingBalance()
+        viewModel.updateAmount("100.00")
 
-        // Assert - mockPayments has PENDING payment
-        assertTrue(hasOutstanding)
+        // Assert - error cleared when user types
+        assertNull(viewModel.paymentFormState.value.errorMessage)
     }
 
     @Test
-    fun hasOutstandingBalance_emptyBalance_returnsFalse() = runTest {
-        // Arrange - load only paid payments
-        val paidOnly = listOf(mockPayments[0])  // status = PAID
-        whenever(mockGetPatientPaymentsUseCase.execute(1L))
-            .thenReturn(paidOnly)
-        viewModel.loadBalance(1L)
-        testDispatcher.scheduler.advanceUntilIdle()
+    fun updatePaymentDate_updatesDateInFormState() {
+        // Act
+        viewModel.updatePaymentDate(yesterday)
+
+        // Assert
+        assertEquals(yesterday, viewModel.paymentFormState.value.paymentDate)
+    }
+
+    @Test
+    fun toggleAppointmentSelection_addsAppointmentId() {
+        // Act
+        viewModel.toggleAppointmentSelection(10L)
+
+        // Assert
+        assertTrue(viewModel.paymentFormState.value.selectedAppointmentIds.contains(10L))
+    }
+
+    @Test
+    fun toggleAppointmentSelection_removesAlreadySelectedId() {
+        // Arrange - select first
+        viewModel.toggleAppointmentSelection(10L)
+
+        // Act - toggle again to deselect
+        viewModel.toggleAppointmentSelection(10L)
+
+        // Assert
+        assertTrue(viewModel.paymentFormState.value.selectedAppointmentIds.isEmpty())
+    }
+
+    @Test
+    fun toggleAppointmentSelection_multipleIds_allSelected() {
+        // Act
+        viewModel.toggleAppointmentSelection(10L)
+        viewModel.toggleAppointmentSelection(11L)
+
+        // Assert
+        val selected = viewModel.paymentFormState.value.selectedAppointmentIds
+        assertTrue(selected.contains(10L))
+        assertTrue(selected.contains(11L))
+    }
+
+    @Test
+    fun submitForm_withBlankAmount_setsErrorMessage() {
+        // Arrange - amount is blank by default, or explicitly clear it
+        viewModel.updateAmount("")
 
         // Act
-        val hasOutstanding = viewModel.hasOutstandingBalance()
+        viewModel.submitForm(1L)
 
-        // Assert - no pending payments
-        assertTrue(!hasOutstanding)
+        // Assert
+        assertEquals("Informe o valor do pagamento", viewModel.paymentFormState.value.errorMessage)
+    }
+
+    @Test
+    fun submitForm_withZeroAmount_setsErrorMessage() {
+        // Arrange
+        viewModel.updateAmount("0")
+
+        // Act
+        viewModel.submitForm(1L)
+
+        // Assert
+        assertEquals("Valor inválido", viewModel.paymentFormState.value.errorMessage)
+    }
+
+    @Test
+    fun submitForm_withNegativeAmount_setsErrorMessage() {
+        // Arrange
+        viewModel.updateAmount("-50")
+
+        // Act
+        viewModel.submitForm(1L)
+
+        // Assert
+        assertEquals("Valor inválido", viewModel.paymentFormState.value.errorMessage)
+    }
+
+    @Test
+    fun submitForm_onSuccess_clearsSelectionAndAmount() = runTest {
+        // Arrange
+        viewModel.updateAmount("150.00")
+        viewModel.toggleAppointmentSelection(10L)
+
+        // Act
+        viewModel.submitForm(1L)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Assert — createPaymentUseCase does not throw, so success path runs
+        val formState = viewModel.paymentFormState.value
+        assertEquals("", formState.amountText)
+        assertTrue(formState.selectedAppointmentIds.isEmpty())
     }
 
     // ========================================
-    // Edge Cases and State Management
+    // Available Appointments Loading Tests
     // ========================================
 
     @Test
-    fun multipleLoadPayments_lastLoadWins() = runTest {
+    fun loadAvailableAppointments_onSuccess_updatesFormState() = runTest {
         // Arrange
         val patientId = 1L
-        val firstPayments = listOf(mockPayments[0])
-        val secondPayments = mockPayments
+        whenever(mockGetUnpaidAppointmentsUseCase.execute(patientId))
+            .thenReturn(flowOf(mockAppointments))
 
-        whenever(mockGetPatientPaymentsUseCase.execute(patientId))
-            .thenReturn(firstPayments)
-
-        // Act - Load first set
-        viewModel.loadPatientPayments(patientId)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        // Arrange - Change return value
-        whenever(mockGetPatientPaymentsUseCase.execute(patientId))
-            .thenReturn(secondPayments)
-
-        // Act - Load second set
-        viewModel.loadPatientPayments(patientId)
+        // Act
+        viewModel.loadAvailableAppointments(patientId)
         testDispatcher.scheduler.advanceUntilIdle()
 
         // Assert
-        val state = viewModel.paymentListState.value
-        val payments = (state as PaymentViewState.ListState.Success).payments
-        assertEquals(2, payments.size)  // Second set wins
+        assertEquals(2, viewModel.paymentFormState.value.availableAppointments.size)
     }
 
     @Test
-    fun formState_afterReset_hasNoErrors() {
-        // Arrange - trigger some state
-        viewModel.setFormAmount("-50")
-        viewModel.setFormMethod("")
+    fun loadAvailableAppointments_emptyList_setsEmptyAppointments() = runTest {
+        // Arrange
+        val patientId = 1L
+        whenever(mockGetUnpaidAppointmentsUseCase.execute(patientId))
+            .thenReturn(flowOf(emptyList()))
 
         // Act
-        viewModel.resetForm()
+        viewModel.loadAvailableAppointments(patientId)
+        testDispatcher.scheduler.advanceUntilIdle()
 
-        // Assert - after reset, form state should be default (no errors)
-        val formState = viewModel.createFormState.value
-        assertTrue(!formState.hasErrors())
+        // Assert
+        assertTrue(viewModel.paymentFormState.value.availableAppointments.isEmpty())
     }
 }

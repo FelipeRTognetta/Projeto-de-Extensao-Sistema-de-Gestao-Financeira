@@ -14,27 +14,33 @@ import java.time.YearMonth
  * Unit tests for BalanceCalculator
  *
  * Coverage:
- * - Total balance calculation
- * - Amount due now (excluding pending)
- * - Total outstanding (including pending)
+ * - Total balance calculation (v3: all payments are PAID)
+ * - Amount due now (sum of all payments)
+ * - Total outstanding (always zero in v3)
  * - Period-based calculations (monthly, weekly, daily, range)
- * - Payment method breakdown
- * - Collection rate and statistics
- * - Edge cases (zero payments, all paid, all pending, mixed)
- * - Boundary conditions (very large amounts, single payment)
+ * - Payment method breakdown (empty in v3)
+ * - Collection rate (always 100% for non-empty in v3)
+ * - Edge cases (zero payments, single payment, large datasets)
+ * - Boundary conditions (decimal precision, large amounts)
  *
- * Total: 40+ test cases with 85%+ coverage
+ * Total: 30+ test cases
  */
 class BalanceCalculatorTest {
 
     private lateinit var calculator: BalanceCalculator
 
-    // Test data
     private val today = LocalDate.now()
     private val yesterday = today.minusDays(1)
     private val weekAgo = today.minusDays(7)
     private val monthAgo = today.minusMonths(1)
     private val twoMonthsAgo = today.minusMonths(2)
+
+    private fun payment(id: Long, amount: String, date: LocalDate = yesterday) = Payment(
+        id = id,
+        patientId = 1L,
+        amount = BigDecimal(amount),
+        paymentDate = date
+    )
 
     @Before
     fun setUp() {
@@ -55,117 +61,23 @@ class BalanceCalculatorTest {
     }
 
     @Test
-    fun calculateBalance_allPaidPayments_sumsCorrectly() {
+    fun calculateBalance_multiplePayments_sumsAll() {
         val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("150.00"),
-                paymentDate = yesterday,
-                paymentMethod = "Débito",
-                status = "PAID"
-            ),
-            Payment(
-                id = 2L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("200.00"),
-                paymentDate = weekAgo,
-                paymentMethod = "Crédito",
-                status = "PAID"
-            )
+            payment(1L, "150.00"),
+            payment(2L, "200.00", weekAgo)
         )
 
         val balance = calculator.calculateBalance(payments)
 
+        // v3: all payments are PAID
         assertEquals(BigDecimal("350.00"), balance.amountDueNow)
         assertEquals(BigDecimal.ZERO, balance.totalOutstanding)
         assertEquals(BigDecimal("350.00"), balance.totalBalance)
     }
 
     @Test
-    fun calculateBalance_allPendingPayments_sumsCorrectly() {
-        val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("100.00"),
-                paymentDate = yesterday,
-                paymentMethod = "Pix",
-                status = "PENDING"
-            ),
-            Payment(
-                id = 2L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("150.00"),
-                paymentDate = weekAgo,
-                paymentMethod = "Cheque",
-                status = "PENDING"
-            )
-        )
-
-        val balance = calculator.calculateBalance(payments)
-
-        assertEquals(BigDecimal.ZERO, balance.amountDueNow)
-        assertEquals(BigDecimal("250.00"), balance.totalOutstanding)
-        assertEquals(BigDecimal("250.00"), balance.totalBalance)
-    }
-
-    @Test
-    fun calculateBalance_mixedPayments_separatesCorrectly() {
-        val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("200.00"),
-                paymentDate = yesterday,
-                paymentMethod = "Débito",
-                status = "PAID"
-            ),
-            Payment(
-                id = 2L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("150.00"),
-                paymentDate = weekAgo,
-                paymentMethod = "Pix",
-                status = "PENDING"
-            ),
-            Payment(
-                id = 3L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("100.00"),
-                paymentDate = monthAgo,
-                paymentMethod = "Crédito",
-                status = "PAID"
-            )
-        )
-
-        val balance = calculator.calculateBalance(payments)
-
-        assertEquals(BigDecimal("300.00"), balance.amountDueNow)  // 200 + 100
-        assertEquals(BigDecimal("150.00"), balance.totalOutstanding)  // 150
-        assertEquals(BigDecimal("450.00"), balance.totalBalance)  // 300 + 150
-    }
-
-    @Test
     fun calculateBalance_singlePayment_calculatesCorrectly() {
-        val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("125.50"),
-                paymentDate = yesterday,
-                paymentMethod = "Dinheiro",
-                status = "PAID"
-            )
-        )
+        val payments = listOf(payment(1L, "125.50"))
 
         val balance = calculator.calculateBalance(payments)
 
@@ -175,21 +87,62 @@ class BalanceCalculatorTest {
 
     @Test
     fun calculateBalance_largeAmounts_calculatesWithoutPrecisionLoss() {
-        val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("999999.99"),
-                paymentDate = yesterday,
-                paymentMethod = "Crédito",
-                status = "PAID"
-            )
-        )
+        val payments = listOf(payment(1L, "999999.99"))
 
         val balance = calculator.calculateBalance(payments)
 
         assertEquals(BigDecimal("999999.99"), balance.amountDueNow)
+    }
+
+    @Test
+    fun calculateBalance_threePayments_sumsAll() {
+        val payments = listOf(
+            payment(1L, "200.00"),
+            payment(2L, "150.00", weekAgo),
+            payment(3L, "100.00", monthAgo)
+        )
+
+        val balance = calculator.calculateBalance(payments)
+
+        // v3: all are paid, no outstanding
+        assertEquals(BigDecimal("450.00"), balance.amountDueNow)
+        assertEquals(BigDecimal.ZERO, balance.totalOutstanding)
+        assertEquals(BigDecimal("450.00"), balance.totalBalance)
+    }
+
+    // ========================================
+    // Collection Rate Tests
+    // ========================================
+
+    @Test
+    fun calculateBalance_withPayments_collectionRateIs100() {
+        val payments = listOf(payment(1L, "500.00"))
+
+        val balance = calculator.calculateBalance(payments)
+
+        // v3: all payments are paid → always 100%
+        assertEquals(100, balance.collectionPercentage)
+    }
+
+    @Test
+    fun calculateBalance_emptyList_collectionRateIs0() {
+        val balance = calculator.calculateBalance(emptyList())
+
+        assertEquals(0, balance.collectionPercentage)
+    }
+
+    @Test
+    fun calculateBalance_manyPayments_collectionRateIs100() {
+        val payments = (1..1000).map { i ->
+            payment(i.toLong(), "10.00", today.minusDays((i % 365).toLong()))
+        }
+
+        val balance = calculator.calculateBalance(payments)
+
+        // v3: all payments are PAID
+        assertEquals(BigDecimal("10000.00"), balance.amountDueNow)
+        assertEquals(BigDecimal.ZERO, balance.totalOutstanding)
+        assertEquals(100, balance.collectionPercentage)
     }
 
     // ========================================
@@ -199,24 +152,8 @@ class BalanceCalculatorTest {
     @Test
     fun calculateMonthlyBalance_currentMonth_includesOnlyCurrentMonthPayments() {
         val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("100.00"),
-                paymentDate = today,
-                paymentMethod = "Débito",
-                status = "PAID"
-            ),
-            Payment(
-                id = 2L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("200.00"),
-                paymentDate = monthAgo,
-                paymentMethod = "Crédito",
-                status = "PAID"
-            )
+            payment(1L, "100.00", today),
+            payment(2L, "200.00", monthAgo)
         )
 
         val monthBalance = calculator.calculateMonthlyBalance(payments, YearMonth.now())
@@ -231,186 +168,68 @@ class BalanceCalculatorTest {
         val endDate = today
 
         val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("100.00"),
-                paymentDate = yesterday,
-                paymentMethod = "Débito",
-                status = "PAID"
-            ),
-            Payment(
-                id = 2L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("200.00"),
-                paymentDate = monthAgo,  // Outside range
-                paymentMethod = "Crédito",
-                status = "PAID"
-            ),
-            Payment(
-                id = 3L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("50.00"),
-                paymentDate = today,
-                paymentMethod = "Pix",
-                status = "PENDING"
-            )
+            payment(1L, "100.00", yesterday),           // in range
+            payment(2L, "200.00", monthAgo),            // outside range
+            payment(3L, "50.00", today)                 // in range
         )
 
         val rangeBalance = calculator.calculateRangeBalance(payments, startDate, endDate)
 
-        assertEquals(BigDecimal("100.00"), rangeBalance.amountDueNow)
-        assertEquals(BigDecimal("50.00"), rangeBalance.totalOutstanding)
+        // v3: all in-range payments sum to amountDueNow
+        assertEquals(BigDecimal("150.00"), rangeBalance.amountDueNow)
+        assertEquals(BigDecimal.ZERO, rangeBalance.totalOutstanding)
     }
 
-    // ========================================
-    // Collection Rate Tests
-    // ========================================
-
     @Test
-    fun calculateBalance_fullyPaid_collectionRateIs100() {
+    fun calculateWeeklyBalance_thisWeek_includesCurrentWeekPayments() {
         val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("500.00"),
-                paymentDate = yesterday,
-                paymentMethod = "Crédito",
-                status = "PAID"
-            )
+            payment(1L, "75.00", yesterday),
+            payment(2L, "500.00", monthAgo)
         )
 
-        val balance = calculator.calculateBalance(payments)
+        val weekBalance = calculator.calculateWeeklyBalance(payments, today)
 
-        assertEquals(100, balance.collectionPercentage)
+        assertEquals(BigDecimal("75.00"), weekBalance.amountDueNow)
     }
 
     @Test
-    fun calculateBalance_halfPaid_collectionRateIs50() {
+    fun calculateLastNDaysBalance_30days_calculatesCorrectly() {
         val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("100.00"),
-                paymentDate = yesterday,
-                paymentMethod = "Débito",
-                status = "PAID"
-            ),
-            Payment(
-                id = 2L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("100.00"),
-                paymentDate = weekAgo,
-                paymentMethod = "Crédito",
-                status = "PENDING"
-            )
+            payment(1L, "100.00", yesterday),
+            payment(2L, "200.00", today.minusDays(15)),
+            payment(3L, "300.00", today.minusDays(60)) // outside 30 days
         )
 
-        val balance = calculator.calculateBalance(payments)
+        val balance = calculator.calculateLastNDaysBalance(payments, 30)
 
-        assertEquals(50, balance.collectionPercentage)
-    }
-
-    @Test
-    fun calculateBalance_nothingPaid_collectionRateIs0() {
-        val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("300.00"),
-                paymentDate = yesterday,
-                paymentMethod = "Cheque",
-                status = "PENDING"
-            )
-        )
-
-        val balance = calculator.calculateBalance(payments)
-
-        assertEquals(0, balance.collectionPercentage)
+        assertEquals(BigDecimal("300.00"), balance.amountDueNow)
     }
 
     // ========================================
-    // Payment Method Breakdown
+    // Payment Method Breakdown (v3: always empty)
     // ========================================
 
     @Test
-    fun calculateMethodBreakdown_groupsPaymentsByMethod() {
+    fun calculateMethodBreakdown_alwaysReturnsEmpty() {
         val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("100.00"),
-                paymentDate = yesterday,
-                paymentMethod = "Débito",
-                status = "PAID"
-            ),
-            Payment(
-                id = 2L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("150.00"),
-                paymentDate = weekAgo,
-                paymentMethod = "Débito",
-                status = "PAID"
-            ),
-            Payment(
-                id = 3L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("200.00"),
-                paymentDate = monthAgo,
-                paymentMethod = "Crédito",
-                status = "PAID"
-            )
+            payment(1L, "100.00"),
+            payment(2L, "150.00", weekAgo),
+            payment(3L, "200.00", monthAgo)
         )
 
         val breakdown = calculator.calculateMethodBreakdown(payments)
 
-        assertTrue(breakdown.containsKey("Débito"))
-        assertTrue(breakdown.containsKey("Crédito"))
-        assertEquals(BigDecimal("250.00"), breakdown["Débito"])
-        assertEquals(BigDecimal("200.00"), breakdown["Crédito"])
+        // v3: paymentMethod field removed — always empty
+        assertTrue(breakdown.isEmpty())
     }
 
-    // ========================================
-    // Status-Based Calculations via calculateBalance
-    // ========================================
-
     @Test
-    fun calculateBalance_separatesPaidAndPending() {
-        val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("100.00"),
-                paymentDate = yesterday,
-                paymentMethod = "Débito",
-                status = "PAID"
-            ),
-            Payment(
-                id = 2L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("200.00"),
-                paymentDate = weekAgo,
-                paymentMethod = "Crédito",
-                status = "PENDING"
-            )
-        )
+    fun calculateByMethod_alwaysReturnsZero() {
+        val payments = listOf(payment(1L, "100.00"))
 
-        val balance = calculator.calculateBalance(payments)
+        val total = calculator.calculateByMethod(payments, "Débito")
 
-        assertEquals(BigDecimal("100.00"), balance.amountDueNow)
-        assertEquals(BigDecimal("200.00"), balance.totalOutstanding)
+        assertEquals(BigDecimal.ZERO, total)
     }
 
     // ========================================
@@ -420,24 +239,8 @@ class BalanceCalculatorTest {
     @Test
     fun calculateBalance_decimalPrecision_maintains2Places() {
         val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("10.01"),
-                paymentDate = yesterday,
-                paymentMethod = "Pix",
-                status = "PAID"
-            ),
-            Payment(
-                id = 2L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("20.02"),
-                paymentDate = weekAgo,
-                paymentMethod = "Débito",
-                status = "PAID"
-            )
+            payment(1L, "10.01"),
+            payment(2L, "20.02", weekAgo)
         )
 
         val balance = calculator.calculateBalance(payments)
@@ -446,38 +249,8 @@ class BalanceCalculatorTest {
     }
 
     @Test
-    fun calculateBalance_manyPayments_calculatesWithoutStackOverflow() {
-        val payments = (1..1000).map { i ->
-            Payment(
-                id = i.toLong(),
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("10.00"),
-                paymentDate = today.minusDays((i % 365).toLong()),
-                paymentMethod = "Débito",
-                status = if (i % 2 == 0) "PAID" else "PENDING"
-            )
-        }
-
-        val balance = calculator.calculateBalance(payments)
-
-        assertEquals(BigDecimal("5000.00"), balance.amountDueNow)  // 500 paid * 10
-        assertEquals(BigDecimal("5000.00"), balance.totalOutstanding)  // 500 pending * 10
-    }
-
-    @Test
     fun calculateBalance_minimumAmount_calculatesCorrectly() {
-        val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("0.01"),
-                paymentDate = yesterday,
-                paymentMethod = "Pix",
-                status = "PAID"
-            )
-        )
+        val payments = listOf(payment(1L, "0.01"))
 
         val balance = calculator.calculateBalance(payments)
 
@@ -485,35 +258,11 @@ class BalanceCalculatorTest {
     }
 
     @Test
-    fun calculateAveragePayment_mixed_calculatesCorrectly() {
+    fun calculateAveragePayment_multiplePayments_calculatesCorrectly() {
         val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("100.00"),
-                paymentDate = yesterday,
-                paymentMethod = "Débito",
-                status = "PAID"
-            ),
-            Payment(
-                id = 2L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("200.00"),
-                paymentDate = weekAgo,
-                paymentMethod = "Crédito",
-                status = "PAID"
-            ),
-            Payment(
-                id = 3L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("300.00"),
-                paymentDate = monthAgo,
-                paymentMethod = "Cheque",
-                status = "PENDING"
-            )
+            payment(1L, "100.00"),
+            payment(2L, "200.00", weekAgo),
+            payment(3L, "300.00", monthAgo)
         )
 
         val average = calculator.calculateAveragePayment(payments)
@@ -523,32 +272,72 @@ class BalanceCalculatorTest {
     }
 
     @Test
+    fun calculateAveragePayment_emptyList_returnsZero() {
+        val average = calculator.calculateAveragePayment(emptyList())
+
+        assertEquals(BigDecimal.ZERO, average)
+    }
+
+    @Test
     fun calculateBalance_formattedDisplay_returnsCorrectFormats() {
         val payments = listOf(
-            Payment(
-                id = 1L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("1500.00"),
-                paymentDate = yesterday,
-                paymentMethod = "Crédito",
-                status = "PAID"
-            ),
-            Payment(
-                id = 2L,
-                patientId = 1L,
-                appointmentId = null,
-                amount = BigDecimal("750.00"),
-                paymentDate = weekAgo,
-                paymentMethod = "Cheque",
-                status = "PENDING"
-            )
+            payment(1L, "1500.00"),
+            payment(2L, "750.00", weekAgo)
         )
 
         val balance = calculator.calculateBalance(payments)
 
+        // v3: all PAID, outstanding = 0
+        assertEquals(BigDecimal("2250.00"), balance.amountDueNow)
+        assertEquals(BigDecimal.ZERO, balance.totalOutstanding)
         assertTrue(balance.getFormattedAmountDue().contains("R$"))
         assertTrue(balance.getFormattedOutstanding().contains("R$"))
         assertTrue(balance.getFormattedTotal().contains("R$"))
+    }
+
+    @Test
+    fun calculateTotalOutstanding_alwaysReturnsZero() {
+        val payments = listOf(
+            payment(1L, "300.00"),
+            payment(2L, "100.00", weekAgo)
+        )
+
+        val outstanding = calculator.calculateTotalOutstanding(payments)
+
+        assertEquals(BigDecimal.ZERO, outstanding)
+    }
+
+    @Test
+    fun calculateCollectionRate_nonEmptyList_returns100() {
+        val payments = listOf(payment(1L, "150.00"))
+
+        val rate = calculator.calculateCollectionRate(payments)
+
+        assertEquals(100, rate)
+    }
+
+    @Test
+    fun calculateCollectionRate_emptyList_returns0() {
+        val rate = calculator.calculateCollectionRate(emptyList())
+
+        assertEquals(0, rate)
+    }
+
+    @Test
+    fun calculateMonthlyBreakdown_groupsByMonth() {
+        val thisMonth = YearMonth.now()
+        val lastMonth = thisMonth.minusMonths(1)
+
+        val payments = listOf(
+            payment(1L, "100.00", today),
+            payment(2L, "200.00", monthAgo)
+        )
+
+        val breakdown = calculator.calculateMonthlyBreakdown(payments)
+
+        assertTrue(breakdown.containsKey(thisMonth))
+        assertTrue(breakdown.containsKey(lastMonth))
+        assertEquals(BigDecimal("100.00"), breakdown[thisMonth]?.amountDueNow)
+        assertEquals(BigDecimal("200.00"), breakdown[lastMonth]?.amountDueNow)
     }
 }

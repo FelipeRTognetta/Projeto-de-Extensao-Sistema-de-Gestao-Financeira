@@ -33,13 +33,14 @@ class UpdatePatientUseCase(
         email: String?,
         initialConsultDate: LocalDate,
         cpf: String? = null,
-        endereco: String? = null
+        endereco: String? = null,
+        naoPagante: Boolean = false
     ): UpdatePatientResult {
         // Basic validation
         if (name.isBlank()) {
             return UpdatePatientResult.ValidationError("Nome é obrigatório")
         }
-        if (phone.isNullOrBlank() && email.isNullOrBlank()) {
+        if (!naoPagante && phone.isNullOrBlank() && email.isNullOrBlank()) {
             return UpdatePatientResult.ValidationError("Informe telefone ou email")
         }
 
@@ -58,7 +59,8 @@ class UpdatePatientUseCase(
             email = email?.trim()?.ifBlank { null },
             initialConsultDate = initialConsultDate,
             cpf = rawCpf,
-            endereco = endereco?.trim()?.ifBlank { null }
+            endereco = endereco?.trim()?.ifBlank { null },
+            naoPagante = naoPagante
         )
 
         return try {

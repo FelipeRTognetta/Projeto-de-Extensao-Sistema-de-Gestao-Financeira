@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.psychologist.financial.data.entities.AppointmentEntity
 import kotlinx.coroutines.flow.Flow
@@ -467,6 +468,94 @@ interface AppointmentDao {
         patientId: Long,
         fromDate: LocalDate = LocalDate.now()
     ): Boolean
+
+    // ========================================
+    // Payment Status Queries (Junction Table)
+    // ========================================
+
+    /**
+     * Get all appointments with payment status (read model)
+     *
+     * Derives payment status from junction table:
+     * - hasPendingPayment = true if appointment is NOT in payment_appointments
+     * - hasPendingPayment = false if appointment IS linked to a payment
+     *
+     * Uses LEFT JOIN on payment_appointments to efficiently calculate status
+     * in a single query. The hasPendingPayment flag is computed via:
+     * `(payment_appointments.payment_id IS NULL) as has_pending_payment`
+     *
+     * Results ordered by most recent appointment date first (DESC).
+     *
+     * @return Flow of all appointments with derived payment status
+     */
+    @Query("""
+        SELECT
+            a.*,
+            (a.id NOT IN (SELECT appointment_id FROM payment_appointments)) as has_pending_payment,
+            p.name as patient_name
+        FROM appointments a
+        JOIN patient p ON a.patient_id = p.id
+        ORDER BY a.date DESC, a.time_start DESC
+    """)
+    fun getAllWithPaymentStatus(): Flow<List<AppointmentWithStatusResult>>
+
+    /**
+     * Get unpaid (unlinked) appointments for patient
+     *
+     * Returns appointments that have NO payment link in the junction table.
+     * Useful for the payment form to show which appointments are available
+     * for linking to a new or existing payment.
+     *
+     * Results ordered by most recent appointment date first (DESC).
+     *
+     * @param patientId Patient ID
+     * @return List of appointments without payment links
+     */
+    @Query("""
+        SELECT * FROM appointments
+        WHERE patient_id = :patientId
+        AND id NOT IN (SELECT appointment_id FROM payment_appointments)
+        ORDER BY date DESC, time_start DESC
+    """)
+    suspend fun getUnpaidByPatient(patientId: Long): List<AppointmentEntity>
+
+    /**
+     * Get all appointments for a patient with payment status.
+     *
+     * Derives payment status from junction table via LEFT JOIN:
+     * - hasPendingPayment = true if appointment is NOT linked to a payment
+     * - hasPendingPayment = false if appointment IS linked to a payment
+     *
+     * @param patientId Patient ID
+     * @return List of appointments with derived payment status
+     */
+    @Query("""
+        SELECT
+            a.*,
+            (a.id NOT IN (SELECT appointment_id FROM payment_appointments)) as has_pending_payment,
+            p.name as patient_name
+        FROM appointments a
+        JOIN patient p ON a.patient_id = p.id
+        WHERE a.patient_id = :patientId
+        ORDER BY a.date DESC, a.time_start DESC
+    """)
+    suspend fun getByPatientWithPaymentStatus(patientId: Long): List<AppointmentWithStatusResult>
+
+    /**
+     * Get distinct patient IDs that have appointments with no payment link.
+     *
+     * Used to show a "Pagamento em aberto" flag on patient cards and detail screen.
+     *
+     * @return Flow of patient IDs with pending payments
+     */
+    @Query("""
+        SELECT DISTINCT patient_id FROM appointments
+        WHERE id NOT IN (SELECT appointment_id FROM payment_appointments)
+    """)
+    fun getPatientIdsWithPendingPaymentsFlow(): Flow<List<Long>>
+
+    @Query("SELECT COUNT(*) FROM appointments WHERE id NOT IN (SELECT appointment_id FROM payment_appointments)")
+    fun countUnpaidAppointmentsFlow(): Flow<Int>
 }
 
 /**

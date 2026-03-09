@@ -90,10 +90,7 @@ class ExportRepositoryUnitTest {
     private fun makePaymentEntity(id: Long) = PaymentEntity(
         id = id,
         patientId = 1L,
-        appointmentId = null,
         amount = BigDecimal("150.00"),
-        status = "PAID",
-        paymentMethod = "PIX",
         paymentDate = yesterday
     )
 
@@ -190,8 +187,7 @@ class ExportRepositoryUnitTest {
     @Test
     fun `hasDataToExport returns true when patients exist`() = runTest {
         whenever(mockPatientDao.countAllPatients()).thenReturn(3)
-        whenever(mockAppointmentDao.count()).thenReturn(0)
-        whenever(mockPaymentDao.count()).thenReturn(0)
+        // hasDataToExport short-circuits after first truthy count — no need to stub others
 
         val hasData = repository.hasDataToExport()
 
@@ -218,8 +214,6 @@ class ExportRepositoryUnitTest {
         whenever(mockPatientDao.countAllPatients()).thenReturn(10)
         whenever(mockAppointmentDao.count()).thenReturn(50)
         whenever(mockPaymentDao.count()).thenReturn(75)
-        whenever(mockPatientDao.getAllActivePatients()).thenReturn(listOf(makePatientEntity(1L)))
-        whenever(mockPatientDao.getAllInactivePatients()).thenReturn(emptyList())
 
         val stats = repository.getExportStatistics()
 

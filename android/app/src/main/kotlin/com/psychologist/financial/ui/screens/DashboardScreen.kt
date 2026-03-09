@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -34,15 +33,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.psychologist.financial.domain.models.DashboardMetrics
-import com.psychologist.financial.domain.models.MonthlyMetrics
 import com.psychologist.financial.ui.components.ErrorDialog
 import com.psychologist.financial.ui.components.GridMetricsCard
-import com.psychologist.financial.ui.components.MetricsCard
 import com.psychologist.financial.ui.components.MonthSelector
-import com.psychologist.financial.ui.components.WeeklyBreakdown
 import com.psychologist.financial.viewmodel.DashboardViewModel
 import com.psychologist.financial.viewmodel.DashboardViewState
-import java.math.BigDecimal
 
 /**
  * Dashboard screen
@@ -161,6 +156,8 @@ private fun SuccessScreen(
     currentState: DashboardViewState.DashboardState,
     viewModel: DashboardViewModel
 ) {
+    val unpaidCount = viewModel.unpaidAppointmentsCount.collectAsState()
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -181,21 +178,10 @@ private fun SuccessScreen(
         // Main metrics cards (if available)
         item {
             if (currentState.metricsState is DashboardViewState.MetricsState.Success) {
-                MetricsGrid(currentState.metricsState.metrics)
-            }
-        }
-
-        // Trend section
-        item {
-            if (currentState.trendState is DashboardViewState.TrendState.Success) {
-                TrendSection(currentState.trendState)
-            }
-        }
-
-        // Weekly breakdown
-        item {
-            if (currentState.monthlyState is DashboardViewState.MonthlyState.Success) {
-                WeeklyBreakdown(currentState.monthlyState.metrics)
+                MetricsGrid(
+                    metrics = currentState.metricsState.metrics,
+                    unpaidAppointmentsCount = unpaidCount.value
+                )
             }
         }
 
@@ -223,7 +209,8 @@ private fun SuccessScreen(
  */
 @Composable
 private fun MetricsGrid(
-    metrics: DashboardMetrics
+    metrics: DashboardMetrics,
+    unpaidAppointmentsCount: Int = 0
 ) {
     Column(
         modifier = Modifier
@@ -252,7 +239,7 @@ private fun MetricsGrid(
             )
         }
 
-        // Row 2: Average Fee and Outstanding
+        // Row 2: Average Fee and Unpaid Appointments
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -266,8 +253,8 @@ private fun MetricsGrid(
             )
             GridMetricsCard(
                 icon = Icons.Default.Warning,
-                label = "Pendente",
-                value = metrics.getFormattedOutstanding(),
+                label = "Em aberto",
+                value = unpaidAppointmentsCount.toString(),
                 backgroundColor = Color(0xFFFFEBEE),
                 modifier = Modifier.weight(1f)
             )
@@ -322,65 +309,6 @@ private fun GridMetricsCard(
     }
 }
 
-/**
- * Trend section - Month comparison
- *
- * @param trendState Trend data
- */
-@Composable
-private fun TrendSection(
-    trendState: DashboardViewState.TrendState.Success
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        Text(
-            text = "Tendência",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Receita",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = trendState.getRevenueTrendText(),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (trendState.isRevenueUp()) Color.Green else Color.Red
-                )
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Pacientes",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = trendState.getPatientTrendText(),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (trendState.isPatientsUp()) Color.Green else Color.Red
-                )
-            }
-        }
-    }
-}
 
 /**
  * Loading screen

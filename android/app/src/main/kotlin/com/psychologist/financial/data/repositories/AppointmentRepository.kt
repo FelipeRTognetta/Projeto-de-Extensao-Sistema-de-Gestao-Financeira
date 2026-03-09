@@ -5,6 +5,7 @@ import com.psychologist.financial.data.database.AppointmentDao
 import com.psychologist.financial.data.database.AppointmentStats
 import com.psychologist.financial.data.entities.AppointmentEntity
 import com.psychologist.financial.domain.models.Appointment
+import com.psychologist.financial.domain.models.AppointmentWithPaymentStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
@@ -437,6 +438,77 @@ class AppointmentRepository(
         fromDate: LocalDate = LocalDate.now()
     ): Boolean {
         return appointmentDao.hasUpcomingAppointments(patientId, fromDate)
+    }
+
+    // ========================================
+    // Payment Status Queries (Junction Table)
+    // ========================================
+
+    /**
+     * Get all appointments with payment status (read model)
+     *
+     * Derives payment status from junction table via LEFT JOIN:
+     * - hasPendingPayment = true if appointment is NOT linked to a payment
+     * - hasPendingPayment = false if appointment IS linked to a payment
+     *
+     * Ordered by most recent appointment date first.
+     *
+     * @return Flow of all appointments with payment status
+     */
+    fun getAllWithPaymentStatus(): Flow<List<AppointmentWithPaymentStatus>> {
+        return appointmentDao.getAllWithPaymentStatus().map { results ->
+            results.map { result ->
+                AppointmentWithPaymentStatus(
+                    appointment = result.appointment.toDomain(),
+                    hasPendingPayment = result.hasPendingPayment,
+                    patientName = result.patientName
+                )
+            }
+        }
+    }
+
+    /**
+     * Get unpaid (unlinked) appointments for patient
+     *
+     * Returns appointments that have NO payment link in the junction table.
+     * These are appointments with pending payment that need to be covered.
+     *
+     * Useful for payment form to show which appointments are available to link.
+     *
+     * @param patientId Patient ID
+     * @return List of unpaid appointments
+     */
+    suspend fun getUnpaidByPatient(patientId: Long): List<Appointment> {
+        return appointmentDao.getUnpaidByPatient(patientId).map { it.toDomain() }
+    }
+
+    /**
+     * Get all appointments for patient with payment status.
+     *
+     * @param patientId Patient ID
+     * @return List of appointments with derived payment status
+     */
+    suspend fun getByPatientWithPaymentStatus(patientId: Long): List<AppointmentWithPaymentStatus> {
+        return appointmentDao.getByPatientWithPaymentStatus(patientId).map { result ->
+            AppointmentWithPaymentStatus(
+                appointment = result.appointment.toDomain(),
+                hasPendingPayment = result.hasPendingPayment,
+                patientName = result.patientName
+            )
+        }
+    }
+
+    /**
+     * Get patient IDs that have at least one unpaid appointment.
+     *
+     * @return Flow of patient ID set with pending payments
+     */
+    fun getPatientIdsWithPendingPayments(): Flow<Set<Long>> {
+        return appointmentDao.getPatientIdsWithPendingPaymentsFlow().map { it.toSet() }
+    }
+
+    fun countUnpaidAppointments(): Flow<Int> {
+        return appointmentDao.countUnpaidAppointmentsFlow()
     }
 
     // ========================================

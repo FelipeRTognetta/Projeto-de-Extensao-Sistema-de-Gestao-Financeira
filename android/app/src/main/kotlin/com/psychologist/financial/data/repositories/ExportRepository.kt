@@ -248,8 +248,8 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
      */
     suspend fun getPaymentsByStatus(status: String): List<Payment> {
         return try {
-            AppLogger.d(TAG, "Querying payments with status $status...")
-            val entities = paymentDao.getByStatus(status)
+            AppLogger.d(TAG, "Querying payments (status filter removed — all payments are PAID)...")
+            val entities = paymentDao.getAll()
             entities.map { it.toPayment() }
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error retrieving payments by status", e)
@@ -358,10 +358,7 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
         return Payment(
             id = this.id,
             patientId = this.patientId,
-            appointmentId = this.appointmentId,
             amount = this.amount,
-            status = this.status,
-            paymentMethod = this.paymentMethod,
             paymentDate = this.paymentDate,
             createdDate = this.createdDate
         )

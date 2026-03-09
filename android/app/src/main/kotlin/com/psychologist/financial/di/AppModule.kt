@@ -11,6 +11,7 @@ import com.psychologist.financial.data.repositories.PatientRepository
 import com.psychologist.financial.data.repositories.PayerInfoRepository
 import com.psychologist.financial.data.repositories.PaymentRepository
 import com.psychologist.financial.domain.usecases.CreateAppointmentUseCase
+import com.psychologist.financial.domain.usecases.GetAllAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.UpdateAppointmentUseCase
 import com.psychologist.financial.domain.usecases.CreatePatientUseCase
 import com.psychologist.financial.domain.usecases.CreatePaymentUseCase
@@ -19,6 +20,8 @@ import com.psychologist.financial.domain.usecases.GetAllPatientsUseCase
 import com.psychologist.financial.domain.usecases.GetDashboardMetricsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientPaymentsUseCase
+import com.psychologist.financial.domain.usecases.GetAllPaymentsUseCase
+import com.psychologist.financial.domain.usecases.GetUnpaidAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.MarkPatientInactiveUseCase
 import com.psychologist.financial.domain.usecases.ReactivatePatientUseCase
 import com.psychologist.financial.domain.usecases.UpdatePatientUseCase
@@ -209,6 +212,10 @@ object AppModule {
         GetPatientAppointmentsUseCase(appointmentRepository)
     }
 
+    val getAllAppointmentsUseCase: GetAllAppointmentsUseCase by lazy {
+        GetAllAppointmentsUseCase(appointmentRepository)
+    }
+
     val createAppointmentUseCase: CreateAppointmentUseCase by lazy {
         CreateAppointmentUseCase(appointmentRepository)
     }
@@ -223,6 +230,14 @@ object AppModule {
 
     val createPaymentUseCase: CreatePaymentUseCase by lazy {
         CreatePaymentUseCase(paymentRepository, patientRepository, paymentValidator)
+    }
+
+    val getUnpaidAppointmentsUseCase: GetUnpaidAppointmentsUseCase by lazy {
+        GetUnpaidAppointmentsUseCase(appointmentRepository)
+    }
+
+    val getAllPaymentsUseCase: GetAllPaymentsUseCase by lazy {
+        GetAllPaymentsUseCase(paymentRepository)
     }
 
     val getDashboardMetricsUseCase: GetDashboardMetricsUseCase by lazy {
@@ -249,26 +264,30 @@ object AppModule {
         reactivatePatientUseCase = reactivatePatientUseCase,
         updatePatientUseCase = updatePatientUseCase,
         payerInfoRepository = payerInfoRepository,
-        payerInfoValidator = payerInfoValidator
+        payerInfoValidator = payerInfoValidator,
+        appointmentRepository = appointmentRepository
     )
 
     fun provideAppointmentViewModel(): AppointmentViewModel = AppointmentViewModel(
         repository = appointmentRepository,
         getPatientAppointmentsUseCase = getPatientAppointmentsUseCase,
         createAppointmentUseCase = createAppointmentUseCase,
-        updateAppointmentUseCase = updateAppointmentUseCase
+        updateAppointmentUseCase = updateAppointmentUseCase,
+        getAllAppointmentsUseCase = getAllAppointmentsUseCase
     )
 
     fun providePaymentViewModel(): PaymentViewModel = PaymentViewModel(
+        createPaymentUseCase = createPaymentUseCase,
+        getUnpaidAppointmentsUseCase = getUnpaidAppointmentsUseCase,
         repository = paymentRepository,
         getPatientPaymentsUseCase = getPatientPaymentsUseCase,
-        createPaymentUseCase = createPaymentUseCase,
-        getPatientAppointmentsUseCase = getPatientAppointmentsUseCase
+        getAllPaymentsUseCase = getAllPaymentsUseCase
     )
 
     fun provideDashboardViewModel(): DashboardViewModel = DashboardViewModel(
         repository = dashboardRepository,
-        useCase = getDashboardMetricsUseCase
+        useCase = getDashboardMetricsUseCase,
+        appointmentRepository = appointmentRepository
     )
 
     fun provideExportViewModel(): ExportViewModel = ExportViewModel(
