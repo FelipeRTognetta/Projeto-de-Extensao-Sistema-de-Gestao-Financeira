@@ -90,4 +90,14 @@ interface PayerInfoDao {
      */
     @Query("SELECT * FROM payer_info WHERE patient_id = :patientId LIMIT 1")
     fun getByPatientIdFlow(patientId: Long): Flow<PayerInfoEntity?>
+
+    /**
+     * Get all PayerInfo records (one-shot).
+     *
+     * Used for backup export and financial CSV generation.
+     *
+     * @return List of all PayerInfoEntity records ordered by id ASC
+     */
+    @Query("SELECT * FROM payer_info ORDER BY id ASC")
+    suspend fun getAll(): List<PayerInfoEntity>
 }
