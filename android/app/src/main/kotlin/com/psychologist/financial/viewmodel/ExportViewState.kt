@@ -5,6 +5,17 @@ import java.io.File
 import java.time.YearMonth
 
 /**
+ * Identifies which entity type was (or is being) exported.
+ * Used by [ExportViewState.InProgress] and [ExportViewState.Success].
+ */
+enum class ExportType {
+    PATIENTS,
+    APPOINTMENTS,
+    PAYMENTS,
+    ALL
+}
+
+/**
  * State classes for Export screens
  *
  * Sealed classes representing different UI states during data export.
@@ -98,7 +109,8 @@ sealed class ExportViewState {
         val patientsExported: Int = 0,
         val appointmentsExported: Int = 0,
         val paymentsExported: Int = 0,
-        val totalProgress: Int = 0
+        val totalProgress: Int = 0,
+        val exportType: ExportType = ExportType.ALL
     ) : ExportViewState() {
         /**
          * Get status message with current counts
@@ -129,7 +141,8 @@ sealed class ExportViewState {
      */
     data class Success(
         val result: ExportResult,
-        val successMessage: String = "Exportação concluída com sucesso!"
+        val successMessage: String = "Exportação concluída com sucesso!",
+        val exportType: ExportType = ExportType.ALL
     ) : ExportViewState() {
         /**
          * Check if export has files

@@ -44,6 +44,7 @@ import androidx.core.content.FileProvider
 import com.psychologist.financial.ui.components.ErrorDialog
 import com.psychologist.financial.ui.components.ExportProgressComponent
 import com.psychologist.financial.ui.components.ExportSuccessIndicator
+import com.psychologist.financial.viewmodel.ExportType
 import com.psychologist.financial.viewmodel.ExportViewModel
 import com.psychologist.financial.viewmodel.ExportViewState
 import com.psychologist.financial.viewmodel.FinanceiroCsvState
@@ -260,24 +261,47 @@ private fun IdleScreen(
             StorageInfoCard(state)
         }
 
-        // Export button
+        // Export buttons (4 individual options)
         item {
-            Button(
-                onClick = { viewModel.performExport() },
-                enabled = state.hasData() && !isExporting,
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Download,
-                    contentDescription = null,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
-                Text(
-                    text = if (state.hasData()) "EXPORTAR AGORA" else "Nenhum Dado para Exportar",
-                    fontWeight = FontWeight.SemiBold
-                )
+                Button(
+                    onClick = { viewModel.performSelectiveExport(exportPatients = true, exportAppointments = false, exportPayments = false) },
+                    enabled = state.hasData() && !isExporting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Exportar Pacientes", fontWeight = FontWeight.SemiBold)
+                }
+                Button(
+                    onClick = { viewModel.performSelectiveExport(exportPatients = false, exportAppointments = true, exportPayments = false) },
+                    enabled = state.hasData() && !isExporting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Exportar Consultas", fontWeight = FontWeight.SemiBold)
+                }
+                Button(
+                    onClick = { viewModel.performSelectiveExport(exportPatients = false, exportAppointments = false, exportPayments = true) },
+                    enabled = state.hasData() && !isExporting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Exportar Pagamentos", fontWeight = FontWeight.SemiBold)
+                }
+                OutlinedButton(
+                    onClick = { viewModel.performExport() },
+                    enabled = state.hasData() && !isExporting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text("Exportar Tudo", fontWeight = FontWeight.SemiBold)
+                }
             }
         }
 
@@ -723,6 +747,13 @@ private fun SuccessScreen(
 ) {
     val context = LocalContext.current
 
+    val exportTypeLabel = when (state.exportType) {
+        ExportType.PATIENTS -> "Pacientes exportados"
+        ExportType.APPOINTMENTS -> "Consultas exportadas"
+        ExportType.PAYMENTS -> "Pagamentos exportados"
+        ExportType.ALL -> "Todos os dados exportados"
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -732,6 +763,17 @@ private fun SuccessScreen(
     ) {
         item {
             ExportSuccessIndicator(state)
+        }
+
+        item {
+            Text(
+                text = exportTypeLabel,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         item {

@@ -254,7 +254,8 @@ class ExportViewModel(
                     _exportState.value = ExportViewState.Success(
                         result = result,
                         successMessage = "Exportação concluída com sucesso! " +
-                            "${result.totalRecords} registros exportados."
+                            "${result.totalRecords} registros exportados.",
+                        exportType = ExportType.ALL
                     )
                 } else {
                     Log.w(TAG, "Export failed: ${result.errorMessage}")
@@ -303,6 +304,13 @@ class ExportViewModel(
         Log.d(TAG, "Starting selective export: " +
             "patients=$exportPatients, appointments=$exportAppointments, payments=$exportPayments")
 
+        val exportType = when {
+            exportPatients && !exportAppointments && !exportPayments -> ExportType.PATIENTS
+            !exportPatients && exportAppointments && !exportPayments -> ExportType.APPOINTMENTS
+            !exportPatients && !exportAppointments && exportPayments -> ExportType.PAYMENTS
+            else -> ExportType.ALL
+        }
+
         _isExporting.value = true
 
         launchSafe {
@@ -324,7 +332,8 @@ class ExportViewModel(
                 // Start export
                 _exportState.value = ExportViewState.InProgress(
                     currentStep = "Preparando exportação...",
-                    totalProgress = 5
+                    totalProgress = 5,
+                    exportType = exportType
                 )
 
                 // Execute selective export
@@ -341,7 +350,8 @@ class ExportViewModel(
                     _exportState.value = ExportViewState.Success(
                         result = result,
                         successMessage = "Exportação seletiva concluída! " +
-                            "${result.totalRecords} registros salvos."
+                            "${result.totalRecords} registros salvos.",
+                        exportType = exportType
                     )
                 } else {
                     Log.w(TAG, "Selective export failed: ${result.errorMessage}")
