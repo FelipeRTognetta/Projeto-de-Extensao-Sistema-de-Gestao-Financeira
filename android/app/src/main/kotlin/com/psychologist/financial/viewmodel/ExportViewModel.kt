@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.YearMonth
 
 /**
  * ViewModel for Data Export screens
@@ -119,6 +120,23 @@ class ExportViewModel(
      */
     private val _lastExportResult = MutableStateFlow<ExportResult?>(null)
     val lastExportResult: StateFlow<ExportResult?> = _lastExportResult.asStateFlow()
+
+    // ========================================
+    // Financeiro CSV State (US1)
+    // ========================================
+
+    /**
+     * Currently selected month for the financial CSV export.
+     * Defaults to the current month.
+     */
+    private val _selectedMonth = MutableStateFlow(YearMonth.now())
+    val selectedMonth: StateFlow<YearMonth> = _selectedMonth.asStateFlow()
+
+    /**
+     * State of the financial CSV export operation.
+     */
+    private val _financeiroState = MutableStateFlow<FinanceiroCsvState>(FinanceiroCsvState.Idle)
+    val financeiroState: StateFlow<FinanceiroCsvState> = _financeiroState.asStateFlow()
 
     init {
         Log.d(TAG, "ExportViewModel initialized")
@@ -433,6 +451,63 @@ class ExportViewModel(
                 Log.d(TAG, "Found ${exports.size} export directories")
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to list exports", e)
+            }
+        }
+    }
+
+    // ========================================
+    // Financeiro CSV Operations (US1)
+    // ========================================
+
+    /**
+     * Update the selected month for the financial CSV export.
+     *
+     * @param yearMonth The new month/year to select
+     */
+    fun selectMonth(yearMonth: YearMonth) {
+        _selectedMonth.value = yearMonth
+        // Reset state so the previous result is not shown for the new month
+        _financeiroState.value = FinanceiroCsvState.Idle
+    }
+
+    /**
+     * Perform the financial CSV export for the currently selected month.
+     *
+     * - Sets state to [FinanceiroCsvState.InProgress] while running.
+     * - On success with rows → [FinanceiroCsvState.Success]
+     * - On success with 0 rows → [FinanceiroCsvState.Empty]
+     * - On exception → [FinanceiroCsvState.Error]
+     */
+    fun performFinanceiroExport() {
+        val yearMonth = _selectedMonth.value
+        Log.d(TAG, "Starting financeiro CSV export for $yearMonth")
+        _financeiroState.value = FinanceiroCsvState.InProgress
+
+        launchSafe {
+            try {
+                val result = exportDataUseCase.executeFinanceiro(yearMonth)
+
+                if (!result.success) {
+                    Log.w(TAG, "Financeiro export failed: ${result.errorMessage}")
+                    _financeiroState.value = FinanceiroCsvState.Error(
+                        result.errorMessage ?: "Erro desconhecido na exportação"
+                    )
+                    return@launchSafe
+                }
+
+                val file = result.paymentFile
+                if (file == null) {
+                    Log.d(TAG, "Financeiro export: no payments found for $yearMonth")
+                    _financeiroState.value = FinanceiroCsvState.Empty
+                } else {
+                    Log.d(TAG, "Financeiro export: ${result.paymentCount} rows written to ${file.name}")
+                    _financeiroState.value = FinanceiroCsvState.Success(file, result.paymentCount)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Financeiro export exception", e)
+                _financeiroState.value = FinanceiroCsvState.Error(
+                    "Erro ao exportar CSV financeiro: ${e.message ?: "desconhecido"}"
+                )
             }
         }
     }

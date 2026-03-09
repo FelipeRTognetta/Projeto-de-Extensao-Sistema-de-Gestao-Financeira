@@ -16,14 +16,22 @@ import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,6 +46,8 @@ import com.psychologist.financial.ui.components.ExportProgressComponent
 import com.psychologist.financial.ui.components.ExportSuccessIndicator
 import com.psychologist.financial.viewmodel.ExportViewModel
 import com.psychologist.financial.viewmodel.ExportViewState
+import com.psychologist.financial.viewmodel.FinanceiroCsvState
+import java.time.YearMonth
 
 /**
  * Export data screen
@@ -185,6 +195,10 @@ private fun IdleScreen(
     isExporting: Boolean,
     viewModel: ExportViewModel
 ) {
+    val selectedMonth by viewModel.selectedMonth.collectAsState()
+    val financeiroState by viewModel.financeiroState.collectAsState()
+    val context = LocalContext.current
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -211,6 +225,29 @@ private fun IdleScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+
+        // CSV Financeiro section
+        item {
+            FinanceiroCsvSection(
+                selectedMonth = selectedMonth,
+                financeiroState = financeiroState,
+                onMonthSelected = { viewModel.selectMonth(it) },
+                onExport = { viewModel.performFinanceiroExport() },
+                onShare = { file ->
+                    val uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file
+                    )
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/csv"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(intent, "Compartilhar CSV Financeiro"))
+                }
+            )
         }
 
         // Statistics card
@@ -254,6 +291,191 @@ private fun IdleScreen(
                 modifier = Modifier.padding(top = 8.dp),
                 textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+private val monthNames = listOf(
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+)
+
+/**
+ * Month/year selector with two dropdown menus.
+ *
+ * @param selectedMonth Currently selected YearMonth
+ * @param onMonthSelected Callback when the user picks a new month/year
+ */
+@Composable
+private fun MonthYearSelector(
+    selectedMonth: YearMonth,
+    onMonthSelected: (YearMonth) -> Unit
+) {
+    val currentYear = YearMonth.now().year
+    val years = (currentYear - 5..currentYear).toList().reversed()
+
+    var monthExpanded by remember { mutableStateOf(false) }
+    var yearExpanded by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Month dropdown
+        ExposedDropdownMenuBox(
+            expanded = monthExpanded,
+            onExpandedChange = { monthExpanded = it },
+            modifier = Modifier.weight(1f)
+        ) {
+            OutlinedTextField(
+                value = monthNames[selectedMonth.monthValue - 1],
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Mês") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(monthExpanded) },
+                modifier = Modifier.menuAnchor()
+            )
+            ExposedDropdownMenu(
+                expanded = monthExpanded,
+                onDismissRequest = { monthExpanded = false }
+            ) {
+                monthNames.forEachIndexed { index, name ->
+                    DropdownMenuItem(
+                        text = { Text(name) },
+                        onClick = {
+                            onMonthSelected(YearMonth.of(selectedMonth.year, index + 1))
+                            monthExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+
+        // Year dropdown
+        ExposedDropdownMenuBox(
+            expanded = yearExpanded,
+            onExpandedChange = { yearExpanded = it },
+            modifier = Modifier.weight(1f)
+        ) {
+            OutlinedTextField(
+                value = selectedMonth.year.toString(),
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Ano") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(yearExpanded) },
+                modifier = Modifier.menuAnchor()
+            )
+            ExposedDropdownMenu(
+                expanded = yearExpanded,
+                onDismissRequest = { yearExpanded = false }
+            ) {
+                years.forEach { year ->
+                    DropdownMenuItem(
+                        text = { Text(year.toString()) },
+                        onClick = {
+                            onMonthSelected(YearMonth.of(year, selectedMonth.monthValue))
+                            yearExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * CSV Financeiro section displayed in the idle export screen.
+ *
+ * Shows a month/year selector, export button, and feedback for
+ * [FinanceiroCsvState.Empty] (no payments) or [FinanceiroCsvState.Success] (share).
+ */
+@Composable
+private fun FinanceiroCsvSection(
+    selectedMonth: YearMonth,
+    financeiroState: FinanceiroCsvState,
+    onMonthSelected: (YearMonth) -> Unit,
+    onExport: () -> Unit,
+    onShare: (java.io.File) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "CSV Financeiro Mensal",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Text(
+                text = "Exporte os pagamentos do mês selecionado com dados do paciente e responsável financeiro.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            MonthYearSelector(
+                selectedMonth = selectedMonth,
+                onMonthSelected = onMonthSelected
+            )
+
+            Button(
+                onClick = onExport,
+                enabled = financeiroState !is FinanceiroCsvState.InProgress,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (financeiroState is FinanceiroCsvState.InProgress)
+                        "Exportando..." else "Exportar CSV Financeiro",
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            when (financeiroState) {
+                is FinanceiroCsvState.Empty -> {
+                    Text(
+                        text = "Nenhum pagamento encontrado para o mês selecionado.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                is FinanceiroCsvState.Success -> {
+                    Text(
+                        text = "${financeiroState.rowCount} pagamento(s) exportado(s).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    OutlinedButton(
+                        onClick = { onShare(financeiroState.file) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Text("COMPARTILHAR CSV FINANCEIRO")
+                    }
+                }
+                is FinanceiroCsvState.Error -> {
+                    Text(
+                        text = financeiroState.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                else -> { /* Idle / InProgress — no extra UI */ }
+            }
         }
     }
 }

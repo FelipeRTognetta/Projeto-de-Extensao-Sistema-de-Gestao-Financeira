@@ -2,6 +2,7 @@ package com.psychologist.financial.viewmodel
 
 import com.psychologist.financial.domain.models.ExportResult
 import java.io.File
+import java.time.YearMonth
 
 /**
  * State classes for Export screens
@@ -189,4 +190,43 @@ sealed class ExportViewState {
             }
         }
     }
+}
+
+/**
+ * State for the financial CSV monthly export operation (US1).
+ *
+ * Transitions:
+ *   Idle → InProgress → Success (file ready to share)
+ *                     → Empty   (no payments in selected month)
+ *                     → Error   (unexpected failure)
+ */
+sealed class FinanceiroCsvState {
+
+    /** No export in progress. */
+    object Idle : FinanceiroCsvState()
+
+    /** Export is executing. */
+    object InProgress : FinanceiroCsvState()
+
+    /**
+     * Export completed — CSV file is ready to share.
+     *
+     * @property file Generated CSV file
+     * @property rowCount Number of payment rows written
+     */
+    data class Success(val file: File, val rowCount: Int) : FinanceiroCsvState()
+
+    /**
+     * Month has no payments — no file generated.
+     *
+     * UI should display an informational message instead of a share button.
+     */
+    object Empty : FinanceiroCsvState()
+
+    /**
+     * Export failed.
+     *
+     * @property message Human-readable error message in Portuguese
+     */
+    data class Error(val message: String) : FinanceiroCsvState()
 }
