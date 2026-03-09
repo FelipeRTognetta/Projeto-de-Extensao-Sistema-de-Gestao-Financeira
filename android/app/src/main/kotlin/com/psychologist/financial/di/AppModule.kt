@@ -286,7 +286,8 @@ object AppModule {
 
     fun provideDashboardViewModel(): DashboardViewModel = DashboardViewModel(
         repository = dashboardRepository,
-        useCase = getDashboardMetricsUseCase
+        useCase = getDashboardMetricsUseCase,
+        appointmentRepository = appointmentRepository
     )
 
     fun provideExportViewModel(): ExportViewModel = ExportViewModel(

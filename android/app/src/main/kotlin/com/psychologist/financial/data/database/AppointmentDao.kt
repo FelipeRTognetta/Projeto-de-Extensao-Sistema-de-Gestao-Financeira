@@ -553,6 +553,9 @@ interface AppointmentDao {
         WHERE id NOT IN (SELECT appointment_id FROM payment_appointments)
     """)
     fun getPatientIdsWithPendingPaymentsFlow(): Flow<List<Long>>
+
+    @Query("SELECT COUNT(*) FROM appointments WHERE id NOT IN (SELECT appointment_id FROM payment_appointments)")
+    fun countUnpaidAppointmentsFlow(): Flow<Int>
 }
 
 /**

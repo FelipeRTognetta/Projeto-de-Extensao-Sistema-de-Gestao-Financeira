@@ -385,7 +385,14 @@ class PatientViewModel(
                 .firstOrNull { it.id == patientId }
 
             if (patient != null) {
-                _patientDetailState.value = DetailState.Success(patient)
+                // Load payerInfo separately if naoPagante — getAllPatients() does not join payerInfoDao
+                val patientWithPayer = if (patient.naoPagante) {
+                    val payerInfo = payerInfoRepository?.getPayerInfoByPatientId(patientId)
+                    patient.copy(payerInfo = payerInfo)
+                } else {
+                    patient
+                }
+                _patientDetailState.value = DetailState.Success(patientWithPayer)
             } else {
                 setError("Paciente não encontrado")
                 _patientDetailState.value = DetailState.Error("Paciente não encontrado")
@@ -766,11 +773,12 @@ class PatientViewModel(
 
             val result = createPatientUseCase.execute(
                 name = _formName.value,
-                phone = _formPhone.value,
-                email = _formEmail.value,
+                phone = _formPhone.value.ifBlank { null },
+                email = _formEmail.value.ifBlank { null },
                 initialConsultDate = _formInitialConsultDate.value,
                 cpf = _formCpf.value.ifBlank { null },
-                endereco = _formEndereco.value.ifBlank { null }
+                endereco = _formEndereco.value.ifBlank { null },
+                naoPagante = _formNaoPagante.value
             )
 
             when (result) {
@@ -863,7 +871,8 @@ class PatientViewModel(
                 email = _formEmail.value.ifBlank { null },
                 initialConsultDate = _formInitialConsultDate.value,
                 cpf = _formCpf.value.ifBlank { null },
-                endereco = _formEndereco.value.ifBlank { null }
+                endereco = _formEndereco.value.ifBlank { null },
+                naoPagante = _formNaoPagante.value
             )
 
             when (result) {

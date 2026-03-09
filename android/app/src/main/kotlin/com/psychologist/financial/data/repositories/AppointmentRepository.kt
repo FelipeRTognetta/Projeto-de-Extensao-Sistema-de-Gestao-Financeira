@@ -507,6 +507,10 @@ class AppointmentRepository(
         return appointmentDao.getPatientIdsWithPendingPaymentsFlow().map { it.toSet() }
     }
 
+    fun countUnpaidAppointments(): Flow<Int> {
+        return appointmentDao.countUnpaidAppointmentsFlow()
+    }
+
     // ========================================
     // Mapping Functions
     // ========================================

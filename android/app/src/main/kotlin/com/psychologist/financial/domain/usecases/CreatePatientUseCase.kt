@@ -104,7 +104,8 @@ class CreatePatientUseCase(
         email: String? = null,
         initialConsultDate: LocalDate = LocalDate.now(),
         cpf: String? = null,
-        endereco: String? = null
+        endereco: String? = null,
+        naoPagante: Boolean = false
     ): CreatePatientResult {
         return try {
             // Validate input
@@ -129,15 +130,16 @@ class CreatePatientUseCase(
             val patient = Patient(
                 id = 0,  // Unsaved
                 name = name.trim(),
-                phone = phone?.trim(),
-                email = email?.trim(),
+                phone = phone?.trim()?.ifBlank { null },
+                email = email?.trim()?.ifBlank { null },
                 status = PatientStatus.ACTIVE,
                 initialConsultDate = initialConsultDate,
                 registrationDate = LocalDate.now(),
                 lastAppointmentDate = null,
                 createdDate = LocalDateTime.now(),
                 cpf = rawCpf,
-                endereco = endereco?.trim()?.ifBlank { null }
+                endereco = endereco?.trim()?.ifBlank { null },
+                naoPagante = naoPagante
             )
 
             // Save to repository

@@ -95,14 +95,12 @@ fun PatientFormScreen(
     }
 
     // Handle success navigation
-    when (val result = formState.submissionResult) {
-        is CreatePatientState.SubmissionResult.Success -> {
-            LaunchedEffect(result) {
-                onSuccess(result.patientId)
-            }
+    val submissionResult = formState.submissionResult
+    if (submissionResult is CreatePatientState.SubmissionResult.Success) {
+        LaunchedEffect(submissionResult) {
+            onSuccess(submissionResult.patientId)
             viewModel.clearSubmissionResult()
         }
-        else -> { }
     }
 
     // Confirmation dialog when user tries to turn off naoPagante with an existing payer

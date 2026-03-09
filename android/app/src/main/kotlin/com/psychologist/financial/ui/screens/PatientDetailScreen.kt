@@ -1,6 +1,5 @@
 package com.psychologist.financial.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -204,8 +203,8 @@ private fun PatientDetailContent(
         // Responsável Financeiro — shown only when naoPagante=true
         PatientDetailPayerSection(patient)
 
-        // Status and dates
-        StatusCard(patient)
+        // Registration date — small card, always last before action buttons
+        RegistrationDateCard(patient)
 
         // Navigation buttons — Appointments and Payments
         Row(
@@ -357,7 +356,7 @@ private fun PatientHeader(patient: Patient, hasPendingPayments: Boolean = false)
  */
 @Composable
 internal fun PatientDetailPayerSection(patient: Patient) {
-    if (!patient.naoPagante || patient.payerInfo == null) return
+    if (patient.payerInfo == null) return
 
     val payer = patient.payerInfo
     Card(
@@ -383,16 +382,16 @@ internal fun PatientDetailPayerSection(patient: Patient) {
                 ContactRow(label = "CPF", value = it)
             }
 
-            if (!payer.endereco.isNullOrEmpty()) {
-                ContactRow(label = "Endereço", value = payer.endereco)
-            }
-
             if (!payer.email.isNullOrEmpty()) {
                 ContactRow(label = "Email", value = payer.email)
             }
 
             if (!payer.telefone.isNullOrEmpty()) {
                 ContactRow(label = "Telefone", value = payer.telefone)
+            }
+
+            if (!payer.endereco.isNullOrEmpty()) {
+                ContactRow(label = "Endereço", value = payer.endereco)
             }
         }
     }
@@ -419,20 +418,20 @@ private fun ContactCard(patient: Patient) {
                 fontWeight = FontWeight.SemiBold
             )
 
-            if (!patient.phone.isNullOrEmpty()) {
-                ContactRow(label = "Telefone", value = patient.phone)
-            }
-
-            if (!patient.email.isNullOrEmpty()) {
-                ContactRow(label = "Email", value = patient.email)
-            }
-
             if (!patient.cpf.isNullOrEmpty()) {
                 val digits = patient.cpf.filter { it.isDigit() }
                 val formatted = if (digits.length == 11) {
                     "${digits.substring(0, 3)}.${digits.substring(3, 6)}.${digits.substring(6, 9)}-${digits.substring(9)}"
                 } else digits
                 ContactRow(label = "CPF", value = formatted)
+            }
+
+            if (!patient.email.isNullOrEmpty()) {
+                ContactRow(label = "Email", value = patient.email)
+            }
+
+            if (!patient.phone.isNullOrEmpty()) {
+                ContactRow(label = "Telefone", value = patient.phone)
             }
 
             if (!patient.endereco.isNullOrEmpty()) {
@@ -446,6 +445,35 @@ private fun ContactCard(patient: Patient) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun RegistrationDateCard(patient: Patient) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Data de Registro",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = patient.registrationDate.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
@@ -470,72 +498,6 @@ private fun ContactRow(label: String, value: String) {
     }
 }
 
-/**
- * Status and dates card
- */
-@Composable
-private fun StatusCard(patient: Patient) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = "Informações",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Primeira Consulta",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = patient.initialConsultDate.toString(),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Data de Registro",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = patient.registrationDate.toString(),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-
-            if (patient.lastAppointmentDate != null) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Última Consulta",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = patient.lastAppointmentDate.toString(),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-        }
-    }
-}
 
 /**
  * Summary card (appointments, payments)

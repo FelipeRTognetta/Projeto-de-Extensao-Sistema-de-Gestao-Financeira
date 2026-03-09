@@ -39,8 +39,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.psychologist.financial.domain.models.Appointment
 import com.psychologist.financial.ui.components.ErrorBanner
@@ -173,11 +175,15 @@ private fun PaymentFormContent(
                 )
             }
 
-            // Amount field — implicit cents: digits enter right-to-left, always 2 decimal places
+            // Amount field — implicit cents, cursor always at end (right-to-left entry)
+            val displayAmount = if (formState.amountText.isEmpty()) "0,00" else formState.amountText
             OutlinedTextField(
-                value = formState.amountText,
-                onValueChange = { newValue ->
-                    val digits = newValue.filter { it.isDigit() }.trimStart('0')
+                value = TextFieldValue(
+                    text = displayAmount,
+                    selection = TextRange(displayAmount.length)
+                ),
+                onValueChange = { tfv ->
+                    val digits = tfv.text.filter { it.isDigit() }
                     if (digits.isEmpty()) {
                         onAmountChange("")
                         return@OutlinedTextField
@@ -196,7 +202,6 @@ private fun PaymentFormContent(
                     imeAction = ImeAction.Next
                 ),
                 enabled = !formState.isLoading,
-                placeholder = { Text("0,00") },
                 prefix = { Text("R$ ") }
             )
 

@@ -93,8 +93,8 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
      */
     suspend fun createPatient(patient: Patient): Long {
         return withTransaction {
-            // Validate contact info
-            if (!patient.hasContactInfo()) {
+            // Validate contact info (non-payer patients may omit contact)
+            if (!patient.naoPagante && !patient.hasContactInfo()) {
                 throw IllegalArgumentException("Patient must have phone or email")
             }
 
