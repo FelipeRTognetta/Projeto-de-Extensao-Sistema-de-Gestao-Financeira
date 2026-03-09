@@ -1,11 +1,13 @@
 package com.psychologist.financial.viewmodel
 
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.psychologist.financial.domain.models.BackupResult
 import com.psychologist.financial.domain.models.ExportResult
 import com.psychologist.financial.domain.usecases.ExportBackupUseCase
 import com.psychologist.financial.domain.usecases.ExportDataUseCase
+import com.psychologist.financial.domain.usecases.ImportBackupUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -73,7 +75,8 @@ import java.time.YearMonth
  */
 class ExportViewModel(
     private val exportDataUseCase: ExportDataUseCase,
-    private val exportBackupUseCase: ExportBackupUseCase? = null
+    private val exportBackupUseCase: ExportBackupUseCase? = null,
+    private val importBackupUseCase: ImportBackupUseCase? = null
 ) : BaseViewModel() {
 
     private companion object {
@@ -150,6 +153,22 @@ class ExportViewModel(
      */
     private val _backupExportState = MutableStateFlow<BackupExportState>(BackupExportState.Idle)
     val backupExportState: StateFlow<BackupExportState> = _backupExportState.asStateFlow()
+
+    // ========================================
+    // Backup Import State (US4)
+    // ========================================
+
+    /**
+     * State of the backup import operation.
+     */
+    private val _backupImportState = MutableStateFlow<BackupImportState>(BackupImportState.Idle)
+    val backupImportState: StateFlow<BackupImportState> = _backupImportState.asStateFlow()
+
+    /** URI of the file selected by the user — held until [confirmBackupImport] is called. */
+    private var pendingImportUri: Uri? = null
+
+    /** Password entered by the user — held until [confirmBackupImport] is called. */
+    private var pendingImportPassword: String = ""
 
     init {
         Log.d(TAG, "ExportViewModel initialized")
@@ -589,6 +608,84 @@ class ExportViewModel(
      */
     fun resetBackupExportState() {
         _backupExportState.value = BackupExportState.Idle
+    }
+
+    // ========================================
+    // Backup Import Operations (US4)
+    // ========================================
+
+    /**
+     * Stage a backup import: store URI + password and move to [BackupImportState.AwaitingConfirmation].
+     *
+     * The actual import runs only after [confirmBackupImport] is called.
+     *
+     * @param uri      Content URI of the `.pgfbackup` file
+     * @param password User-provided decryption password
+     */
+    fun initiateBackupImport(uri: Uri, password: String) {
+        pendingImportUri = uri
+        pendingImportPassword = password
+        _backupImportState.value = BackupImportState.AwaitingConfirmation
+        Log.d(TAG, "Backup import staged, awaiting confirmation")
+    }
+
+    /**
+     * Execute the pending backup import after user confirms the data-overwrite warning.
+     *
+     * Requires [initiateBackupImport] to have been called first.
+     */
+    fun confirmBackupImport() {
+        val useCase = importBackupUseCase ?: run {
+            Log.w(TAG, "importBackupUseCase not configured")
+            _backupImportState.value = BackupImportState.Error("Serviço de importação não disponível.")
+            return
+        }
+        val uri = pendingImportUri ?: run {
+            Log.w(TAG, "No pending import URI")
+            _backupImportState.value = BackupImportState.Error("Nenhum arquivo selecionado.")
+            return
+        }
+        val password = pendingImportPassword
+
+        Log.d(TAG, "Starting backup import...")
+        _backupImportState.value = BackupImportState.InProgress
+
+        launchSafe {
+            try {
+                val result = useCase.execute(uri, password)
+                when (result) {
+                    is BackupResult.ImportSuccess -> {
+                        Log.d(TAG, "Backup import successful: ${result.totalRecords} records")
+                        _backupImportState.value = BackupImportState.Success(result)
+                    }
+                    is BackupResult.Failure -> {
+                        Log.w(TAG, "Backup import failed: ${result.message}")
+                        _backupImportState.value = BackupImportState.Error(result.message)
+                    }
+                    else -> {
+                        _backupImportState.value = BackupImportState.Error("Resultado inesperado.")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Backup import exception", e)
+                _backupImportState.value = BackupImportState.Error(
+                    "Erro ao importar backup: ${e.message ?: "erro desconhecido"}"
+                )
+            } finally {
+                pendingImportUri = null
+                pendingImportPassword = ""
+            }
+        }
+    }
+
+    /**
+     * Cancel a pending or completed import and return to [BackupImportState.Idle].
+     */
+    fun cancelBackupImport() {
+        pendingImportUri = null
+        pendingImportPassword = ""
+        _backupImportState.value = BackupImportState.Idle
+        Log.d(TAG, "Backup import cancelled")
     }
 
     // ========================================

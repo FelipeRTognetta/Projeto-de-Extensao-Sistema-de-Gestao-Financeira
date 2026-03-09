@@ -274,3 +274,42 @@ sealed class BackupExportState {
      */
     data class Error(val message: String) : BackupExportState()
 }
+
+/**
+ * State for the backup import operation (US4).
+ *
+ * Transitions:
+ *   Idle → AwaitingConfirmation (file + password provided, waiting for user to confirm)
+ *        → InProgress           (user confirmed, import running)
+ *        → Success              (import done, records restored)
+ *        → Error                (failure at any step)
+ *   AwaitingConfirmation → InProgress | Idle (user confirms or cancels)
+ */
+sealed class BackupImportState {
+
+    /** No import in progress. */
+    object Idle : BackupImportState()
+
+    /**
+     * File and password are ready — waiting for user confirmation.
+     * UI shows AlertDialog warning that existing data will be overwritten.
+     */
+    object AwaitingConfirmation : BackupImportState()
+
+    /** Import is executing. */
+    object InProgress : BackupImportState()
+
+    /**
+     * Import completed — all records restored.
+     *
+     * @property result [BackupResult.ImportSuccess] with entity counts
+     */
+    data class Success(val result: BackupResult.ImportSuccess) : BackupImportState()
+
+    /**
+     * Import failed.
+     *
+     * @property message Human-readable error message in Portuguese
+     */
+    data class Error(val message: String) : BackupImportState()
+}

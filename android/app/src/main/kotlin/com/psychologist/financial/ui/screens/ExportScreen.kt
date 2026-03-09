@@ -2,6 +2,8 @@ package com.psychologist.financial.ui.screens
 
 import android.content.Intent
 import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -25,6 +28,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +50,7 @@ import com.psychologist.financial.ui.components.ErrorDialog
 import com.psychologist.financial.ui.components.ExportProgressComponent
 import com.psychologist.financial.ui.components.ExportSuccessIndicator
 import com.psychologist.financial.viewmodel.BackupExportState
+import com.psychologist.financial.viewmodel.BackupImportState
 import com.psychologist.financial.viewmodel.ExportType
 import com.psychologist.financial.viewmodel.ExportViewModel
 import com.psychologist.financial.viewmodel.ExportViewState
@@ -201,6 +206,7 @@ private fun IdleScreen(
     val selectedMonth by viewModel.selectedMonth.collectAsState()
     val financeiroState by viewModel.financeiroState.collectAsState()
     val backupExportState by viewModel.backupExportState.collectAsState()
+    val backupImportState by viewModel.backupImportState.collectAsState()
     val context = LocalContext.current
 
     LazyColumn(
@@ -285,6 +291,18 @@ private fun IdleScreen(
                     context.startActivity(Intent.createChooser(intent, "Salvar backup"))
                 },
                 onReset = { viewModel.resetBackupExportState() }
+            )
+        }
+
+        // Backup import section
+        item {
+            BackupImportSection(
+                backupImportState = backupImportState,
+                onImport = { uri, password ->
+                    viewModel.initiateBackupImport(uri, password)
+                },
+                onConfirm = { viewModel.confirmBackupImport() },
+                onCancel = { viewModel.cancelBackupImport() }
             )
         }
 
@@ -644,6 +662,155 @@ private fun BackupExportSection(
                     )
                 }
                 else -> { /* Idle / InProgress — no extra UI */ }
+            }
+        }
+    }
+}
+
+/**
+ * Backup import section displayed in the idle export screen.
+ *
+ * Shows a file picker button, password field, import button,
+ * a confirmation dialog, and result feedback.
+ */
+@Composable
+private fun BackupImportSection(
+    backupImportState: BackupImportState,
+    onImport: (android.net.Uri, String) -> Unit,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit
+) {
+    var selectedUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var selectedFileName by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            selectedUri = uri
+            selectedFileName = uri.lastPathSegment ?: "backup.pgfbackup"
+        }
+    }
+
+    // Confirmation dialog
+    if (backupImportState is BackupImportState.AwaitingConfirmation) {
+        AlertDialog(
+            onDismissRequest = onCancel,
+            title = { Text("Substituir dados existentes?") },
+            text = {
+                Text(
+                    "Todos os dados atuais (pacientes, consultas e pagamentos) " +
+                        "serão substituídos pelos dados do backup. Esta ação não pode ser desfeita."
+                )
+            },
+            confirmButton = {
+                Button(onClick = onConfirm) { Text("Importar") }
+            },
+            dismissButton = {
+                TextButton(onClick = onCancel) { Text("Cancelar") }
+            }
+        )
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Importar Backup",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Text(
+                text = "Restaure seus dados a partir de um arquivo .pgfbackup. " +
+                    "Os dados atuais serão substituídos.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            OutlinedButton(
+                onClick = { filePicker.launch("*/*") },
+                enabled = backupImportState !is BackupImportState.InProgress,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FileDownload,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Text(
+                    text = if (selectedFileName.isNotEmpty()) selectedFileName
+                    else "Selecionar Arquivo de Backup"
+                )
+            }
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Senha do backup") },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = backupImportState !is BackupImportState.InProgress
+            )
+
+            Button(
+                onClick = {
+                    val uri = selectedUri
+                    if (uri != null && password.isNotBlank()) {
+                        onImport(uri, password)
+                    }
+                },
+                enabled = selectedUri != null && password.isNotBlank() &&
+                    backupImportState !is BackupImportState.InProgress,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (backupImportState is BackupImportState.InProgress)
+                        "Importando..." else "Importar Backup",
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            when (backupImportState) {
+                is BackupImportState.Success -> {
+                    val result = backupImportState.result
+                    Text(
+                        text = result.getSummary(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            selectedUri = null
+                            selectedFileName = ""
+                            password = ""
+                            onCancel()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("NOVA IMPORTAÇÃO")
+                    }
+                }
+                is BackupImportState.Error -> {
+                    Text(
+                        text = backupImportState.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                else -> { /* Idle / AwaitingConfirmation / InProgress — handled by dialog */ }
             }
         }
     }

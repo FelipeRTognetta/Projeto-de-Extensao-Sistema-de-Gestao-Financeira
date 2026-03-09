@@ -465,6 +465,24 @@ interface PaymentDao {
     @Query("DELETE FROM payment_appointments WHERE payment_id = :paymentId")
     suspend fun deleteAppointmentLinksByPayment(paymentId: Long)
 
+    /**
+     * Delete all payment-appointment cross-refs (for full backup restore).
+     */
+    @Query("DELETE FROM payment_appointments")
+    suspend fun deleteAllCrossRefs()
+
+    /**
+     * Bulk insert payment-appointment cross-refs (for backup restore).
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllCrossRefs(links: List<PaymentAppointmentCrossRef>)
+
+    /**
+     * Delete all payments (for full backup restore).
+     */
+    @Query("DELETE FROM payments")
+    suspend fun deleteAllPayments()
+
     // ========================================
     // Read Models (With Related Data)
     // ========================================
