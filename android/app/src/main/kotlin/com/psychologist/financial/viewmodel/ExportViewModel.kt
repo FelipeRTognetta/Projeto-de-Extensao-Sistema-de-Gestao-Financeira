@@ -2,7 +2,9 @@ package com.psychologist.financial.viewmodel
 
 import android.util.Log
 import androidx.lifecycle.viewModelScope
+import com.psychologist.financial.domain.models.BackupResult
 import com.psychologist.financial.domain.models.ExportResult
+import com.psychologist.financial.domain.usecases.ExportBackupUseCase
 import com.psychologist.financial.domain.usecases.ExportDataUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,7 +72,8 @@ import java.time.YearMonth
  * @property exportDataUseCase Use case for orchestrating data export
  */
 class ExportViewModel(
-    private val exportDataUseCase: ExportDataUseCase
+    private val exportDataUseCase: ExportDataUseCase,
+    private val exportBackupUseCase: ExportBackupUseCase? = null
 ) : BaseViewModel() {
 
     private companion object {
@@ -137,6 +140,16 @@ class ExportViewModel(
      */
     private val _financeiroState = MutableStateFlow<FinanceiroCsvState>(FinanceiroCsvState.Idle)
     val financeiroState: StateFlow<FinanceiroCsvState> = _financeiroState.asStateFlow()
+
+    // ========================================
+    // Backup Export State (US3)
+    // ========================================
+
+    /**
+     * State of the full-database backup export operation.
+     */
+    private val _backupExportState = MutableStateFlow<BackupExportState>(BackupExportState.Idle)
+    val backupExportState: StateFlow<BackupExportState> = _backupExportState.asStateFlow()
 
     init {
         Log.d(TAG, "ExportViewModel initialized")
@@ -520,6 +533,62 @@ class ExportViewModel(
                 )
             }
         }
+    }
+
+    // ========================================
+    // Backup Export Operations (US3)
+    // ========================================
+
+    /**
+     * Perform a full-database backup export.
+     *
+     * Validates password, serializes all data, encrypts with PBKDF2+AES-256-GCM,
+     * and writes a .pgfbackup file.
+     *
+     * @param password User's password (min 6 chars)
+     * @param passwordConfirmation Must match [password]
+     */
+    fun performBackupExport(password: String, passwordConfirmation: String) {
+        val useCase = exportBackupUseCase ?: run {
+            Log.w(TAG, "exportBackupUseCase not configured")
+            _backupExportState.value = BackupExportState.Error("Serviço de backup não disponível.")
+            return
+        }
+        Log.d(TAG, "Starting backup export...")
+        _backupExportState.value = BackupExportState.InProgress
+
+        launchSafe {
+            try {
+                val result = useCase.execute(password, passwordConfirmation)
+                when (result) {
+                    is BackupResult.ExportSuccess -> {
+                        Log.d(TAG, "Backup export successful: ${result.totalRecords} records")
+                        _backupExportState.value = BackupExportState.Success(result)
+                    }
+                    is BackupResult.Failure -> {
+                        Log.w(TAG, "Backup export failed: ${result.message}")
+                        _backupExportState.value = BackupExportState.Error(result.message)
+                    }
+                    else -> {
+                        _backupExportState.value = BackupExportState.Error("Resultado inesperado.")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Backup export exception", e)
+                _backupExportState.value = BackupExportState.Error(
+                    "Erro ao exportar backup: ${e.message ?: "erro desconhecido"}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Reset backup export state to Idle.
+     *
+     * Called when user dismisses result or wants to start fresh.
+     */
+    fun resetBackupExportState() {
+        _backupExportState.value = BackupExportState.Idle
     }
 
     // ========================================

@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,6 +45,7 @@ import androidx.core.content.FileProvider
 import com.psychologist.financial.ui.components.ErrorDialog
 import com.psychologist.financial.ui.components.ExportProgressComponent
 import com.psychologist.financial.ui.components.ExportSuccessIndicator
+import com.psychologist.financial.viewmodel.BackupExportState
 import com.psychologist.financial.viewmodel.ExportType
 import com.psychologist.financial.viewmodel.ExportViewModel
 import com.psychologist.financial.viewmodel.ExportViewState
@@ -198,6 +200,7 @@ private fun IdleScreen(
 ) {
     val selectedMonth by viewModel.selectedMonth.collectAsState()
     val financeiroState by viewModel.financeiroState.collectAsState()
+    val backupExportState by viewModel.backupExportState.collectAsState()
     val context = LocalContext.current
 
     LazyColumn(
@@ -259,6 +262,30 @@ private fun IdleScreen(
         // Storage info card
         item {
             StorageInfoCard(state)
+        }
+
+        // Backup export section
+        item {
+            BackupExportSection(
+                backupExportState = backupExportState,
+                onExport = { password, confirm ->
+                    viewModel.performBackupExport(password, confirm)
+                },
+                onShare = { file ->
+                    val uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file
+                    )
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/octet-stream"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(intent, "Salvar backup"))
+                },
+                onReset = { viewModel.resetBackupExportState() }
+            )
         }
 
         // Export buttons (4 individual options)
@@ -494,6 +521,124 @@ private fun FinanceiroCsvSection(
                 is FinanceiroCsvState.Error -> {
                     Text(
                         text = financeiroState.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                else -> { /* Idle / InProgress — no extra UI */ }
+            }
+        }
+    }
+}
+
+/**
+ * Backup export section displayed in the idle export screen.
+ *
+ * Provides two password fields, an export button, and result feedback.
+ * - [BackupExportState.InProgress]: button disabled
+ * - [BackupExportState.Success]: share button + reset
+ * - [BackupExportState.Error]: error text inline
+ */
+@Composable
+private fun BackupExportSection(
+    backupExportState: BackupExportState,
+    onExport: (password: String, confirm: String) -> Unit,
+    onShare: (java.io.File) -> Unit,
+    onReset: () -> Unit
+) {
+    var password by remember { mutableStateOf("") }
+    var passwordConfirm by remember { mutableStateOf("") }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Backup Completo",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Text(
+                text = "Exporte todos os dados criptografados em um único arquivo .pgfbackup.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Senha do backup") },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = backupExportState !is BackupExportState.InProgress
+            )
+
+            OutlinedTextField(
+                value = passwordConfirm,
+                onValueChange = { passwordConfirm = it },
+                label = { Text("Confirmar senha") },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = backupExportState !is BackupExportState.InProgress
+            )
+
+            Button(
+                onClick = { onExport(password, passwordConfirm) },
+                enabled = backupExportState !is BackupExportState.InProgress,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (backupExportState is BackupExportState.InProgress)
+                        "Exportando..." else "Exportar Backup",
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            when (backupExportState) {
+                is BackupExportState.Success -> {
+                    val result = backupExportState.result
+                    Text(
+                        text = "${result.totalRecords} registros exportados.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    OutlinedButton(
+                        onClick = { onShare(result.file) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Text("COMPARTILHAR BACKUP")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            password = ""
+                            passwordConfirm = ""
+                            onReset()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("NOVO BACKUP")
+                    }
+                }
+                is BackupExportState.Error -> {
+                    Text(
+                        text = backupExportState.message,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )

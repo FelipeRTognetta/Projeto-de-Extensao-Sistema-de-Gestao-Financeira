@@ -1,5 +1,6 @@
 package com.psychologist.financial.viewmodel
 
+import com.psychologist.financial.domain.models.BackupResult
 import com.psychologist.financial.domain.models.ExportResult
 import java.io.File
 import java.time.YearMonth
@@ -242,4 +243,34 @@ sealed class FinanceiroCsvState {
      * @property message Human-readable error message in Portuguese
      */
     data class Error(val message: String) : FinanceiroCsvState()
+}
+
+/**
+ * State for the backup export operation (US3).
+ *
+ * Transitions:
+ *   Idle → InProgress → Success (file ready to share)
+ *                     → Error   (unexpected failure)
+ */
+sealed class BackupExportState {
+
+    /** No backup export in progress. */
+    object Idle : BackupExportState()
+
+    /** Backup export is executing. */
+    object InProgress : BackupExportState()
+
+    /**
+     * Backup export completed — file is ready to share.
+     *
+     * @property result [BackupResult.ExportSuccess] with file and record counts
+     */
+    data class Success(val result: BackupResult.ExportSuccess) : BackupExportState()
+
+    /**
+     * Backup export failed.
+     *
+     * @property message Human-readable error message in Portuguese
+     */
+    data class Error(val message: String) : BackupExportState()
 }
