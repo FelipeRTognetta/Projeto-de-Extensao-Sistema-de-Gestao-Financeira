@@ -11,6 +11,8 @@ import com.psychologist.financial.data.repositories.PatientRepository
 import com.psychologist.financial.data.repositories.PayerInfoRepository
 import com.psychologist.financial.data.repositories.PaymentRepository
 import com.psychologist.financial.domain.usecases.CreateAppointmentUseCase
+import com.psychologist.financial.domain.usecases.DeleteAppointmentUseCase
+import com.psychologist.financial.domain.usecases.DeletePaymentUseCase
 import com.psychologist.financial.domain.usecases.GetAllAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.UpdateAppointmentUseCase
 import com.psychologist.financial.domain.usecases.CreatePatientUseCase
@@ -243,6 +245,14 @@ object AppModule {
 
     val getAllPaymentsUseCase: GetAllPaymentsUseCase by lazy {
         GetAllPaymentsUseCase(paymentRepository)
+    }
+
+    val deleteAppointmentUseCase: DeleteAppointmentUseCase by lazy {
+        DeleteAppointmentUseCase(appointmentRepository)
+    }
+
+    val deletePaymentUseCase: DeletePaymentUseCase by lazy {
+        DeletePaymentUseCase(paymentRepository)
     }
 
     val getDashboardMetricsUseCase: GetDashboardMetricsUseCase by lazy {

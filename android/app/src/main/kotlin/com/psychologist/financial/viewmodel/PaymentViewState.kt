@@ -108,4 +108,26 @@ object PaymentViewState {
         val errorMessage: String? = null,
         val editingPaymentId: Long? = null
     )
+
+    // ========================================
+    // Delete Payment State
+    // ========================================
+
+    /**
+     * State for the delete-payment flow.
+     */
+    sealed class DeletePaymentState {
+        /** No delete in progress. */
+        object Idle : DeletePaymentState()
+        /** Biometric/PIN authentication requested before showing confirm dialog. */
+        object AwaitingAuth : DeletePaymentState()
+        /** Waiting for user to confirm the irreversible delete dialog. */
+        object AwaitingConfirmation : DeletePaymentState()
+        /** Delete is executing. */
+        object InProgress : DeletePaymentState()
+        /** Delete completed successfully. */
+        object Success : DeletePaymentState()
+        /** Delete failed with an error message. */
+        data class Error(val message: String) : DeletePaymentState()
+    }
 }
