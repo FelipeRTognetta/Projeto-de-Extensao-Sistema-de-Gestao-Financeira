@@ -1,10 +1,15 @@
 package com.psychologist.financial.services
 
 import com.psychologist.financial.domain.models.Appointment
+import com.psychologist.financial.domain.models.FinanceiroCsvRow
 import com.psychologist.financial.domain.models.Payment
 import com.psychologist.financial.domain.models.Patient
+import org.apache.commons.csv.CSVFormat
+import org.apache.commons.csv.CSVPrinter
 import java.io.File
 import java.io.FileWriter
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * CSV Export Service
@@ -118,6 +123,19 @@ class CsvExportService {
     }
 
     /**
+     * Wrap a numeric-looking string so Excel/LibreOffice treats it as text.
+     *
+     * Fields like phone numbers and CPF consist entirely of digits and are
+     * auto-converted to numbers by spreadsheet apps, causing scientific notation
+     * for long values (e.g. +134578945612 → 1.34579E+11) and stripping leading
+     * zeros. The ="value" notation forces the cell to be treated as a text formula
+     * in both Excel and LibreOffice Calc.
+     *
+     * Empty strings are returned as-is (no wrapper added for blank cells).
+     */
+    private fun String.asTextCell(): String = if (isEmpty()) this else "=\"$this\""
+
+    /**
      * Escape CSV special characters
      *
      * Handles quotes, commas, and newlines according to CSV specification.
@@ -131,6 +149,53 @@ class CsvExportService {
             .replace("\"", "\"\"")  // Double quotes for escaping
             .replace("\n", " ")      // Replace newlines with space
             .replace("\r", " ")      // Replace carriage returns
+    }
+
+    /**
+     * Export financial data to CSV with semicolon separator
+     *
+     * Generates a monthly financial report with one row per payment.
+     * Each row contains patient data (5 cols), responsible payer data (5 cols),
+     * payment amount, and payment date. Payer columns are blank when the patient
+     * is the payer (naoPagante = false).
+     *
+     * Uses Apache Commons CSV with `;` as delimiter (Excel-compatible in pt-BR locale).
+     *
+     * @param rows List of pre-built FinanceiroCsvRow (one per payment)
+     * @param exportDir Directory to save the file
+     * @return Generated CSV file
+     */
+    fun exportFinanceiroCsv(rows: List<FinanceiroCsvRow>, exportDir: File): File {
+        val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+        val file = File(exportDir, "financeiro_$timestamp.csv")
+
+        val format = CSVFormat.DEFAULT.builder()
+            .setDelimiter(';')
+            .setRecordSeparator('\n')
+            .setHeader(
+                "Nome", "CPF", "Email",
+                "Telefone", "Endereço",
+                "Nome Pagante", "CPF Pagante", "Email Pagante",
+                "Telefone Pagante", "Endereço Pagante",
+                "Valor Pagamento", "Data Pagamento"
+            )
+            .build()
+
+        file.bufferedWriter().use { writer ->
+            CSVPrinter(writer, format).use { printer ->
+                rows.forEach { row ->
+                    printer.printRecord(
+                        row.nomePaciente, row.cpfPaciente.asTextCell(), row.emailPaciente,
+                        row.telefonePaciente.asTextCell(), row.enderecoPaciente,
+                        row.nomeResponsavel, row.cpfResponsavel.asTextCell(), row.emailResponsavel,
+                        row.telefoneResponsavel.asTextCell(), row.enderecoResponsavel,
+                        row.valorPagamento, row.dataPagamento.asTextCell()
+                    )
+                }
+            }
+        }
+
+        return file
     }
 
     /**

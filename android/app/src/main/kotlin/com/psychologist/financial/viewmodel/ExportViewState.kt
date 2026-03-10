@@ -1,7 +1,20 @@
 package com.psychologist.financial.viewmodel
 
+import com.psychologist.financial.domain.models.BackupResult
 import com.psychologist.financial.domain.models.ExportResult
 import java.io.File
+import java.time.YearMonth
+
+/**
+ * Identifies which entity type was (or is being) exported.
+ * Used by [ExportViewState.InProgress] and [ExportViewState.Success].
+ */
+enum class ExportType {
+    PATIENTS,
+    APPOINTMENTS,
+    PAYMENTS,
+    ALL
+}
 
 /**
  * State classes for Export screens
@@ -97,7 +110,8 @@ sealed class ExportViewState {
         val patientsExported: Int = 0,
         val appointmentsExported: Int = 0,
         val paymentsExported: Int = 0,
-        val totalProgress: Int = 0
+        val totalProgress: Int = 0,
+        val exportType: ExportType = ExportType.ALL
     ) : ExportViewState() {
         /**
          * Get status message with current counts
@@ -128,7 +142,8 @@ sealed class ExportViewState {
      */
     data class Success(
         val result: ExportResult,
-        val successMessage: String = "Exportação concluída com sucesso!"
+        val successMessage: String = "Exportação concluída com sucesso!",
+        val exportType: ExportType = ExportType.ALL
     ) : ExportViewState() {
         /**
          * Check if export has files
@@ -189,4 +204,112 @@ sealed class ExportViewState {
             }
         }
     }
+}
+
+/**
+ * State for the financial CSV monthly export operation (US1).
+ *
+ * Transitions:
+ *   Idle → InProgress → Success (file ready to share)
+ *                     → Empty   (no payments in selected month)
+ *                     → Error   (unexpected failure)
+ */
+sealed class FinanceiroCsvState {
+
+    /** No export in progress. */
+    object Idle : FinanceiroCsvState()
+
+    /** Export is executing. */
+    object InProgress : FinanceiroCsvState()
+
+    /**
+     * Export completed — CSV file is ready to share.
+     *
+     * @property file Generated CSV file
+     * @property rowCount Number of payment rows written
+     */
+    data class Success(val file: File, val rowCount: Int) : FinanceiroCsvState()
+
+    /**
+     * Month has no payments — no file generated.
+     *
+     * UI should display an informational message instead of a share button.
+     */
+    object Empty : FinanceiroCsvState()
+
+    /**
+     * Export failed.
+     *
+     * @property message Human-readable error message in Portuguese
+     */
+    data class Error(val message: String) : FinanceiroCsvState()
+}
+
+/**
+ * State for the backup export operation (US3).
+ *
+ * Transitions:
+ *   Idle → InProgress → Success (file ready to share)
+ *                     → Error   (unexpected failure)
+ */
+sealed class BackupExportState {
+
+    /** No backup export in progress. */
+    object Idle : BackupExportState()
+
+    /** Backup export is executing. */
+    object InProgress : BackupExportState()
+
+    /**
+     * Backup export completed — file is ready to share.
+     *
+     * @property result [BackupResult.ExportSuccess] with file and record counts
+     */
+    data class Success(val result: BackupResult.ExportSuccess) : BackupExportState()
+
+    /**
+     * Backup export failed.
+     *
+     * @property message Human-readable error message in Portuguese
+     */
+    data class Error(val message: String) : BackupExportState()
+}
+
+/**
+ * State for the backup import operation (US4).
+ *
+ * Transitions:
+ *   Idle → AwaitingConfirmation (file + password provided, waiting for user to confirm)
+ *        → InProgress           (user confirmed, import running)
+ *        → Success              (import done, records restored)
+ *        → Error                (failure at any step)
+ *   AwaitingConfirmation → InProgress | Idle (user confirms or cancels)
+ */
+sealed class BackupImportState {
+
+    /** No import in progress. */
+    object Idle : BackupImportState()
+
+    /**
+     * File and password are ready — waiting for user confirmation.
+     * UI shows AlertDialog warning that existing data will be overwritten.
+     */
+    object AwaitingConfirmation : BackupImportState()
+
+    /** Import is executing. */
+    object InProgress : BackupImportState()
+
+    /**
+     * Import completed — all records restored.
+     *
+     * @property result [BackupResult.ImportSuccess] with entity counts
+     */
+    data class Success(val result: BackupResult.ImportSuccess) : BackupImportState()
+
+    /**
+     * Import failed.
+     *
+     * @property message Human-readable error message in Portuguese
+     */
+    data class Error(val message: String) : BackupImportState()
 }

@@ -1,6 +1,7 @@
 package com.psychologist.financial
 
 import com.psychologist.financial.domain.models.Appointment
+import com.psychologist.financial.domain.models.FinanceiroCsvRow
 import com.psychologist.financial.domain.models.Patient
 import com.psychologist.financial.domain.models.PatientStatus
 import com.psychologist.financial.domain.models.Payment
@@ -577,6 +578,116 @@ class CsvExportServiceTest {
         // Assert
         val content = file.readText()
         assertTrue(content.contains("23:45"))
+    }
+
+    // ========================================
+    // Financeiro CSV Export Tests (T008)
+    // ========================================
+
+    @Test
+    fun `exportFinanceiroCsv paciente com responsavel preenche colunas do responsavel`() {
+        val row = FinanceiroCsvRow(
+            nomePaciente = "Ana Souza",
+            cpfPaciente = "12345678901",
+            emailPaciente = "ana@test.com",
+            telefonePaciente = "(11) 9000-0001",
+            enderecoPaciente = "Rua A, 1",
+            nomeResponsavel = "Carlos Responsavel",
+            cpfResponsavel = "98765432100",
+            emailResponsavel = "carlos@test.com",
+            telefoneResponsavel = "(11) 9000-0002",
+            enderecoResponsavel = "Rua B, 2",
+            valorPagamento = "150,00",
+            dataPagamento = "15/03/2026"
+        )
+
+        val file = csvService.exportFinanceiroCsv(listOf(row), tempDir)
+        val content = file.readText()
+
+        assertTrue(content.contains("Carlos Responsavel"))
+        assertTrue(content.contains("98765432100"))
+        assertTrue(content.contains("carlos@test.com"))
+    }
+
+    @Test
+    fun `exportFinanceiroCsv paciente sem responsavel deixa colunas do responsavel em branco`() {
+        val row = FinanceiroCsvRow(
+            nomePaciente = "Pedro Lima",
+            cpfPaciente = "",
+            emailPaciente = "pedro@test.com",
+            telefonePaciente = "(21) 9000-0003",
+            enderecoPaciente = "",
+            nomeResponsavel = "",
+            cpfResponsavel = "",
+            emailResponsavel = "",
+            telefoneResponsavel = "",
+            enderecoResponsavel = "",
+            valorPagamento = "200,00",
+            dataPagamento = "20/03/2026"
+        )
+
+        val file = csvService.exportFinanceiroCsv(listOf(row), tempDir)
+        val lines = file.readLines()
+        assertTrue("Should have header + 1 data row", lines.size >= 2)
+
+        val dataLine = lines[1]
+        val cols = dataLine.split(";")
+        assertEquals("Payer name column should be empty", "", cols[5])
+        assertEquals("Payer CPF column should be empty", "", cols[6])
+        assertEquals("Payer email column should be empty", "", cols[7])
+        assertEquals("Payer phone column should be empty", "", cols[8])
+        assertEquals("Payer address column should be empty", "", cols[9])
+    }
+
+    @Test
+    fun `exportFinanceiroCsv dois pagamentos geram duas linhas de dados`() {
+        val row1 = FinanceiroCsvRow(
+            nomePaciente = "Paciente Um",
+            cpfPaciente = "", emailPaciente = "", telefonePaciente = "", enderecoPaciente = "",
+            nomeResponsavel = "", cpfResponsavel = "", emailResponsavel = "",
+            telefoneResponsavel = "", enderecoResponsavel = "",
+            valorPagamento = "100,00", dataPagamento = "01/03/2026"
+        )
+        val row2 = FinanceiroCsvRow(
+            nomePaciente = "Paciente Dois",
+            cpfPaciente = "", emailPaciente = "", telefonePaciente = "", enderecoPaciente = "",
+            nomeResponsavel = "", cpfResponsavel = "", emailResponsavel = "",
+            telefoneResponsavel = "", enderecoResponsavel = "",
+            valorPagamento = "200,00", dataPagamento = "15/03/2026"
+        )
+
+        val file = csvService.exportFinanceiroCsv(listOf(row1, row2), tempDir)
+        val lines = file.readLines()
+
+        assertEquals("Should have header + 2 data rows", 3, lines.size)
+    }
+
+    @Test
+    fun `exportFinanceiroCsv usa ponto-e-virgula como separador`() {
+        val row = FinanceiroCsvRow(
+            nomePaciente = "Test",
+            cpfPaciente = "111", emailPaciente = "a@b.com",
+            telefonePaciente = "999", enderecoPaciente = "Addr",
+            nomeResponsavel = "Resp", cpfResponsavel = "222",
+            emailResponsavel = "r@b.com", telefoneResponsavel = "888",
+            enderecoResponsavel = "Addr2",
+            valorPagamento = "150,00", dataPagamento = "10/03/2026"
+        )
+
+        val file = csvService.exportFinanceiroCsv(listOf(row), tempDir)
+        val headerLine = file.readLines().first()
+
+        assertEquals("Header should have 12 semicolon-delimited columns", 12, headerLine.split(";").size)
+    }
+
+    @Test
+    fun `exportFinanceiroCsv lista vazia gera apenas o cabecalho`() {
+        val file = csvService.exportFinanceiroCsv(emptyList(), tempDir)
+        assertTrue(file.exists())
+
+        val lines = file.readLines()
+        assertEquals("Should have only the header line", 1, lines.size)
+        assertTrue("Header should use semicolon separator", lines[0].contains(";"))
     }
 
     // Cleanup

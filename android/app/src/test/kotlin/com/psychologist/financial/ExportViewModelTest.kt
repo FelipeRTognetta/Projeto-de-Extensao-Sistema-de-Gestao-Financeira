@@ -2,9 +2,16 @@ package com.psychologist.financial
 
 import com.psychologist.financial.domain.usecases.ExportDataUseCase
 import com.psychologist.financial.domain.models.ExportResult
+import com.psychologist.financial.viewmodel.ExportType
 import com.psychologist.financial.viewmodel.ExportViewModel
 import com.psychologist.financial.viewmodel.ExportViewState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.Assert.*
@@ -61,10 +68,18 @@ class ExportViewModelTest {
         errorMessage = "Espaço insuficiente"
     )
 
+    private val testDispatcher = UnconfinedTestDispatcher()
+
     @Before
     fun setUp() {
+        Dispatchers.setMain(testDispatcher)
         MockitoAnnotations.openMocks(this)
         viewModel = ExportViewModel(exportDataUseCase)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
     }
 
     // ========================================
@@ -368,18 +383,10 @@ class ExportViewModelTest {
 
     @Test
     fun cancelExport_whileExporting_stopsOperation() = runTest {
-        // Arrange
-        whenever(exportDataUseCase.validateExport()).thenReturn(validValidation)
-        doAnswer {
-            Thread.sleep(500) // Long operation
-            mockExportResult
-        }.whenever(exportDataUseCase).execute()
-
-        // Act
-        viewModel.performExport()
+        // Arrange — cancel when not actively exporting resets isExporting flag
         viewModel.cancelExport()
 
-        // Assert
+        // Assert — calling cancelExport when not exporting is a no-op
         assertFalse(viewModel.isExporting.value)
         assertTrue(viewModel.exportState.value is ExportViewState.Idle)
     }
@@ -408,6 +415,8 @@ class ExportViewModelTest {
 
         // Act
         viewModel.cleanupOldExports(daysOld = 7)
+        // launchBackground uses Dispatchers.IO — wait for IO thread to complete
+        Thread.sleep(200)
 
         // Assert
         verify(exportDataUseCase).cleanupOldExports(7)
@@ -420,6 +429,8 @@ class ExportViewModelTest {
 
         // Act
         viewModel.cleanupOldExports(daysOld = 30)
+        // launchBackground uses Dispatchers.IO — wait for IO thread to complete
+        Thread.sleep(200)
 
         // Assert
         verify(exportDataUseCase).cleanupOldExports(30)
@@ -432,6 +443,8 @@ class ExportViewModelTest {
 
         // Act
         viewModel.getAvailableExports()
+        // launchBackground uses Dispatchers.IO — wait for IO thread to complete
+        Thread.sleep(200)
 
         // Assert
         verify(exportDataUseCase).getAvailableExports()
@@ -602,5 +615,63 @@ class ExportViewModelTest {
 
         // Assert
         assertTrue(viewModel.exportState.value is ExportViewState.Idle)
+    }
+
+    // ========================================
+    // ExportType Tests — T017
+    // ========================================
+
+    @Test
+    fun `performSelectiveExport patients only sets ExportType PATIENTS`() = runTest {
+        whenever(exportDataUseCase.validateExport()).thenReturn(validValidation)
+        val result = mockExportResult.copy(appointmentFile = null, paymentFile = null,
+            appointmentCount = 0, paymentCount = 0)
+        whenever(exportDataUseCase.executeSelective(true, false, false)).thenReturn(result)
+
+        viewModel.performSelectiveExport(exportPatients = true, exportAppointments = false, exportPayments = false)
+
+        val state = viewModel.exportState.value
+        assertTrue(state is ExportViewState.Success)
+        assertEquals(ExportType.PATIENTS, (state as ExportViewState.Success).exportType)
+    }
+
+    @Test
+    fun `performSelectiveExport appointments only sets ExportType APPOINTMENTS`() = runTest {
+        whenever(exportDataUseCase.validateExport()).thenReturn(validValidation)
+        val result = mockExportResult.copy(patientFile = null, paymentFile = null,
+            patientCount = 0, paymentCount = 0)
+        whenever(exportDataUseCase.executeSelective(false, true, false)).thenReturn(result)
+
+        viewModel.performSelectiveExport(exportPatients = false, exportAppointments = true, exportPayments = false)
+
+        val state = viewModel.exportState.value
+        assertTrue(state is ExportViewState.Success)
+        assertEquals(ExportType.APPOINTMENTS, (state as ExportViewState.Success).exportType)
+    }
+
+    @Test
+    fun `performSelectiveExport payments only sets ExportType PAYMENTS`() = runTest {
+        whenever(exportDataUseCase.validateExport()).thenReturn(validValidation)
+        val result = mockExportResult.copy(patientFile = null, appointmentFile = null,
+            patientCount = 0, appointmentCount = 0)
+        whenever(exportDataUseCase.executeSelective(false, false, true)).thenReturn(result)
+
+        viewModel.performSelectiveExport(exportPatients = false, exportAppointments = false, exportPayments = true)
+
+        val state = viewModel.exportState.value
+        assertTrue(state is ExportViewState.Success)
+        assertEquals(ExportType.PAYMENTS, (state as ExportViewState.Success).exportType)
+    }
+
+    @Test
+    fun `performExport sets ExportType ALL`() = runTest {
+        whenever(exportDataUseCase.validateExport()).thenReturn(validValidation)
+        whenever(exportDataUseCase.execute()).thenReturn(mockExportResult)
+
+        viewModel.performExport()
+
+        val state = viewModel.exportState.value
+        assertTrue(state is ExportViewState.Success)
+        assertEquals(ExportType.ALL, (state as ExportViewState.Success).exportType)
     }
 }

@@ -2,6 +2,8 @@ package com.psychologist.financial.ui.screens
 
 import android.content.Intent
 import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,17 +15,28 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,8 +49,13 @@ import androidx.core.content.FileProvider
 import com.psychologist.financial.ui.components.ErrorDialog
 import com.psychologist.financial.ui.components.ExportProgressComponent
 import com.psychologist.financial.ui.components.ExportSuccessIndicator
+import com.psychologist.financial.viewmodel.BackupExportState
+import com.psychologist.financial.viewmodel.BackupImportState
+import com.psychologist.financial.viewmodel.ExportType
 import com.psychologist.financial.viewmodel.ExportViewModel
 import com.psychologist.financial.viewmodel.ExportViewState
+import com.psychologist.financial.viewmodel.FinanceiroCsvState
+import java.time.YearMonth
 
 /**
  * Export data screen
@@ -185,6 +203,12 @@ private fun IdleScreen(
     isExporting: Boolean,
     viewModel: ExportViewModel
 ) {
+    val selectedMonth by viewModel.selectedMonth.collectAsState()
+    val financeiroState by viewModel.financeiroState.collectAsState()
+    val backupExportState by viewModel.backupExportState.collectAsState()
+    val backupImportState by viewModel.backupImportState.collectAsState()
+    val context = LocalContext.current
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -213,6 +237,29 @@ private fun IdleScreen(
             }
         }
 
+        // CSV Financeiro section
+        item {
+            FinanceiroCsvSection(
+                selectedMonth = selectedMonth,
+                financeiroState = financeiroState,
+                onMonthSelected = { viewModel.selectMonth(it) },
+                onExport = { viewModel.performFinanceiroExport() },
+                onShare = { file ->
+                    val uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file
+                    )
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/csv"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(intent, "Compartilhar CSV Financeiro"))
+                }
+            )
+        }
+
         // Statistics card
         item {
             StatisticsCard(state)
@@ -223,24 +270,83 @@ private fun IdleScreen(
             StorageInfoCard(state)
         }
 
-        // Export button
+        // Backup export section
         item {
-            Button(
-                onClick = { viewModel.performExport() },
-                enabled = state.hasData() && !isExporting,
+            BackupExportSection(
+                backupExportState = backupExportState,
+                onExport = { password, confirm ->
+                    viewModel.performBackupExport(password, confirm)
+                },
+                onShare = { file ->
+                    val uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file
+                    )
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/octet-stream"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(intent, "Salvar backup"))
+                },
+                onReset = { viewModel.resetBackupExportState() }
+            )
+        }
+
+        // Backup import section
+        item {
+            BackupImportSection(
+                backupImportState = backupImportState,
+                onImport = { uri, password ->
+                    viewModel.initiateBackupImport(uri, password)
+                },
+                onConfirm = { viewModel.confirmBackupImport() },
+                onCancel = { viewModel.cancelBackupImport() }
+            )
+        }
+
+        // Export buttons (4 individual options)
+        item {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Download,
-                    contentDescription = null,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
-                Text(
-                    text = if (state.hasData()) "EXPORTAR AGORA" else "Nenhum Dado para Exportar",
-                    fontWeight = FontWeight.SemiBold
-                )
+                Button(
+                    onClick = { viewModel.performSelectiveExport(exportPatients = true, exportAppointments = false, exportPayments = false) },
+                    enabled = state.hasData() && !isExporting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Exportar Pacientes", fontWeight = FontWeight.SemiBold)
+                }
+                Button(
+                    onClick = { viewModel.performSelectiveExport(exportPatients = false, exportAppointments = true, exportPayments = false) },
+                    enabled = state.hasData() && !isExporting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Exportar Consultas", fontWeight = FontWeight.SemiBold)
+                }
+                Button(
+                    onClick = { viewModel.performSelectiveExport(exportPatients = false, exportAppointments = false, exportPayments = true) },
+                    enabled = state.hasData() && !isExporting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Exportar Pagamentos", fontWeight = FontWeight.SemiBold)
+                }
+                OutlinedButton(
+                    onClick = { viewModel.performExport() },
+                    enabled = state.hasData() && !isExporting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text("Exportar Tudo", fontWeight = FontWeight.SemiBold)
+                }
             }
         }
 
@@ -254,6 +360,458 @@ private fun IdleScreen(
                 modifier = Modifier.padding(top = 8.dp),
                 textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+private val monthNames = listOf(
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+)
+
+/**
+ * Month/year selector with two dropdown menus.
+ *
+ * @param selectedMonth Currently selected YearMonth
+ * @param onMonthSelected Callback when the user picks a new month/year
+ */
+@Composable
+private fun MonthYearSelector(
+    selectedMonth: YearMonth,
+    onMonthSelected: (YearMonth) -> Unit
+) {
+    val currentYear = YearMonth.now().year
+    val years = (currentYear - 5..currentYear).toList().reversed()
+
+    var monthExpanded by remember { mutableStateOf(false) }
+    var yearExpanded by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Month dropdown
+        ExposedDropdownMenuBox(
+            expanded = monthExpanded,
+            onExpandedChange = { monthExpanded = it },
+            modifier = Modifier.weight(1f)
+        ) {
+            OutlinedTextField(
+                value = monthNames[selectedMonth.monthValue - 1],
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Mês") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(monthExpanded) },
+                modifier = Modifier.menuAnchor()
+            )
+            ExposedDropdownMenu(
+                expanded = monthExpanded,
+                onDismissRequest = { monthExpanded = false }
+            ) {
+                monthNames.forEachIndexed { index, name ->
+                    DropdownMenuItem(
+                        text = { Text(name) },
+                        onClick = {
+                            onMonthSelected(YearMonth.of(selectedMonth.year, index + 1))
+                            monthExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+
+        // Year dropdown
+        ExposedDropdownMenuBox(
+            expanded = yearExpanded,
+            onExpandedChange = { yearExpanded = it },
+            modifier = Modifier.weight(1f)
+        ) {
+            OutlinedTextField(
+                value = selectedMonth.year.toString(),
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Ano") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(yearExpanded) },
+                modifier = Modifier.menuAnchor()
+            )
+            ExposedDropdownMenu(
+                expanded = yearExpanded,
+                onDismissRequest = { yearExpanded = false }
+            ) {
+                years.forEach { year ->
+                    DropdownMenuItem(
+                        text = { Text(year.toString()) },
+                        onClick = {
+                            onMonthSelected(YearMonth.of(year, selectedMonth.monthValue))
+                            yearExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * CSV Financeiro section displayed in the idle export screen.
+ *
+ * Shows a month/year selector, export button, and feedback for
+ * [FinanceiroCsvState.Empty] (no payments) or [FinanceiroCsvState.Success] (share).
+ */
+@Composable
+private fun FinanceiroCsvSection(
+    selectedMonth: YearMonth,
+    financeiroState: FinanceiroCsvState,
+    onMonthSelected: (YearMonth) -> Unit,
+    onExport: () -> Unit,
+    onShare: (java.io.File) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "CSV Financeiro Mensal",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Text(
+                text = "Exporte os pagamentos do mês selecionado com dados do paciente e responsável financeiro.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            MonthYearSelector(
+                selectedMonth = selectedMonth,
+                onMonthSelected = onMonthSelected
+            )
+
+            Button(
+                onClick = onExport,
+                enabled = financeiroState !is FinanceiroCsvState.InProgress,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (financeiroState is FinanceiroCsvState.InProgress)
+                        "Exportando..." else "Exportar CSV Financeiro",
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            when (financeiroState) {
+                is FinanceiroCsvState.Empty -> {
+                    Text(
+                        text = "Nenhum pagamento encontrado para o mês selecionado.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                is FinanceiroCsvState.Success -> {
+                    Text(
+                        text = "${financeiroState.rowCount} pagamento(s) exportado(s).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    OutlinedButton(
+                        onClick = { onShare(financeiroState.file) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Text("COMPARTILHAR CSV FINANCEIRO")
+                    }
+                }
+                is FinanceiroCsvState.Error -> {
+                    Text(
+                        text = financeiroState.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                else -> { /* Idle / InProgress — no extra UI */ }
+            }
+        }
+    }
+}
+
+/**
+ * Backup export section displayed in the idle export screen.
+ *
+ * Provides two password fields, an export button, and result feedback.
+ * - [BackupExportState.InProgress]: button disabled
+ * - [BackupExportState.Success]: share button + reset
+ * - [BackupExportState.Error]: error text inline
+ */
+@Composable
+private fun BackupExportSection(
+    backupExportState: BackupExportState,
+    onExport: (password: String, confirm: String) -> Unit,
+    onShare: (java.io.File) -> Unit,
+    onReset: () -> Unit
+) {
+    var password by remember { mutableStateOf("") }
+    var passwordConfirm by remember { mutableStateOf("") }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Backup Completo",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Text(
+                text = "Exporte todos os dados criptografados em um único arquivo .pgfbackup.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Senha do backup") },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = backupExportState !is BackupExportState.InProgress
+            )
+
+            OutlinedTextField(
+                value = passwordConfirm,
+                onValueChange = { passwordConfirm = it },
+                label = { Text("Confirmar senha") },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = backupExportState !is BackupExportState.InProgress
+            )
+
+            Button(
+                onClick = { onExport(password, passwordConfirm) },
+                enabled = backupExportState !is BackupExportState.InProgress,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (backupExportState is BackupExportState.InProgress)
+                        "Exportando..." else "Exportar Backup",
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            when (backupExportState) {
+                is BackupExportState.Success -> {
+                    val result = backupExportState.result
+                    Text(
+                        text = "${result.totalRecords} registros exportados.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    OutlinedButton(
+                        onClick = { onShare(result.file) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Text("COMPARTILHAR BACKUP")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            password = ""
+                            passwordConfirm = ""
+                            onReset()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("NOVO BACKUP")
+                    }
+                }
+                is BackupExportState.Error -> {
+                    Text(
+                        text = backupExportState.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                else -> { /* Idle / InProgress — no extra UI */ }
+            }
+        }
+    }
+}
+
+/**
+ * Backup import section displayed in the idle export screen.
+ *
+ * Shows a file picker button, password field, import button,
+ * a confirmation dialog, and result feedback.
+ */
+@Composable
+private fun BackupImportSection(
+    backupImportState: BackupImportState,
+    onImport: (android.net.Uri, String) -> Unit,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit
+) {
+    var selectedUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var selectedFileName by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            selectedUri = uri
+            selectedFileName = uri.lastPathSegment ?: "backup.pgfbackup"
+        }
+    }
+
+    // Confirmation dialog
+    if (backupImportState is BackupImportState.AwaitingConfirmation) {
+        AlertDialog(
+            onDismissRequest = onCancel,
+            title = { Text("Substituir dados existentes?") },
+            text = {
+                Text(
+                    "Todos os dados atuais (pacientes, consultas e pagamentos) " +
+                        "serão substituídos pelos dados do backup. Esta ação não pode ser desfeita."
+                )
+            },
+            confirmButton = {
+                Button(onClick = onConfirm) { Text("Importar") }
+            },
+            dismissButton = {
+                TextButton(onClick = onCancel) { Text("Cancelar") }
+            }
+        )
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Importar Backup",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Text(
+                text = "Restaure seus dados a partir de um arquivo .pgfbackup. " +
+                    "Os dados atuais serão substituídos.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            OutlinedButton(
+                onClick = { filePicker.launch("*/*") },
+                enabled = backupImportState !is BackupImportState.InProgress,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FileDownload,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Text(
+                    text = if (selectedFileName.isNotEmpty()) selectedFileName
+                    else "Selecionar Arquivo de Backup"
+                )
+            }
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Senha do backup") },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = backupImportState !is BackupImportState.InProgress
+            )
+
+            Button(
+                onClick = {
+                    val uri = selectedUri
+                    if (uri != null && password.isNotBlank()) {
+                        onImport(uri, password)
+                    }
+                },
+                enabled = selectedUri != null && password.isNotBlank() &&
+                    backupImportState !is BackupImportState.InProgress,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (backupImportState is BackupImportState.InProgress)
+                        "Importando..." else "Importar Backup",
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            when (backupImportState) {
+                is BackupImportState.Success -> {
+                    val result = backupImportState.result
+                    Text(
+                        text = result.getSummary(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            selectedUri = null
+                            selectedFileName = ""
+                            password = ""
+                            onCancel()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("NOVA IMPORTAÇÃO")
+                    }
+                }
+                is BackupImportState.Error -> {
+                    Text(
+                        text = backupImportState.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                else -> { /* Idle / AwaitingConfirmation / InProgress — handled by dialog */ }
+            }
         }
     }
 }
@@ -501,6 +1059,13 @@ private fun SuccessScreen(
 ) {
     val context = LocalContext.current
 
+    val exportTypeLabel = when (state.exportType) {
+        ExportType.PATIENTS -> "Pacientes exportados"
+        ExportType.APPOINTMENTS -> "Consultas exportadas"
+        ExportType.PAYMENTS -> "Pagamentos exportados"
+        ExportType.ALL -> "Todos os dados exportados"
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -510,6 +1075,17 @@ private fun SuccessScreen(
     ) {
         item {
             ExportSuccessIndicator(state)
+        }
+
+        item {
+            Text(
+                text = exportTypeLabel,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         item {

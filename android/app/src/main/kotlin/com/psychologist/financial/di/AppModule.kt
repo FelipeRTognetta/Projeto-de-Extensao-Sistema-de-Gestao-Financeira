@@ -15,7 +15,9 @@ import com.psychologist.financial.domain.usecases.GetAllAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.UpdateAppointmentUseCase
 import com.psychologist.financial.domain.usecases.CreatePatientUseCase
 import com.psychologist.financial.domain.usecases.CreatePaymentUseCase
+import com.psychologist.financial.domain.usecases.ExportBackupUseCase
 import com.psychologist.financial.domain.usecases.ExportDataUseCase
+import com.psychologist.financial.domain.usecases.ImportBackupUseCase
 import com.psychologist.financial.domain.usecases.GetAllPatientsUseCase
 import com.psychologist.financial.domain.usecases.GetDashboardMetricsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientAppointmentsUseCase
@@ -28,9 +30,12 @@ import com.psychologist.financial.domain.usecases.UpdatePatientUseCase
 import com.psychologist.financial.domain.validation.PatientValidator
 import com.psychologist.financial.domain.validation.PayerInfoValidator
 import com.psychologist.financial.domain.validation.PaymentValidator
+import com.psychologist.financial.services.BackupExportService
+import com.psychologist.financial.services.BackupImportService
 import com.psychologist.financial.services.BiometricAuthManager
 import com.psychologist.financial.services.DatabaseEncryptionManager
 import com.psychologist.financial.services.EncryptionService
+import com.psychologist.financial.services.FileStorageManager
 import com.psychologist.financial.services.SecureKeyStore
 import com.psychologist.financial.viewmodel.AppointmentViewModel
 import com.psychologist.financial.viewmodel.AuthenticationViewModel
@@ -248,6 +253,27 @@ object AppModule {
         ExportDataUseCase(appContext, exportRepository)
     }
 
+    val fileStorageManager: FileStorageManager by lazy {
+        FileStorageManager(appContext).also { Log.d(TAG, "FileStorageManager created") }
+    }
+
+    val backupExportService: BackupExportService by lazy {
+        BackupExportService().also { Log.d(TAG, "BackupExportService created") }
+    }
+
+    val exportBackupUseCase: ExportBackupUseCase by lazy {
+        ExportBackupUseCase(exportRepository, backupExportService, fileStorageManager)
+    }
+
+    val backupImportService: BackupImportService by lazy {
+        BackupImportService(database, backupExportService)
+            .also { Log.d(TAG, "BackupImportService created") }
+    }
+
+    val importBackupUseCase: ImportBackupUseCase by lazy {
+        ImportBackupUseCase(appContext.contentResolver, database, backupImportService)
+    }
+
     // ========================================
     // ViewModel Factories
     // ========================================
@@ -291,7 +317,9 @@ object AppModule {
     )
 
     fun provideExportViewModel(): ExportViewModel = ExportViewModel(
-        exportDataUseCase = exportDataUseCase
+        exportDataUseCase = exportDataUseCase,
+        exportBackupUseCase = exportBackupUseCase,
+        importBackupUseCase = importBackupUseCase
     )
 
     fun provideAuthViewModel(activity: FragmentActivity): AuthenticationViewModel =

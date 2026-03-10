@@ -4,6 +4,7 @@ plugins {
     kotlin("kapt")
     id("com.google.devtools.ksp")
     id("jacoco")
+    kotlin("plugin.serialization")
 }
 
 android {
@@ -113,6 +114,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
+    // JSON Serialization (backup export/import)
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
     // Testing - Unit Tests
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
@@ -165,7 +169,7 @@ tasks.register<JacocoReport>("jacocoTestReport") {
     )
 
     val debugTree = fileTree(mapOf(
-        "dir" to "${layout.buildDirectory}/intermediates/classes/debug",
+        "dir" to "${layout.buildDirectory}/tmp/kotlin-classes/debug",
         "excludes" to fileFilter
     ))
 

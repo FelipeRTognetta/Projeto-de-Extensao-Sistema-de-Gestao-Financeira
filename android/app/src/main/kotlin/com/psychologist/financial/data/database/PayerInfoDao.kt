@@ -69,6 +69,18 @@ interface PayerInfoDao {
     suspend fun deleteByPatientId(patientId: Long)
 
     /**
+     * Delete all payer info records (for full backup restore).
+     */
+    @Query("DELETE FROM payer_info")
+    suspend fun deleteAll()
+
+    /**
+     * Bulk insert payer info records (for backup restore).
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(entities: List<PayerInfoEntity>): List<Long>
+
+    /**
      * Get the PayerInfo for a patient (one-shot).
      *
      * Returns null if no payer record exists for the given patient.
@@ -90,4 +102,14 @@ interface PayerInfoDao {
      */
     @Query("SELECT * FROM payer_info WHERE patient_id = :patientId LIMIT 1")
     fun getByPatientIdFlow(patientId: Long): Flow<PayerInfoEntity?>
+
+    /**
+     * Get all PayerInfo records (one-shot).
+     *
+     * Used for backup export and financial CSV generation.
+     *
+     * @return List of all PayerInfoEntity records ordered by id ASC
+     */
+    @Query("SELECT * FROM payer_info ORDER BY id ASC")
+    suspend fun getAll(): List<PayerInfoEntity>
 }
