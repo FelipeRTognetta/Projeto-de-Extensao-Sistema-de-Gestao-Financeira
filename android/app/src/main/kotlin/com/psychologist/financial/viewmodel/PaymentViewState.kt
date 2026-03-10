@@ -70,10 +70,12 @@ object PaymentViewState {
         object Loading : GlobalListState()
 
         data class Success(
-            val payments: List<PaymentWithDetails>
+            val payments: List<PaymentWithDetails>,
+            val filteredPayments: List<PaymentWithDetails> = payments,
+            val nameFilter: String = ""
         ) : GlobalListState() {
-            fun getCount(): Int = payments.size
-            fun isEmpty(): Boolean = payments.isEmpty()
+            fun getCount(): Int = filteredPayments.size
+            fun isEmpty(): Boolean = filteredPayments.isEmpty()
         }
 
         object Empty : GlobalListState()

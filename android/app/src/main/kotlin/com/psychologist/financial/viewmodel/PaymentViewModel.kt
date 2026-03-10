@@ -3,6 +3,7 @@ package com.psychologist.financial.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.psychologist.financial.data.repositories.PaymentRepository
+import com.psychologist.financial.data.repositories.PaymentWithDetails
 import com.psychologist.financial.domain.models.Payment
 import com.psychologist.financial.domain.usecases.CreatePaymentUseCase
 import com.psychologist.financial.domain.usecases.DeletePaymentUseCase
@@ -224,6 +225,9 @@ class PaymentViewModel(
     )
     val globalListState: StateFlow<PaymentViewState.GlobalListState> = _globalListState.asStateFlow()
 
+    private var cachedAllPayments: List<PaymentWithDetails> = emptyList()
+    private var paymentNameFilter: String = ""
+
     /**
      * Load all payments from all patients (global list tab).
      * Collects from [GetAllPaymentsUseCase] reactively.
@@ -234,11 +238,8 @@ class PaymentViewModel(
         viewModelScope.launch {
             try {
                 getAllPaymentsUseCase?.execute()?.collect { payments ->
-                    _globalListState.value = if (payments.isEmpty()) {
-                        PaymentViewState.GlobalListState.Empty
-                    } else {
-                        PaymentViewState.GlobalListState.Success(payments)
-                    }
+                    cachedAllPayments = payments
+                    applyPaymentNameFilter()
                 } ?: run {
                     _globalListState.value = PaymentViewState.GlobalListState.Empty
                 }
@@ -248,6 +249,31 @@ class PaymentViewModel(
                 )
             }
         }
+    }
+
+    fun setNameFilter(query: String) {
+        paymentNameFilter = query
+        applyPaymentNameFilter()
+    }
+
+    fun resetNameFilter() {
+        paymentNameFilter = ""
+        applyPaymentNameFilter()
+    }
+
+    private fun applyPaymentNameFilter() {
+        val all = cachedAllPayments
+        if (all.isEmpty()) {
+            _globalListState.value = PaymentViewState.GlobalListState.Empty
+            return
+        }
+        val filtered = if (paymentNameFilter.isBlank()) all
+        else all.filter { it.patientName.contains(paymentNameFilter, ignoreCase = true) }
+        _globalListState.value = PaymentViewState.GlobalListState.Success(
+            payments = all,
+            filteredPayments = filtered,
+            nameFilter = paymentNameFilter
+        )
     }
 
     // ========================================

@@ -88,6 +88,8 @@ class AppointmentViewModel(
     val globalListState: StateFlow<AppointmentViewState.GlobalListState> = _globalListState.asStateFlow()
 
     private var cachedAllAppointments: List<AppointmentWithPaymentStatus> = emptyList()
+    private var activeAppointmentFilter: AppointmentViewState.AppointmentFilter = AppointmentViewState.AppointmentFilter.ALL
+    private var appointmentNameFilter: String = ""
 
     /**
      * Load all appointments from all patients (global list tab).
@@ -100,7 +102,8 @@ class AppointmentViewModel(
             try {
                 getAllAppointmentsUseCase?.execute()?.collect { appointments ->
                     cachedAllAppointments = appointments
-                    applyGlobalFilter(AppointmentViewState.AppointmentFilter.ALL)
+                    activeAppointmentFilter = AppointmentViewState.AppointmentFilter.ALL
+                    applyGlobalFilter(activeAppointmentFilter)
                 } ?: run {
                     _globalListState.value = AppointmentViewState.GlobalListState.Empty
                 }
@@ -119,7 +122,18 @@ class AppointmentViewModel(
      * @param filter [AppointmentFilter.ALL], [PENDING], or [PAID]
      */
     fun setFilter(filter: AppointmentViewState.AppointmentFilter) {
+        activeAppointmentFilter = filter
         applyGlobalFilter(filter)
+    }
+
+    fun setNameFilter(query: String) {
+        appointmentNameFilter = query
+        applyGlobalFilter(activeAppointmentFilter)
+    }
+
+    fun resetNameFilter() {
+        appointmentNameFilter = ""
+        applyGlobalFilter(activeAppointmentFilter)
     }
 
     private fun applyGlobalFilter(filter: AppointmentViewState.AppointmentFilter) {
@@ -128,11 +142,13 @@ class AppointmentViewModel(
             _globalListState.value = AppointmentViewState.GlobalListState.Empty
             return
         }
-        val filtered = when (filter) {
+        val statusFiltered = when (filter) {
             AppointmentViewState.AppointmentFilter.ALL -> all
             AppointmentViewState.AppointmentFilter.PENDING -> all.filter { it.hasPendingPayment }
             AppointmentViewState.AppointmentFilter.PAID -> all.filter { !it.hasPendingPayment }
         }
+        val filtered = if (appointmentNameFilter.isBlank()) statusFiltered
+        else statusFiltered.filter { it.patientName.contains(appointmentNameFilter, ignoreCase = true) }
         _globalListState.value = AppointmentViewState.GlobalListState.Success(
             allAppointments = all,
             filteredAppointments = filtered,

@@ -10,17 +10,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -48,9 +57,14 @@ fun GlobalAppointmentListScreen(
     viewModel: AppointmentViewModel
 ) {
     val state by viewModel.globalListState.collectAsState()
+    var nameQuery by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         viewModel.loadAllAppointments()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { viewModel.resetNameFilter() }
     }
 
     Scaffold(
@@ -76,6 +90,23 @@ fun GlobalAppointmentListScreen(
 
                 is AppointmentViewState.GlobalListState.Success -> {
                     Column(modifier = Modifier.fillMaxSize()) {
+                        // Name search field
+                        OutlinedTextField(
+                            value = nameQuery,
+                            onValueChange = { nameQuery = it; viewModel.setNameFilter(it) },
+                            placeholder = { Text("Buscar por nome do paciente") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            singleLine = true,
+                            trailingIcon = {
+                                if (nameQuery.isNotEmpty()) {
+                                    IconButton(onClick = { nameQuery = ""; viewModel.resetNameFilter() }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Limpar busca")
+                                    }
+                                }
+                            }
+                        )
                         // Filter chips row
                         FilterRow(
                             activeFilter = s.activeFilter,
