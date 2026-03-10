@@ -237,6 +237,78 @@ class PerOperationAuthManager(
     }
 
     // ========================================
+    // Delete Authentication (appointments and payments)
+    // ========================================
+
+    /**
+     * Authenticate delete operation (appointment or payment).
+     *
+     * Requires Class 3 biometric verification.
+     * Prompt title: "Confirmação de exclusão".
+     *
+     * @return BiometricAuthResult (Success, Error, or UserCancelled)
+     */
+    suspend fun authenticateDelete(): BiometricAuthResult = suspendCancellableCoroutine { continuation ->
+        try {
+            AppLogger.d(TAG, "Starting delete authentication...")
+
+            if (!isClass3BiometricAvailable()) {
+                val status = getOperationBiometricStatus()
+                AppLogger.w(TAG, "Class 3 biometric not available for delete: $status")
+                continuation.resume(
+                    BiometricAuthResult.Unavailable(status, canUseFallback = false)
+                )
+                return@suspendCancellableCoroutine
+            }
+
+            val deleteCallback = object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    AppLogger.d(TAG, "Delete authentication succeeded")
+                    continuation.resume(BiometricAuthResult.Success(result.cryptoObject))
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    AppLogger.w(TAG, "Delete authentication error: $errorCode")
+                    val message = translatePaymentErrorMessage(errorCode)
+                    continuation.resume(BiometricAuthResult.Error(message, errorCode))
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    AppLogger.w(TAG, "Delete authentication failed")
+                    continuation.resume(
+                        BiometricAuthResult.Error("Biometria não reconhecida")
+                    )
+                }
+            }
+
+            val biometricPrompt = BiometricPrompt(
+                fragmentActivity,
+                ContextCompat.getMainExecutor(fragmentActivity),
+                deleteCallback
+            )
+
+            val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Confirmação de exclusão")
+                .setSubtitle("Autentique-se para confirmar a exclusão")
+                .setDescription("Esta operação é irreversível")
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                .setNegativeButtonText("Cancelar")
+                .build()
+
+            biometricPrompt.authenticate(promptInfo)
+
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "Error during delete authentication", e)
+            continuation.resume(
+                BiometricAuthResult.Error("Erro ao autenticar exclusão", exception = e)
+            )
+        }
+    }
+
+    // ========================================
     // Export Authentication
     // ========================================
 

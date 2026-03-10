@@ -96,7 +96,7 @@ fun PaymentFormScreen(
             is PaymentViewState.DeletePaymentState.AwaitingAuth -> {
                 if (activity != null) {
                     val authManager = PerOperationAuthManager(activity)
-                    when (authManager.authenticatePayment()) {
+                    when (authManager.authenticateDelete()) {
                         is BiometricAuthResult.Success -> viewModel.confirmDeletePayment()
                         is BiometricAuthResult.Unavailable -> viewModel.confirmDeletePayment()
                         else -> viewModel.cancelDeletePayment()

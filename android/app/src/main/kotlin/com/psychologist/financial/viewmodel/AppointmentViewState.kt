@@ -416,6 +416,8 @@ object AppointmentViewState {
         object Idle : DeleteAppointmentState()
         /** Waiting for user to confirm the irreversible delete dialog. */
         object AwaitingConfirmation : DeleteAppointmentState()
+        /** Waiting for biometric authentication after dialog confirmation. */
+        object AwaitingAuth : DeleteAppointmentState()
         /** Delete is executing. */
         object InProgress : DeleteAppointmentState()
         /** Delete completed successfully. */

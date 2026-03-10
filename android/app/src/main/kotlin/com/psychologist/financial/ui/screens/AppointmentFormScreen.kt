@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -27,6 +28,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -42,12 +44,17 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
+import com.psychologist.financial.domain.models.BiometricAuthResult
+import com.psychologist.financial.services.PerOperationAuthManager
 import com.psychologist.financial.ui.components.ErrorBanner
 import com.psychologist.financial.viewmodel.AppointmentViewModel
 import com.psychologist.financial.viewmodel.AppointmentViewState
@@ -55,6 +62,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneOffset
+import kotlinx.coroutines.launch
 
 /**
  * Appointment creation form screen
@@ -88,6 +96,8 @@ fun AppointmentFormScreen(
     val formNotes = viewModel.formNotes.collectAsState().value
     val isSubmitting = formState.isSubmitting
     val deleteState = viewModel.deleteAppointmentState.collectAsState().value
+    val activity = LocalContext.current as FragmentActivity
+    val scope = rememberCoroutineScope()
 
     // Load existing appointment data when editing, or reset for new
     LaunchedEffect(editingAppointmentId) {
@@ -115,11 +125,24 @@ fun AppointmentFormScreen(
         }
     }
 
-    // Navigate back when delete succeeds
+    // Navigate back when delete succeeds; trigger biometric when AwaitingAuth
     LaunchedEffect(deleteState) {
-        if (deleteState is AppointmentViewState.DeleteAppointmentState.Success) {
-            onSuccess()
-            viewModel.cancelDeleteAppointment()
+        when (deleteState) {
+            is AppointmentViewState.DeleteAppointmentState.AwaitingAuth -> {
+                scope.launch {
+                    val result = PerOperationAuthManager(activity).authenticateDelete()
+                    if (result is BiometricAuthResult.Success) {
+                        viewModel.confirmDeleteAppointment()
+                    } else {
+                        viewModel.cancelDeleteAppointment()
+                    }
+                }
+            }
+            is AppointmentViewState.DeleteAppointmentState.Success -> {
+                onSuccess()
+                viewModel.cancelDeleteAppointment()
+            }
+            else -> Unit
         }
     }
 
@@ -131,7 +154,7 @@ fun AppointmentFormScreen(
             text = { Text("Tem certeza que deseja excluir esta consulta? Esta ação é irreversível.") },
             confirmButton = {
                 TextButton(
-                    onClick = { viewModel.confirmDeleteAppointment() },
+                    onClick = { viewModel.onAppointmentDeleteAuthSuccess() },
                     colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
                     )
@@ -374,23 +397,26 @@ fun AppointmentFormScreen(
             // Delete button — only visible in edit mode
             if (isEditing) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Button(
+                val deleteEnabled = !isSubmitting &&
+                    deleteState !is AppointmentViewState.DeleteAppointmentState.InProgress
+                OutlinedButton(
                     onClick = {
                         if (editingAppointmentId != null) {
                             viewModel.requestDeleteAppointment(editingAppointmentId)
                         }
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    enabled = !isSubmitting &&
-                        deleteState !is AppointmentViewState.DeleteAppointmentState.InProgress,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    enabled = deleteEnabled,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    ),
+                    border = BorderStroke(
+                        1.dp,
+                        if (deleteEnabled) MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
                     )
                 ) {
-                    Text("Excluir Consulta")
+                    Text("Excluir consulta", style = MaterialTheme.typography.bodySmall)
                 }
             }
 

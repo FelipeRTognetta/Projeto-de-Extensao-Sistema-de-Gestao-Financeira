@@ -685,7 +685,12 @@ class AppointmentViewModel(
         _deleteAppointmentState.value = AppointmentViewState.DeleteAppointmentState.AwaitingConfirmation
     }
 
-    /** User confirmed the dialog — execute the delete. */
+    /** User confirmed the dialog — moves to AwaitingAuth to trigger biometric. */
+    fun onAppointmentDeleteAuthSuccess() {
+        _deleteAppointmentState.value = AppointmentViewState.DeleteAppointmentState.AwaitingAuth
+    }
+
+    /** Called after successful biometric authentication — execute the delete. */
     fun confirmDeleteAppointment() {
         val id = pendingDeleteAppointmentId ?: return
         _deleteAppointmentState.value = AppointmentViewState.DeleteAppointmentState.InProgress
