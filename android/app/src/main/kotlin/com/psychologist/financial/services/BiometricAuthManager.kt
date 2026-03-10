@@ -115,10 +115,13 @@ class BiometricAuthManager(
         try {
             AppLogger.d(TAG, "Starting biometric authentication...")
 
-            if (!isBiometricAvailable()) {
-                val status = getBiometricStatus()
-                AppLogger.w(TAG, "Biometric not available: $status")
-                continuation.resume(BiometricAuthResult.Unavailable(status))
+            // Check that at least one credential method is available (biometric OR device credential)
+            val canAuth = biometricManager.canAuthenticate(
+                BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+            if (canAuth == BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE) {
+                continuation.resume(BiometricAuthResult.Unavailable("Nenhum método de autenticação disponível"))
                 return@suspendCancellableCoroutine
             }
 
@@ -127,7 +130,7 @@ class BiometricAuthManager(
                     result: BiometricPrompt.AuthenticationResult
                 ) {
                     super.onAuthenticationSucceeded(result)
-                    AppLogger.d(TAG, "Biometric authentication succeeded")
+                    AppLogger.d(TAG, "Authentication succeeded")
                     lastAuthTime = System.currentTimeMillis()
                     continuation.resume(BiometricAuthResult.Success(result.cryptoObject))
                 }
@@ -137,22 +140,15 @@ class BiometricAuthManager(
                     errString: CharSequence
                 ) {
                     super.onAuthenticationError(errorCode, errString)
-                    AppLogger.w(TAG, "Biometric authentication error: $errorCode - $errString")
+                    AppLogger.w(TAG, "Authentication error: $errorCode - $errString")
                     val message = translateErrorMessage(errorCode)
-                    val needsFallback = shouldOfferFallback(errorCode)
-                    if (needsFallback) {
-                        continuation.resume(BiometricAuthResult.NeedsFallback(message))
-                    } else {
-                        continuation.resume(BiometricAuthResult.Error(message, errorCode))
-                    }
+                    continuation.resume(BiometricAuthResult.Error(message, errorCode))
                 }
 
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
-                    AppLogger.w(TAG, "Biometric authentication failed")
-                    continuation.resume(
-                        BiometricAuthResult.NeedsFallback("Biometria não reconhecida. Tente novamente.", 1)
-                    )
+                    // Partial failure (e.g. finger not recognised) — prompt stays open, no action needed
+                    AppLogger.w(TAG, "Authentication attempt failed, prompt remains open")
                 }
             }
             val biometricPrompt = BiometricPrompt(
@@ -161,12 +157,17 @@ class BiometricAuthManager(
                 callback
             )
 
+            // BIOMETRIC_WEAK or DEVICE_CREDENTIAL: the system shows biometric first;
+            // if unavailable or the user skips it, the OS presents the device lock screen
+            // (PIN, pattern, password — whatever the user has set). No custom PIN screen needed.
+            // NOTE: setNegativeButtonText must NOT be set when DEVICE_CREDENTIAL is allowed.
             val promptInfo = BiometricPrompt.PromptInfo.Builder()
                 .setTitle("Autenticação de Segurança")
-                .setSubtitle("Use sua biometria para acessar")
-                .setDescription("Coloque seu dedo no sensor ou olhe para a câmera")
-                .setNegativeButtonText("Usar PIN")
-                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+                .setSubtitle("Use sua biometria ou credencial do dispositivo")
+                .setAllowedAuthenticators(
+                    BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                            BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                )
                 .build()
 
             biometricPrompt.authenticate(promptInfo)
@@ -218,6 +219,9 @@ class BiometricAuthManager(
         }
     }
 
+    // With DEVICE_CREDENTIAL fallback, the OS handles all credential types natively.
+    // This method is kept for completeness but shouldOfferFallback logic is no longer used
+    // in authenticate() — errors are forwarded directly as BiometricAuthResult.Error.
     private fun shouldOfferFallback(errorCode: Int): Boolean {
         return when (errorCode) {
             BiometricPrompt.ERROR_TIMEOUT,

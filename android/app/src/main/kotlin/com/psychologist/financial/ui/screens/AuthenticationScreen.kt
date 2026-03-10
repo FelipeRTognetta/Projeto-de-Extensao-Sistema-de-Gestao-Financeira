@@ -79,6 +79,8 @@ fun AuthenticationScreen(
                 is AuthState.Idle -> IdleContent(viewModel)
                 is AuthState.Authenticating -> AuthenticatingContent()
                 is AuthState.NeedsPIN -> NeedsPINContent(viewModel)
+                is AuthState.EnteringPIN -> PINFallbackScreen(viewModel)
+                is AuthState.PINError -> PINFallbackScreen(viewModel)
                 is AuthState.NeedsEnrollment -> NeedsEnrollmentContent(
                     currentState,
                     viewModel
