@@ -236,6 +236,9 @@ fun AppNavGraph(
                     navController.navigate(
                         AppDestinations.AppointmentEdit.createRoute(patientId, appointmentId)
                     )
+                },
+                onPatientClick = { pid ->
+                    navController.navigate(AppDestinations.PatientDetail.createRoute(pid))
                 }
             )
         }
@@ -331,6 +334,9 @@ fun AppNavGraph(
                     navController.navigate(
                         AppDestinations.PaymentEdit.createRoute(patientId, selectedPaymentId)
                     )
+                },
+                onPatientClick = { pid ->
+                    navController.navigate(AppDestinations.PatientDetail.createRoute(pid))
                 }
             )
         }
@@ -350,7 +356,11 @@ fun AppNavGraph(
             PaymentFormScreen(
                 viewModel = paymentViewModel,
                 patientId = patientId,
-                onSuccess = { navController.popBackStack() },
+                onSuccess = {
+                    navController.navigate(AppDestinations.PaymentList.createRoute(patientId)) {
+                        popUpTo(AppDestinations.PaymentList.createRoute(patientId)) { inclusive = true }
+                    }
+                },
                 onCancel = { navController.popBackStack() }
             )
         }
@@ -377,7 +387,11 @@ fun AppNavGraph(
                 viewModel = paymentViewModel,
                 patientId = patientId,
                 paymentId = paymentId,
-                onSuccess = { navController.popBackStack() },
+                onSuccess = {
+                    navController.navigate(AppDestinations.PaymentList.createRoute(patientId)) {
+                        popUpTo(AppDestinations.PaymentList.createRoute(patientId)) { inclusive = true }
+                    }
+                },
                 onCancel = { navController.popBackStack() }
             )
         }

@@ -236,13 +236,13 @@ fun StatusBadge(
     modifier: Modifier = Modifier
 ) {
     val backgroundColor = if (isActive) {
-        Color(0xFFE8F5E9)  // Light green
+        Color(0xFFEADDFF)  // Light lilac (primary container)
     } else {
         Color(0xFFF5F5F5)  // Light gray
     }
 
     val textColor = if (isActive) {
-        Color(0xFF2E7D32)  // Dark green
+        Color(0xFF21005E)  // Dark purple (on primary container)
     } else {
         Color(0xFF757575)  // Dark gray
     }

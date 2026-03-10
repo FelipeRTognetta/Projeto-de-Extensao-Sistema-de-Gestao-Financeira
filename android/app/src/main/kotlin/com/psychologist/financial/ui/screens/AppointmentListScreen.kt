@@ -94,14 +94,16 @@ fun AppointmentListScreen(
     isPatientActive: Boolean = true,
     onBack: () -> Unit,
     onAddAppointment: () -> Unit,
-    onSelectAppointment: (Long) -> Unit = { }
+    onSelectAppointment: (Long) -> Unit = { },
+    onPatientClick: (Long) -> Unit = { }
 ) {
     val isGlobalView = patientId == 0L
 
     if (isGlobalView) {
         GlobalAppointmentListScreen(
             viewModel = viewModel,
-            onSelectAppointment = onSelectAppointment
+            onSelectAppointment = onSelectAppointment,
+            onPatientClick = onPatientClick
         )
     } else {
         PatientAppointmentListScreen(
@@ -119,7 +121,8 @@ fun AppointmentListScreen(
 @Composable
 private fun GlobalAppointmentListScreen(
     viewModel: AppointmentViewModel,
-    onSelectAppointment: (Long) -> Unit
+    onSelectAppointment: (Long) -> Unit,
+    onPatientClick: (Long) -> Unit = { }
 ) {
     val globalState = viewModel.globalListState.collectAsState().value
     var nameQuery by remember { mutableStateOf("") }
@@ -237,7 +240,7 @@ private fun GlobalAppointmentListScreen(
                                     ) { appointmentWithStatus ->
                                         AppointmentListItem(
                                             appointmentWithStatus = appointmentWithStatus,
-                                            onClick = { onSelectAppointment(appointmentWithStatus.appointment.id) }
+                                            onClick = { onPatientClick(appointmentWithStatus.appointment.patientId) }
                                         )
                                     }
                                 }

@@ -28,7 +28,7 @@ object PaymentViewState {
         object Loading : ListState()
 
         data class Success(
-            val payments: List<Payment>
+            val payments: List<PaymentWithDetails>
         ) : ListState() {
             fun getCount(): Int = payments.size
             fun isEmpty(): Boolean = payments.isEmpty()

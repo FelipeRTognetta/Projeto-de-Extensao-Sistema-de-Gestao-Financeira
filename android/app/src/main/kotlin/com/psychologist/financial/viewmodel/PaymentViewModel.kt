@@ -13,6 +13,7 @@ import com.psychologist.financial.domain.usecases.GetUnpaidAppointmentsUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
@@ -299,7 +300,14 @@ class PaymentViewModel(
 
         viewModelScope.launch {
             try {
-                val payments = getPatientPaymentsUseCase?.execute(patientId) ?: emptyList()
+                val payments: List<PaymentWithDetails> = if (repository != null) {
+                    // Prefer repository path — loads payments with linked appointments
+                    repository.getByPatientWithAppointments(patientId).first()
+                } else {
+                    // Fallback for tests/injection without full repository
+                    getPatientPaymentsUseCase?.execute(patientId)
+                        ?.map { PaymentWithDetails(it, emptyList()) } ?: emptyList()
+                }
                 _paymentListState.value = if (payments.isEmpty()) {
                     PaymentViewState.ListState.Empty
                 } else {

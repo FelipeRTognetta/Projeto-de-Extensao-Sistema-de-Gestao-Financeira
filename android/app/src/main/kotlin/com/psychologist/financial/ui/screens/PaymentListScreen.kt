@@ -43,7 +43,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.psychologist.financial.data.repositories.PaymentWithDetails
-import com.psychologist.financial.domain.models.Payment
 import com.psychologist.financial.ui.components.PaymentListItem
 import com.psychologist.financial.viewmodel.PaymentViewModel
 import com.psychologist.financial.viewmodel.PaymentViewState
@@ -94,10 +93,11 @@ fun PaymentListScreen(
     isPatientActive: Boolean = true,
     onBack: () -> Unit,
     onAddPayment: () -> Unit,
-    onSelectPayment: (Long) -> Unit = { }
+    onSelectPayment: (Long) -> Unit = { },
+    onPatientClick: (Long) -> Unit = { }
 ) {
     if (patientId == 0L) {
-        GlobalPaymentListScreen(viewModel = viewModel)
+        GlobalPaymentListScreen(viewModel = viewModel, onPatientClick = onPatientClick)
     } else {
         PatientPaymentListScreen(
             viewModel = viewModel,
@@ -112,7 +112,10 @@ fun PaymentListScreen(
 }
 
 @Composable
-private fun GlobalPaymentListScreen(viewModel: PaymentViewModel) {
+private fun GlobalPaymentListScreen(
+    viewModel: PaymentViewModel,
+    onPatientClick: (Long) -> Unit = { }
+) {
     val globalState = viewModel.globalListState.collectAsState().value
     var nameQuery by remember { mutableStateOf("") }
 
@@ -198,7 +201,7 @@ private fun GlobalPaymentListScreen(viewModel: PaymentViewModel) {
                                     PaymentListItem(
                                         paymentWithDetails = paymentWithDetails,
                                         patientName = paymentWithDetails.patientName,
-                                        onClick = {}
+                                        onClick = { onPatientClick(paymentWithDetails.payment.patientId) }
                                     )
                                 }
                             }
@@ -325,7 +328,7 @@ private fun PatientPaymentListScreen(
                 }
 
                 is PaymentViewState.ListState.Success -> {
-                    PaymentListContent(
+                    PaymentListWithDetailsContent(
                         payments = listState.payments,
                         onSelectPayment = if (isPatientActive) onSelectPayment else { _ -> }
                     )
@@ -347,11 +350,11 @@ private fun PatientPaymentListScreen(
 }
 
 /**
- * Payment list content
+ * Payment list content with linked appointments (patient-scoped view).
  */
 @Composable
-private fun PaymentListContent(
-    payments: List<Payment>,
+private fun PaymentListWithDetailsContent(
+    payments: List<PaymentWithDetails>,
     onSelectPayment: (Long) -> Unit
 ) {
     LazyColumn(
@@ -361,11 +364,11 @@ private fun PaymentListContent(
     ) {
         items(
             items = payments,
-            key = { it.id }
-        ) { payment ->
+            key = { it.payment.id }
+        ) { paymentWithDetails ->
             PaymentListItem(
-                payment = payment,
-                onClick = { onSelectPayment(payment.id) }
+                paymentWithDetails = paymentWithDetails,
+                onClick = { onSelectPayment(paymentWithDetails.payment.id) }
             )
         }
     }

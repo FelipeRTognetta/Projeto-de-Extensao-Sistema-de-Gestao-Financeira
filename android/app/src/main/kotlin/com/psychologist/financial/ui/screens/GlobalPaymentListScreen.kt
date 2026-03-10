@@ -49,7 +49,8 @@ import com.psychologist.financial.viewmodel.PaymentViewState
 @Composable
 fun GlobalPaymentListScreen(
     viewModel: PaymentViewModel,
-    patientNameProvider: (Long) -> String = { "" }
+    patientNameProvider: (Long) -> String = { "" },
+    onPatientClick: (Long) -> Unit = { }
 ) {
     val state by viewModel.globalListState.collectAsState()
     var nameQuery by remember { mutableStateOf("") }
@@ -136,7 +137,8 @@ fun GlobalPaymentListScreen(
                                         paymentWithDetails = paymentWithDetails,
                                         patientName = paymentWithDetails.patientName.ifEmpty {
                                             patientNameProvider(paymentWithDetails.payment.patientId)
-                                        }
+                                        },
+                                        onClick = { onPatientClick(paymentWithDetails.payment.patientId) }
                                     )
                                 }
                             }

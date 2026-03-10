@@ -54,7 +54,8 @@ import com.psychologist.financial.viewmodel.AppointmentViewState
  */
 @Composable
 fun GlobalAppointmentListScreen(
-    viewModel: AppointmentViewModel
+    viewModel: AppointmentViewModel,
+    onPatientClick: (Long) -> Unit = { }
 ) {
     val state by viewModel.globalListState.collectAsState()
     var nameQuery by remember { mutableStateOf("") }
@@ -150,7 +151,7 @@ fun GlobalAppointmentListScreen(
                                     ) { appointmentWithStatus ->
                                         AppointmentListItem(
                                             appointmentWithStatus = appointmentWithStatus,
-                                            onClick = {}
+                                            onClick = { onPatientClick(appointmentWithStatus.appointment.patientId) }
                                         )
                                     }
                                 }
