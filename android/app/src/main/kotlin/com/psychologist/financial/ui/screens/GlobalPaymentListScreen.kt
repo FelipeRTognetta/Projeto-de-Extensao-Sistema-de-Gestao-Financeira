@@ -73,34 +73,38 @@ fun GlobalPaymentListScreen(
             )
         }
     ) { paddingValues ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            when (val s = state) {
-                is PaymentViewState.GlobalListState.Loading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                }
-
-                is PaymentViewState.GlobalListState.Success -> {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        OutlinedTextField(
-                            value = nameQuery,
-                            onValueChange = { nameQuery = it; viewModel.setNameFilter(it) },
-                            placeholder = { Text("Buscar por nome do paciente") },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            singleLine = true,
-                            trailingIcon = {
-                                if (nameQuery.isNotEmpty()) {
-                                    IconButton(onClick = { nameQuery = ""; viewModel.resetNameFilter() }) {
-                                        Icon(Icons.Default.Close, contentDescription = "Limpar busca")
-                                    }
-                                }
+            // Search field — always visible (not gated by state)
+            if (state !is PaymentViewState.GlobalListState.Error) {
+                OutlinedTextField(
+                    value = nameQuery,
+                    onValueChange = { nameQuery = it; viewModel.setNameFilter(it) },
+                    placeholder = { Text("Buscar por nome do paciente") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    singleLine = true,
+                    trailingIcon = {
+                        if (nameQuery.isNotEmpty()) {
+                            IconButton(onClick = { nameQuery = ""; viewModel.resetNameFilter() }) {
+                                Icon(Icons.Default.Close, contentDescription = "Limpar busca")
                             }
-                        )
+                        }
+                    }
+                )
+            }
+
+            Box(modifier = Modifier.weight(1f)) {
+                when (val s = state) {
+                    is PaymentViewState.GlobalListState.Loading -> {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    }
+
+                    is PaymentViewState.GlobalListState.Success -> {
                         if (s.filteredPayments.isEmpty()) {
                             Box(
                                 modifier = Modifier
@@ -109,7 +113,10 @@ fun GlobalPaymentListScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "Nenhum pagamento encontrado",
+                                    text = if (nameQuery.isNotEmpty())
+                                        "Nenhum pagamento encontrado para \"$nameQuery\""
+                                    else
+                                        "Nenhum pagamento encontrado",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center
@@ -135,41 +142,41 @@ fun GlobalPaymentListScreen(
                             }
                         }
                     }
-                }
 
-                is PaymentViewState.GlobalListState.Empty -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp)
-                            .align(Alignment.Center),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    is PaymentViewState.GlobalListState.Empty -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp)
+                                .align(Alignment.Center),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "Nenhum pagamento registrado",
+                                style = MaterialTheme.typography.titleMedium,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = "Os pagamentos aparecerão aqui após serem registrados na tela do paciente.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+
+                    is PaymentViewState.GlobalListState.Error -> {
                         Text(
-                            text = "Nenhum pagamento registrado",
-                            style = MaterialTheme.typography.titleMedium,
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = "Os pagamentos aparecerão aqui após serem registrados na tela do paciente.",
+                            text = s.message,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .padding(24.dp),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.error,
                             textAlign = TextAlign.Center
                         )
                     }
-                }
-
-                is PaymentViewState.GlobalListState.Error -> {
-                    Text(
-                        text = s.message,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(24.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center
-                    )
                 }
             }
         }
