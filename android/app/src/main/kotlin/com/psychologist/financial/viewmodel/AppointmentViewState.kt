@@ -404,6 +404,28 @@ object AppointmentViewState {
         PAST      // Past appointments only
     }
 
+    // ========================================
+    // Delete Appointment State
+    // ========================================
+
+    /**
+     * State for the delete-appointment flow in AppointmentFormScreen.
+     */
+    sealed class DeleteAppointmentState {
+        /** No delete in progress. */
+        object Idle : DeleteAppointmentState()
+        /** Waiting for user to confirm the irreversible delete dialog. */
+        object AwaitingConfirmation : DeleteAppointmentState()
+        /** Waiting for biometric authentication after dialog confirmation. */
+        object AwaitingAuth : DeleteAppointmentState()
+        /** Delete is executing. */
+        object InProgress : DeleteAppointmentState()
+        /** Delete completed successfully. */
+        object Success : DeleteAppointmentState()
+        /** Delete failed with an error message. */
+        data class Error(val message: String) : DeleteAppointmentState()
+    }
+
     /**
      * Appointment list sort order
      */

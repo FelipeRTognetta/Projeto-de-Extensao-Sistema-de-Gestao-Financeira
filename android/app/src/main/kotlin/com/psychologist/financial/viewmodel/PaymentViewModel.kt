@@ -3,14 +3,17 @@ package com.psychologist.financial.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.psychologist.financial.data.repositories.PaymentRepository
+import com.psychologist.financial.data.repositories.PaymentWithDetails
 import com.psychologist.financial.domain.models.Payment
 import com.psychologist.financial.domain.usecases.CreatePaymentUseCase
+import com.psychologist.financial.domain.usecases.DeletePaymentUseCase
 import com.psychologist.financial.domain.usecases.GetAllPaymentsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientPaymentsUseCase
 import com.psychologist.financial.domain.usecases.GetUnpaidAppointmentsUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
@@ -37,7 +40,8 @@ class PaymentViewModel(
     private val getUnpaidAppointmentsUseCase: GetUnpaidAppointmentsUseCase,
     private val repository: PaymentRepository? = null,
     private val getPatientPaymentsUseCase: GetPatientPaymentsUseCase? = null,
-    private val getAllPaymentsUseCase: GetAllPaymentsUseCase? = null
+    private val getAllPaymentsUseCase: GetAllPaymentsUseCase? = null,
+    private val deletePaymentUseCase: DeletePaymentUseCase? = null
 ) : ViewModel() {
 
     // ========================================
@@ -222,6 +226,9 @@ class PaymentViewModel(
     )
     val globalListState: StateFlow<PaymentViewState.GlobalListState> = _globalListState.asStateFlow()
 
+    private var cachedAllPayments: List<PaymentWithDetails> = emptyList()
+    private var paymentNameFilter: String = ""
+
     /**
      * Load all payments from all patients (global list tab).
      * Collects from [GetAllPaymentsUseCase] reactively.
@@ -232,11 +239,8 @@ class PaymentViewModel(
         viewModelScope.launch {
             try {
                 getAllPaymentsUseCase?.execute()?.collect { payments ->
-                    _globalListState.value = if (payments.isEmpty()) {
-                        PaymentViewState.GlobalListState.Empty
-                    } else {
-                        PaymentViewState.GlobalListState.Success(payments)
-                    }
+                    cachedAllPayments = payments
+                    applyPaymentNameFilter()
                 } ?: run {
                     _globalListState.value = PaymentViewState.GlobalListState.Empty
                 }
@@ -246,6 +250,31 @@ class PaymentViewModel(
                 )
             }
         }
+    }
+
+    fun setNameFilter(query: String) {
+        paymentNameFilter = query
+        applyPaymentNameFilter()
+    }
+
+    fun resetNameFilter() {
+        paymentNameFilter = ""
+        applyPaymentNameFilter()
+    }
+
+    private fun applyPaymentNameFilter() {
+        val all = cachedAllPayments
+        if (all.isEmpty()) {
+            _globalListState.value = PaymentViewState.GlobalListState.Empty
+            return
+        }
+        val filtered = if (paymentNameFilter.isBlank()) all
+        else all.filter { it.patientName.contains(paymentNameFilter, ignoreCase = true) }
+        _globalListState.value = PaymentViewState.GlobalListState.Success(
+            payments = all,
+            filteredPayments = filtered,
+            nameFilter = paymentNameFilter
+        )
     }
 
     // ========================================
@@ -271,7 +300,14 @@ class PaymentViewModel(
 
         viewModelScope.launch {
             try {
-                val payments = getPatientPaymentsUseCase?.execute(patientId) ?: emptyList()
+                val payments: List<PaymentWithDetails> = if (repository != null) {
+                    // Prefer repository path — loads payments with linked appointments
+                    repository.getByPatientWithAppointments(patientId).first()
+                } else {
+                    // Fallback for tests/injection without full repository
+                    getPatientPaymentsUseCase?.execute(patientId)
+                        ?.map { PaymentWithDetails(it, emptyList()) } ?: emptyList()
+                }
                 _paymentListState.value = if (payments.isEmpty()) {
                     PaymentViewState.ListState.Empty
                 } else {
@@ -340,5 +376,54 @@ class PaymentViewModel(
                 // silent — list will refresh on next load
             }
         }
+    }
+
+    // ========================================
+    // Delete Payment State (US2)
+    // ========================================
+
+    private val _deletePaymentState = MutableStateFlow<PaymentViewState.DeletePaymentState>(
+        PaymentViewState.DeletePaymentState.Idle
+    )
+    val deletePaymentState: StateFlow<PaymentViewState.DeletePaymentState> =
+        _deletePaymentState.asStateFlow()
+
+    private var pendingDeletePaymentId: Long? = null
+
+    /**
+     * Request deletion — shows confirmation dialog first (AwaitingConfirmation).
+     * After user confirms the dialog, [onPaymentDeleteAuthSuccess] triggers biometric.
+     */
+    fun requestDeletePayment(paymentId: Long) {
+        pendingDeletePaymentId = paymentId
+        _deletePaymentState.value = PaymentViewState.DeletePaymentState.AwaitingConfirmation
+    }
+
+    /** Called by the UI when user confirms the dialog — moves to AwaitingAuth to trigger biometric. */
+    fun onPaymentDeleteAuthSuccess() {
+        _deletePaymentState.value = PaymentViewState.DeletePaymentState.AwaitingAuth
+    }
+
+    /** Called by the UI after successful biometric authentication — execute the delete. */
+    fun confirmDeletePayment() {
+        val id = pendingDeletePaymentId ?: return
+        _deletePaymentState.value = PaymentViewState.DeletePaymentState.InProgress
+        viewModelScope.launch {
+            try {
+                deletePaymentUseCase?.execute(id)
+                _deletePaymentState.value = PaymentViewState.DeletePaymentState.Success
+                pendingDeletePaymentId = null
+            } catch (e: Exception) {
+                _deletePaymentState.value = PaymentViewState.DeletePaymentState.Error(
+                    e.message ?: "Erro ao excluir pagamento"
+                )
+            }
+        }
+    }
+
+    /** Cancel or reset the delete flow. */
+    fun cancelDeletePayment() {
+        pendingDeletePaymentId = null
+        _deletePaymentState.value = PaymentViewState.DeletePaymentState.Idle
     }
 }

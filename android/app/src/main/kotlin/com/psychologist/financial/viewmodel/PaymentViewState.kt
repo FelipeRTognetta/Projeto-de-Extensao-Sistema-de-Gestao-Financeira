@@ -28,7 +28,7 @@ object PaymentViewState {
         object Loading : ListState()
 
         data class Success(
-            val payments: List<Payment>
+            val payments: List<PaymentWithDetails>
         ) : ListState() {
             fun getCount(): Int = payments.size
             fun isEmpty(): Boolean = payments.isEmpty()
@@ -70,10 +70,12 @@ object PaymentViewState {
         object Loading : GlobalListState()
 
         data class Success(
-            val payments: List<PaymentWithDetails>
+            val payments: List<PaymentWithDetails>,
+            val filteredPayments: List<PaymentWithDetails> = payments,
+            val nameFilter: String = ""
         ) : GlobalListState() {
-            fun getCount(): Int = payments.size
-            fun isEmpty(): Boolean = payments.isEmpty()
+            fun getCount(): Int = filteredPayments.size
+            fun isEmpty(): Boolean = filteredPayments.isEmpty()
         }
 
         object Empty : GlobalListState()
@@ -108,4 +110,26 @@ object PaymentViewState {
         val errorMessage: String? = null,
         val editingPaymentId: Long? = null
     )
+
+    // ========================================
+    // Delete Payment State
+    // ========================================
+
+    /**
+     * State for the delete-payment flow.
+     */
+    sealed class DeletePaymentState {
+        /** No delete in progress. */
+        object Idle : DeletePaymentState()
+        /** Biometric/PIN authentication requested before showing confirm dialog. */
+        object AwaitingAuth : DeletePaymentState()
+        /** Waiting for user to confirm the irreversible delete dialog. */
+        object AwaitingConfirmation : DeletePaymentState()
+        /** Delete is executing. */
+        object InProgress : DeletePaymentState()
+        /** Delete completed successfully. */
+        object Success : DeletePaymentState()
+        /** Delete failed with an error message. */
+        data class Error(val message: String) : DeletePaymentState()
+    }
 }

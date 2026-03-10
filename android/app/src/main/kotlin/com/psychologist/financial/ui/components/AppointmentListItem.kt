@@ -230,9 +230,8 @@ fun AppointmentListItem(
                     if (appointmentWithStatus.patientName.isNotEmpty()) {
                         Text(
                             text = appointmentWithStatus.patientName,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 

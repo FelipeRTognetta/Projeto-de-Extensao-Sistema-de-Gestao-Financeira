@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -46,12 +45,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
-import com.psychologist.financial.ui.components.ErrorDialog
-import com.psychologist.financial.ui.components.ExportProgressComponent
-import com.psychologist.financial.ui.components.ExportSuccessIndicator
 import com.psychologist.financial.viewmodel.BackupExportState
 import com.psychologist.financial.viewmodel.BackupImportState
-import com.psychologist.financial.viewmodel.ExportType
 import com.psychologist.financial.viewmodel.ExportViewModel
 import com.psychologist.financial.viewmodel.ExportViewState
 import com.psychologist.financial.viewmodel.FinanceiroCsvState
@@ -110,12 +105,7 @@ import java.time.YearMonth
 fun ExportScreen(
     viewModel: ExportViewModel
 ) {
-    val exportState = viewModel.exportState.collectAsState()
-    val currentState = exportState.value
-    val isExporting = viewModel.isExporting.collectAsState()
-    val error = viewModel.error.collectAsState()
-
-    Log.d("ExportScreen", "Rendering with state: ${currentState::class.simpleName}")
+    val state by viewModel.exportState.collectAsState()
 
     // Load statistics on screen open
     LaunchedEffect(Unit) {
@@ -125,62 +115,10 @@ fun ExportScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize()
     ) { paddingValues ->
-        when (currentState) {
-            // Validating state
-            is ExportViewState.Validating -> {
-                ValidatingScreen(
-                    paddingValues = paddingValues,
-                    state = currentState
-                )
-            }
-
-            // In-progress state
-            is ExportViewState.InProgress -> {
-                ProgressScreen(
-                    paddingValues = paddingValues,
-                    state = currentState,
-                    onCancel = { viewModel.cancelExport() }
-                )
-            }
-
-            // Success state
-            is ExportViewState.Success -> {
-                SuccessScreen(
-                    paddingValues = paddingValues,
-                    state = currentState,
-                    viewModel = viewModel
-                )
-            }
-
-            // Error state
-            is ExportViewState.Error -> {
-                ErrorScreen(
-                    paddingValues = paddingValues,
-                    state = currentState,
-                    onRetry = { viewModel.retryExport() },
-                    onDismiss = { viewModel.dismissError() }
-                )
-            }
-
-            // Idle/ready state
-            is ExportViewState.Idle -> {
-                IdleScreen(
-                    paddingValues = paddingValues,
-                    state = currentState,
-                    isExporting = isExporting.value,
-                    viewModel = viewModel
-                )
-            }
-        }
-    }
-
-    // Show error dialog if present
-    if (error.value != null) {
-        ErrorDialog(
-            message = error.value ?: "Unknown error",
-            onDismiss = { viewModel.clearError() },
-            onRetry = { viewModel.performExport() },
-            title = "Erro na Exportação"
+        IdleScreen(
+            paddingValues = paddingValues,
+            state = state,
+            viewModel = viewModel
         )
     }
 }
@@ -199,8 +137,7 @@ fun ExportScreen(
 @Composable
 private fun IdleScreen(
     paddingValues: PaddingValues,
-    state: ExportViewState.Idle,
-    isExporting: Boolean,
+    state: ExportViewState,
     viewModel: ExportViewModel
 ) {
     val selectedMonth by viewModel.selectedMonth.collectAsState()
@@ -230,7 +167,7 @@ private fun IdleScreen(
                 )
 
                 Text(
-                    text = "Faça backup de todos os seus dados para arquivo CSV",
+                    text = "Exporte o CSV financeiro mensal ou faça backup completo dos seus dados",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -306,61 +243,6 @@ private fun IdleScreen(
             )
         }
 
-        // Export buttons (4 individual options)
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = { viewModel.performSelectiveExport(exportPatients = true, exportAppointments = false, exportPayments = false) },
-                    enabled = state.hasData() && !isExporting,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Exportar Pacientes", fontWeight = FontWeight.SemiBold)
-                }
-                Button(
-                    onClick = { viewModel.performSelectiveExport(exportPatients = false, exportAppointments = true, exportPayments = false) },
-                    enabled = state.hasData() && !isExporting,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Exportar Consultas", fontWeight = FontWeight.SemiBold)
-                }
-                Button(
-                    onClick = { viewModel.performSelectiveExport(exportPatients = false, exportAppointments = false, exportPayments = true) },
-                    enabled = state.hasData() && !isExporting,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Exportar Pagamentos", fontWeight = FontWeight.SemiBold)
-                }
-                OutlinedButton(
-                    onClick = { viewModel.performExport() },
-                    enabled = state.hasData() && !isExporting,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Download,
-                        contentDescription = null,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-                    Text("Exportar Tudo", fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-
-        // Info text
-        item {
-            Text(
-                text = "Os arquivos serão salvos em formato CSV " +
-                    "e podem ser abertos em aplicativos de planilha como Excel ou Google Sheets.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp),
-                textAlign = TextAlign.Center
-            )
-        }
     }
 }
 
@@ -825,7 +707,7 @@ private fun BackupImportSection(
  */
 @Composable
 private fun StatisticsCard(
-    state: ExportViewState.Idle
+    state: ExportViewState
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -891,7 +773,7 @@ private fun StatisticsCard(
  */
 @Composable
 private fun StorageInfoCard(
-    state: ExportViewState.Idle
+    state: ExportViewState
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -986,240 +868,3 @@ private fun StatisticRow(
  * @param paddingValues Scaffold padding
  * @param state Validating state
  */
-@Composable
-private fun ValidatingScreen(
-    paddingValues: PaddingValues,
-    state: ExportViewState.Validating
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        ExportProgressComponent(state)
-    }
-}
-
-/**
- * Progress state screen
- *
- * Shows export progress with detailed record counts.
- *
- * @param paddingValues Scaffold padding
- * @param state InProgress state
- * @param onCancel Callback to cancel export
- */
-@Composable
-private fun ProgressScreen(
-    paddingValues: PaddingValues,
-    state: ExportViewState.InProgress,
-    onCancel: () -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        item {
-            ExportProgressComponent(state)
-        }
-
-        item {
-            OutlinedButton(
-                onClick = onCancel,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp)
-            ) {
-                Text("Cancelar Exportação")
-            }
-        }
-    }
-}
-
-/**
- * Success state screen
- *
- * Shows export completion with file info and sharing options.
- *
- * @param paddingValues Scaffold padding
- * @param state Success state
- * @param viewModel Export ViewModel
- */
-@Composable
-private fun SuccessScreen(
-    paddingValues: PaddingValues,
-    state: ExportViewState.Success,
-    viewModel: ExportViewModel
-) {
-    val context = LocalContext.current
-
-    val exportTypeLabel = when (state.exportType) {
-        ExportType.PATIENTS -> "Pacientes exportados"
-        ExportType.APPOINTMENTS -> "Consultas exportadas"
-        ExportType.PAYMENTS -> "Pagamentos exportados"
-        ExportType.ALL -> "Todos os dados exportados"
-    }
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            ExportSuccessIndicator(state)
-        }
-
-        item {
-            Text(
-                text = exportTypeLabel,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Share button
-                Button(
-                    onClick = {
-                        val files = state.result.getFiles()
-                        if (files.isNotEmpty()) {
-                            val uris = ArrayList(files.map { file ->
-                                FileProvider.getUriForFile(
-                                    context,
-                                    "${context.packageName}.fileprovider",
-                                    file
-                                )
-                            })
-                            val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-                                type = "text/csv"
-                                putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(
-                                Intent.createChooser(shareIntent, "Compartilhar arquivos CSV")
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.FileDownload,
-                        contentDescription = null,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-                    Text("COMPARTILHAR ARQUIVOS")
-                }
-
-                // New export button
-                OutlinedButton(
-                    onClick = { viewModel.loadExportStatistics() },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("NOVA EXPORTAÇÃO")
-                }
-            }
-        }
-
-        item {
-            Text(
-                text = "Os arquivos foram salvos com sucesso. " +
-                    "Você pode encontrá-los na pasta de aplicativos no armazenamento do dispositivo.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp),
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-/**
- * Error state screen
- *
- * Shows error message with retry and dismiss options.
- *
- * @param paddingValues Scaffold padding
- * @param state Error state
- * @param onRetry Callback to retry export
- * @param onDismiss Callback to dismiss error
- */
-@Composable
-private fun ErrorScreen(
-    paddingValues: PaddingValues,
-    state: ExportViewState.Error,
-    onRetry: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(paddingValues)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer
-            )
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Erro na Exportação",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    textAlign = TextAlign.Center
-                )
-
-                Text(
-                    text = state.message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    textAlign = TextAlign.Center
-                )
-
-                // Retry button
-                Button(
-                    onClick = onRetry,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("TENTAR NOVAMENTE")
-                }
-
-                // Dismiss button
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("FECHAR")
-                }
-            }
-        }
-    }
-}

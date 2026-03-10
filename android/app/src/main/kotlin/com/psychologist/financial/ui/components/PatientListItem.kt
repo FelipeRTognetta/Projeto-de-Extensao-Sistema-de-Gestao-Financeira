@@ -201,8 +201,8 @@ private fun StatusBadge(
 ) {
     val (backgroundColor, textColor, text) = when (status) {
         PatientStatus.ACTIVE -> Triple(
-            MaterialTheme.colorScheme.tertiaryContainer,
-            MaterialTheme.colorScheme.onTertiaryContainer,
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.onPrimaryContainer,
             "Ativo"
         )
         PatientStatus.INACTIVE -> Triple(

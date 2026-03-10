@@ -293,17 +293,47 @@ class BiometricAuthManagerTest {
 
     @Test
     fun `PIN fallback offered on timeout error`() {
-        // Requires mocking BiometricPrompt and testing shouldOfferFallback
+        val method = BiometricAuthManager::class.java.getDeclaredMethod("shouldOfferFallback", Int::class.java)
+        method.isAccessible = true
+        assertTrue(method.invoke(authManager, BiometricPrompt.ERROR_TIMEOUT) as Boolean)
     }
 
     @Test
     fun `PIN fallback offered on unable to process error`() {
-        // Requires mocking BiometricPrompt
+        val method = BiometricAuthManager::class.java.getDeclaredMethod("shouldOfferFallback", Int::class.java)
+        method.isAccessible = true
+        assertTrue(method.invoke(authManager, BiometricPrompt.ERROR_UNABLE_TO_PROCESS) as Boolean)
+    }
+
+    @Test
+    fun `PIN fallback offered on hw unavailable error`() {
+        val method = BiometricAuthManager::class.java.getDeclaredMethod("shouldOfferFallback", Int::class.java)
+        method.isAccessible = true
+        assertTrue(method.invoke(authManager, BiometricPrompt.ERROR_HW_UNAVAILABLE) as Boolean)
+    }
+
+    @Test
+    fun `ERROR_NEGATIVE_BUTTON does not offer fallback (DEVICE_CREDENTIAL handles it natively)`() {
+        // With BIOMETRIC_WEAK or DEVICE_CREDENTIAL allowed authenticators, there is no negative
+        // button in the prompt — the OS handles PIN/pattern/password fallback automatically.
+        // ERROR_NEGATIVE_BUTTON should NOT trigger a custom fallback.
+        val method = BiometricAuthManager::class.java.getDeclaredMethod("shouldOfferFallback", Int::class.java)
+        method.isAccessible = true
+        assertFalse(method.invoke(authManager, BiometricPrompt.ERROR_NEGATIVE_BUTTON) as Boolean)
     }
 
     @Test
     fun `PIN fallback not offered on cancelled error`() {
-        // Requires mocking BiometricPrompt
+        val method = BiometricAuthManager::class.java.getDeclaredMethod("shouldOfferFallback", Int::class.java)
+        method.isAccessible = true
+        assertFalse(method.invoke(authManager, BiometricPrompt.ERROR_CANCELED) as Boolean)
+    }
+
+    @Test
+    fun `PIN fallback not offered on no biometrics error`() {
+        val method = BiometricAuthManager::class.java.getDeclaredMethod("shouldOfferFallback", Int::class.java)
+        method.isAccessible = true
+        assertFalse(method.invoke(authManager, BiometricPrompt.ERROR_NO_BIOMETRICS) as Boolean)
     }
 
     // ========================================

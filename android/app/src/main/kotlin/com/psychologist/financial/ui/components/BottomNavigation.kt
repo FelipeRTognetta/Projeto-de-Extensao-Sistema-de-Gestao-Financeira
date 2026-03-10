@@ -4,6 +4,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.navigation.NavController
@@ -60,7 +61,12 @@ fun AppBottomNavigation(
                     )
                 },
                 label = {
-                    Text(text = item.label)
+                    Text(
+                        text = item.label,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             )
         }
@@ -70,17 +76,16 @@ fun AppBottomNavigation(
 /**
  * Determines if a bottom nav item should be highlighted as selected.
  *
- * Handles route matching for destinations with arguments:
- * - Exact match for simple routes (e.g., "dashboard")
- * - Prefix match for routes with arguments (e.g., "appointments/0?..." matches "appointments/{patientId}?...")
+ * Compares only the first path segment so that parametric routes like
+ * "appointments/{patientId}?patientName={n}" match nav items whose route
+ * is an instantiated form like "appointments/0?patientName=Todos".
  */
 private fun isRouteSelected(currentRoute: String?, itemRoute: String): Boolean {
     if (currentRoute == null) return false
     if (currentRoute == itemRoute) return true
 
-    // Extract base path (before '?' and '{') for comparison
-    val itemBase = itemRoute.substringBefore("?").substringBefore("{").trimEnd('/')
-    val currentBase = currentRoute.substringBefore("?").substringBefore("{").trimEnd('/')
+    val itemSegment = itemRoute.substringBefore("/").substringBefore("?")
+    val currentSegment = currentRoute.substringBefore("/").substringBefore("?")
 
-    return currentBase == itemBase
+    return itemSegment.isNotEmpty() && itemSegment == currentSegment
 }

@@ -313,11 +313,11 @@ private fun PatientHeader(patient: Patient, hasPendingPayments: Boolean = false)
         Surface(
             shape = RoundedCornerShape(6.dp),
             color = when (patient.status) {
-                PatientStatus.ACTIVE -> MaterialTheme.colorScheme.tertiaryContainer
+                PatientStatus.ACTIVE -> MaterialTheme.colorScheme.primaryContainer
                 PatientStatus.INACTIVE -> MaterialTheme.colorScheme.errorContainer
             },
             contentColor = when (patient.status) {
-                PatientStatus.ACTIVE -> MaterialTheme.colorScheme.onTertiaryContainer
+                PatientStatus.ACTIVE -> MaterialTheme.colorScheme.onPrimaryContainer
                 PatientStatus.INACTIVE -> MaterialTheme.colorScheme.onErrorContainer
             }
         ) {

@@ -4,8 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -79,6 +77,8 @@ fun AuthenticationScreen(
                 is AuthState.Idle -> IdleContent(viewModel)
                 is AuthState.Authenticating -> AuthenticatingContent()
                 is AuthState.NeedsPIN -> NeedsPINContent(viewModel)
+                is AuthState.EnteringPIN -> PINFallbackScreen(viewModel)
+                is AuthState.PINError -> PINFallbackScreen(viewModel)
                 is AuthState.NeedsEnrollment -> NeedsEnrollmentContent(
                     currentState,
                     viewModel
@@ -100,15 +100,16 @@ fun AuthenticationScreen(
 
 @Composable
 private fun IdleContent(viewModel: AuthenticationViewModel) {
-    Icon(
-        imageVector = Icons.Default.Lock,
-        contentDescription = null,
-        modifier = Modifier.padding(bottom = 24.dp),
-        tint = MaterialTheme.colorScheme.primary
+    Text(
+        text = "$",
+        style = MaterialTheme.typography.displayLarge,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(bottom = 8.dp)
     )
 
     Text(
-        text = "Segurança",
+        text = "fin.psi",
         style = MaterialTheme.typography.headlineMedium,
         fontWeight = FontWeight.Bold
     )

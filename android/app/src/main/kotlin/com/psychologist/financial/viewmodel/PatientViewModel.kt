@@ -136,6 +136,9 @@ class PatientViewModel(
     private val _includeInactivePatients = MutableStateFlow(false)
     val includeInactivePatients: StateFlow<Boolean> = _includeInactivePatients.asStateFlow()
 
+    private var cachedPatients: List<Patient> = emptyList()
+    private var _nameFilter: String = ""
+
     // ========================================
     // Patient Detail State
     // ========================================
@@ -279,12 +282,8 @@ class PatientViewModel(
             val patients = getAllPatientsUseCase.execute(
                 includeInactive = _includeInactivePatients.value
             )
-
-            if (patients.isEmpty()) {
-                _patientListState.value = ListState.Empty
-            } else {
-                _patientListState.value = ListState.Success(patients)
-            }
+            cachedPatients = patients
+            applyNameFilter()
         }
     }
 
@@ -357,6 +356,25 @@ class PatientViewModel(
                 _patientListState.value = ListState.Success(filtered)
             }
         }
+    }
+
+    /** Filter the cached patient list by name (case-insensitive). Combined with status filter. */
+    fun setNameFilter(query: String) {
+        _nameFilter = query
+        applyNameFilter()
+    }
+
+    /** Clear the name filter and restore full cached list. */
+    fun resetNameFilter() {
+        _nameFilter = ""
+        applyNameFilter()
+    }
+
+    private fun applyNameFilter() {
+        val filtered = if (_nameFilter.isBlank()) cachedPatients
+        else cachedPatients.filter { it.name.contains(_nameFilter, ignoreCase = true) }
+        _patientListState.value = if (filtered.isEmpty()) ListState.Empty
+        else ListState.Success(filtered)
     }
 
     // ========================================

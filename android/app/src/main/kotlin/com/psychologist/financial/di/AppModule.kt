@@ -11,6 +11,8 @@ import com.psychologist.financial.data.repositories.PatientRepository
 import com.psychologist.financial.data.repositories.PayerInfoRepository
 import com.psychologist.financial.data.repositories.PaymentRepository
 import com.psychologist.financial.domain.usecases.CreateAppointmentUseCase
+import com.psychologist.financial.domain.usecases.DeleteAppointmentUseCase
+import com.psychologist.financial.domain.usecases.DeletePaymentUseCase
 import com.psychologist.financial.domain.usecases.GetAllAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.UpdateAppointmentUseCase
 import com.psychologist.financial.domain.usecases.CreatePatientUseCase
@@ -245,6 +247,14 @@ object AppModule {
         GetAllPaymentsUseCase(paymentRepository)
     }
 
+    val deleteAppointmentUseCase: DeleteAppointmentUseCase by lazy {
+        DeleteAppointmentUseCase(appointmentRepository)
+    }
+
+    val deletePaymentUseCase: DeletePaymentUseCase by lazy {
+        DeletePaymentUseCase(paymentRepository)
+    }
+
     val getDashboardMetricsUseCase: GetDashboardMetricsUseCase by lazy {
         GetDashboardMetricsUseCase(dashboardRepository)
     }
@@ -299,7 +309,8 @@ object AppModule {
         getPatientAppointmentsUseCase = getPatientAppointmentsUseCase,
         createAppointmentUseCase = createAppointmentUseCase,
         updateAppointmentUseCase = updateAppointmentUseCase,
-        getAllAppointmentsUseCase = getAllAppointmentsUseCase
+        getAllAppointmentsUseCase = getAllAppointmentsUseCase,
+        deleteAppointmentUseCase = deleteAppointmentUseCase
     )
 
     fun providePaymentViewModel(): PaymentViewModel = PaymentViewModel(
@@ -307,7 +318,8 @@ object AppModule {
         getUnpaidAppointmentsUseCase = getUnpaidAppointmentsUseCase,
         repository = paymentRepository,
         getPatientPaymentsUseCase = getPatientPaymentsUseCase,
-        getAllPaymentsUseCase = getAllPaymentsUseCase
+        getAllPaymentsUseCase = getAllPaymentsUseCase,
+        deletePaymentUseCase = deletePaymentUseCase
     )
 
     fun provideDashboardViewModel(): DashboardViewModel = DashboardViewModel(

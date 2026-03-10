@@ -3,7 +3,7 @@
     <!-- ================================ -->
     <!-- App Name & Description -->
     <!-- ================================ -->
-    <string name="app_name">Financial Management</string>
+    <string name="app_name">fin.psi</string>
     <string name="app_description">Financial management system for psychologists</string>
 
     <!-- ================================ -->

@@ -2,6 +2,7 @@ package com.psychologist.financial
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.psychologist.financial.data.repositories.PaymentRepository
+import com.psychologist.financial.data.repositories.PaymentWithDetails
 import com.psychologist.financial.domain.models.Appointment
 import com.psychologist.financial.domain.models.Payment
 import com.psychologist.financial.domain.usecases.CreatePaymentUseCase
@@ -91,6 +92,8 @@ class PaymentViewModelTest {
         )
     )
 
+    private val mockPaymentsWithDetails = mockPayments.map { PaymentWithDetails(it, emptyList()) }
+
     private val mockAppointments = listOf(
         Appointment(
             id = 10L,
@@ -135,7 +138,8 @@ class PaymentViewModelTest {
     fun loadPatientPayments_onSuccess_updatesState() = runTest {
         // Arrange
         val patientId = 1L
-        whenever(mockGetPatientPaymentsUseCase.execute(patientId)).thenReturn(mockPayments)
+        whenever(mockRepository.getByPatientWithAppointments(patientId))
+            .thenReturn(flowOf(mockPaymentsWithDetails))
 
         // Act
         viewModel.loadPatientPayments(patientId)
@@ -151,7 +155,8 @@ class PaymentViewModelTest {
     fun loadPatientPayments_emptyList_updatesStateToEmpty() = runTest {
         // Arrange
         val patientId = 1L
-        whenever(mockGetPatientPaymentsUseCase.execute(patientId)).thenReturn(emptyList())
+        whenever(mockRepository.getByPatientWithAppointments(patientId))
+            .thenReturn(flowOf(emptyList()))
 
         // Act
         viewModel.loadPatientPayments(patientId)
@@ -165,7 +170,7 @@ class PaymentViewModelTest {
     fun loadPatientPayments_onError_updatesStateToError() = runTest {
         // Arrange
         val patientId = 1L
-        whenever(mockGetPatientPaymentsUseCase.execute(patientId))
+        whenever(mockRepository.getByPatientWithAppointments(patientId))
             .thenThrow(RuntimeException("Database error"))
 
         // Act
@@ -182,14 +187,15 @@ class PaymentViewModelTest {
     fun multipleLoadPayments_lastLoadWins() = runTest {
         // Arrange - first load returns one payment
         val patientId = 1L
-        whenever(mockGetPatientPaymentsUseCase.execute(patientId))
-            .thenReturn(listOf(mockPayments[0]))
+        whenever(mockRepository.getByPatientWithAppointments(patientId))
+            .thenReturn(flowOf(listOf(mockPaymentsWithDetails[0])))
 
         viewModel.loadPatientPayments(patientId)
         testDispatcher.scheduler.advanceUntilIdle()
 
         // Arrange - second load returns both payments
-        whenever(mockGetPatientPaymentsUseCase.execute(patientId)).thenReturn(mockPayments)
+        whenever(mockRepository.getByPatientWithAppointments(patientId))
+            .thenReturn(flowOf(mockPaymentsWithDetails))
 
         // Act
         viewModel.loadPatientPayments(patientId)

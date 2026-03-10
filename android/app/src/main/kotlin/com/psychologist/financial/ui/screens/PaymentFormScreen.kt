@@ -14,7 +14,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
@@ -39,12 +42,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
 import com.psychologist.financial.domain.models.Appointment
+import com.psychologist.financial.domain.models.BiometricAuthResult
+import com.psychologist.financial.services.PerOperationAuthManager
 import com.psychologist.financial.ui.components.ErrorBanner
 import com.psychologist.financial.viewmodel.PaymentViewModel
 import com.psychologist.financial.viewmodel.PaymentViewState
@@ -72,6 +79,8 @@ fun PaymentFormScreen(
     onCancel: () -> Unit
 ) {
     val formState by viewModel.paymentFormState.collectAsState()
+    val deleteState by viewModel.deletePaymentState.collectAsState()
+    val activity = LocalContext.current as? FragmentActivity
 
     LaunchedEffect(paymentId) {
         if (paymentId != null) {
@@ -79,6 +88,65 @@ fun PaymentFormScreen(
         } else {
             viewModel.loadAvailableAppointments(patientId)
         }
+    }
+
+    // Biometric auth trigger when AwaitingAuth (after user confirmed the dialog); navigate on Success
+    LaunchedEffect(deleteState) {
+        when (deleteState) {
+            is PaymentViewState.DeletePaymentState.AwaitingAuth -> {
+                if (activity != null) {
+                    val authManager = PerOperationAuthManager(activity)
+                    when (authManager.authenticateDelete()) {
+                        is BiometricAuthResult.Success -> viewModel.confirmDeletePayment()
+                        is BiometricAuthResult.Unavailable -> viewModel.confirmDeletePayment()
+                        else -> viewModel.cancelDeletePayment()
+                    }
+                } else {
+                    viewModel.confirmDeletePayment()
+                }
+            }
+            is PaymentViewState.DeletePaymentState.Success -> {
+                onSuccess()
+                viewModel.cancelDeletePayment()
+            }
+            else -> Unit
+        }
+    }
+
+    // Delete confirmation dialog — shown first, before biometric
+    if (deleteState is PaymentViewState.DeletePaymentState.AwaitingConfirmation) {
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelDeletePayment() },
+            title = { Text("Excluir Pagamento") },
+            text = { Text("Tem certeza que deseja excluir este pagamento? Esta ação é irreversível.") },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.onPaymentDeleteAuthSuccess() },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Excluir")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelDeletePayment() }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // Delete error dialog
+    if (deleteState is PaymentViewState.DeletePaymentState.Error) {
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelDeletePayment() },
+            title = { Text("Erro ao excluir") },
+            text = { Text((deleteState as PaymentViewState.DeletePaymentState.Error).message) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.cancelDeletePayment() }) { Text("OK") }
+            }
+        )
     }
 
     Scaffold(
@@ -104,19 +172,15 @@ fun PaymentFormScreen(
             onToggleAppointment = { viewModel.toggleAppointmentSelection(it) },
             onSubmit = { viewModel.submitForm(patientId) },
             onCancel = onCancel,
+            isEditing = paymentId != null,
+            onDeletePayment = { if (paymentId != null) viewModel.requestDeletePayment(paymentId) },
+            deleteInProgress = deleteState is PaymentViewState.DeletePaymentState.InProgress,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         )
     }
 
-    // Navigate on success: when error is null and loading is false and selection was cleared
-    // The ViewModel clears amountText on success — use that as success signal
-    LaunchedEffect(formState.isLoading, formState.errorMessage) {
-        // isLoading transitioned to false and errorMessage is null after a previous submit
-        // We use a different signal: if amountText is empty after user had typed something,
-        // navigate. This is handled by observing the reset state.
-    }
 }
 
 @Composable
@@ -127,6 +191,9 @@ private fun PaymentFormContent(
     onToggleAppointment: (Long) -> Unit,
     onSubmit: () -> Unit,
     onCancel: () -> Unit,
+    isEditing: Boolean = false,
+    onDeletePayment: () -> Unit = {},
+    deleteInProgress: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
@@ -270,6 +337,27 @@ private fun PaymentFormContent(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            // Delete button — only visible in edit mode; outlined for a less prominent style
+            if (isEditing) {
+                OutlinedButton(
+                    onClick = onDeletePayment,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    enabled = !formState.isLoading && !deleteInProgress,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (!formState.isLoading && !deleteInProgress)
+                            MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                    )
+                ) {
+                    Text("Excluir pagamento", style = MaterialTheme.typography.bodySmall)
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
         }
