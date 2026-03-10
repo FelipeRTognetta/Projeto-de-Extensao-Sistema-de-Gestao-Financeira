@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.psychologist.financial.data.repositories.PaymentRepository
 import com.psychologist.financial.domain.models.Payment
 import com.psychologist.financial.domain.usecases.CreatePaymentUseCase
+import com.psychologist.financial.domain.usecases.DeletePaymentUseCase
 import com.psychologist.financial.domain.usecases.GetAllPaymentsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientPaymentsUseCase
 import com.psychologist.financial.domain.usecases.GetUnpaidAppointmentsUseCase
@@ -37,7 +38,8 @@ class PaymentViewModel(
     private val getUnpaidAppointmentsUseCase: GetUnpaidAppointmentsUseCase,
     private val repository: PaymentRepository? = null,
     private val getPatientPaymentsUseCase: GetPatientPaymentsUseCase? = null,
-    private val getAllPaymentsUseCase: GetAllPaymentsUseCase? = null
+    private val getAllPaymentsUseCase: GetAllPaymentsUseCase? = null,
+    private val deletePaymentUseCase: DeletePaymentUseCase? = null
 ) : ViewModel() {
 
     // ========================================
@@ -340,5 +342,54 @@ class PaymentViewModel(
                 // silent — list will refresh on next load
             }
         }
+    }
+
+    // ========================================
+    // Delete Payment State (US2)
+    // ========================================
+
+    private val _deletePaymentState = MutableStateFlow<PaymentViewState.DeletePaymentState>(
+        PaymentViewState.DeletePaymentState.Idle
+    )
+    val deletePaymentState: StateFlow<PaymentViewState.DeletePaymentState> =
+        _deletePaymentState.asStateFlow()
+
+    private var pendingDeletePaymentId: Long? = null
+
+    /**
+     * Request deletion — shows confirmation dialog first (AwaitingConfirmation).
+     * After user confirms the dialog, [onPaymentDeleteAuthSuccess] triggers biometric.
+     */
+    fun requestDeletePayment(paymentId: Long) {
+        pendingDeletePaymentId = paymentId
+        _deletePaymentState.value = PaymentViewState.DeletePaymentState.AwaitingConfirmation
+    }
+
+    /** Called by the UI when user confirms the dialog — moves to AwaitingAuth to trigger biometric. */
+    fun onPaymentDeleteAuthSuccess() {
+        _deletePaymentState.value = PaymentViewState.DeletePaymentState.AwaitingAuth
+    }
+
+    /** Called by the UI after successful biometric authentication — execute the delete. */
+    fun confirmDeletePayment() {
+        val id = pendingDeletePaymentId ?: return
+        _deletePaymentState.value = PaymentViewState.DeletePaymentState.InProgress
+        viewModelScope.launch {
+            try {
+                deletePaymentUseCase?.execute(id)
+                _deletePaymentState.value = PaymentViewState.DeletePaymentState.Success
+                pendingDeletePaymentId = null
+            } catch (e: Exception) {
+                _deletePaymentState.value = PaymentViewState.DeletePaymentState.Error(
+                    e.message ?: "Erro ao excluir pagamento"
+                )
+            }
+        }
+    }
+
+    /** Cancel or reset the delete flow. */
+    fun cancelDeletePayment() {
+        pendingDeletePaymentId = null
+        _deletePaymentState.value = PaymentViewState.DeletePaymentState.Idle
     }
 }

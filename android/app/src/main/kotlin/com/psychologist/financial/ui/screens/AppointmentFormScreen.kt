@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -86,6 +87,7 @@ fun AppointmentFormScreen(
     val formTime = viewModel.formTime.collectAsState().value
     val formNotes = viewModel.formNotes.collectAsState().value
     val isSubmitting = formState.isSubmitting
+    val deleteState = viewModel.deleteAppointmentState.collectAsState().value
 
     // Load existing appointment data when editing, or reset for new
     LaunchedEffect(editingAppointmentId) {
@@ -111,6 +113,50 @@ fun AppointmentFormScreen(
             onSuccess()
             viewModel.clearSubmissionResult()
         }
+    }
+
+    // Navigate back when delete succeeds
+    LaunchedEffect(deleteState) {
+        if (deleteState is AppointmentViewState.DeleteAppointmentState.Success) {
+            onSuccess()
+            viewModel.cancelDeleteAppointment()
+        }
+    }
+
+    // Delete confirmation dialog
+    if (deleteState is AppointmentViewState.DeleteAppointmentState.AwaitingConfirmation) {
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelDeleteAppointment() },
+            title = { Text("Excluir Consulta") },
+            text = { Text("Tem certeza que deseja excluir esta consulta? Esta ação é irreversível.") },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.confirmDeleteAppointment() },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Excluir")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelDeleteAppointment() }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // Delete error dialog
+    if (deleteState is AppointmentViewState.DeleteAppointmentState.Error) {
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelDeleteAppointment() },
+            title = { Text("Erro ao excluir") },
+            text = { Text(deleteState.message) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.cancelDeleteAppointment() }) { Text("OK") }
+            }
+        )
     }
 
     // Picker visibility state
@@ -322,6 +368,29 @@ fun AppointmentFormScreen(
                         )
                     }
                     Text("Salvar")
+                }
+            }
+
+            // Delete button — only visible in edit mode
+            if (isEditing) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        if (editingAppointmentId != null) {
+                            viewModel.requestDeleteAppointment(editingAppointmentId)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    enabled = !isSubmitting &&
+                        deleteState !is AppointmentViewState.DeleteAppointmentState.InProgress,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                ) {
+                    Text("Excluir Consulta")
                 }
             }
 

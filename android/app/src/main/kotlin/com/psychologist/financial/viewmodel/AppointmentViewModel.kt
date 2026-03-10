@@ -7,6 +7,7 @@ import com.psychologist.financial.domain.models.Appointment
 import com.psychologist.financial.domain.models.AppointmentWithPaymentStatus
 import com.psychologist.financial.domain.models.BillableHoursSummary
 import com.psychologist.financial.domain.usecases.CreateAppointmentUseCase
+import com.psychologist.financial.domain.usecases.DeleteAppointmentUseCase
 import com.psychologist.financial.domain.usecases.GetAllAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.UpdateAppointmentUseCase
@@ -73,7 +74,8 @@ class AppointmentViewModel(
     private val createAppointmentUseCase: CreateAppointmentUseCase,
     private val updateAppointmentUseCase: UpdateAppointmentUseCase,
     private val billableHoursCalculator: BillableHoursCalculator = BillableHoursCalculator(),
-    private val getAllAppointmentsUseCase: GetAllAppointmentsUseCase? = null
+    private val getAllAppointmentsUseCase: GetAllAppointmentsUseCase? = null,
+    private val deleteAppointmentUseCase: DeleteAppointmentUseCase? = null
 ) : ViewModel() {
 
     // ========================================
@@ -647,5 +649,46 @@ class AppointmentViewModel(
      */
     fun calculateMonthlyRevenue(hourlyRate: Double): Double {
         return _billableHoursSummary.value?.calculateRevenue(hourlyRate) ?: 0.0
+    }
+
+    // ========================================
+    // Delete Appointment State (US2)
+    // ========================================
+
+    private val _deleteAppointmentState = MutableStateFlow<AppointmentViewState.DeleteAppointmentState>(
+        AppointmentViewState.DeleteAppointmentState.Idle
+    )
+    val deleteAppointmentState: StateFlow<AppointmentViewState.DeleteAppointmentState> =
+        _deleteAppointmentState.asStateFlow()
+
+    private var pendingDeleteAppointmentId: Long? = null
+
+    /** Request deletion — moves to AwaitingConfirmation state for UI to show dialog. */
+    fun requestDeleteAppointment(appointmentId: Long) {
+        pendingDeleteAppointmentId = appointmentId
+        _deleteAppointmentState.value = AppointmentViewState.DeleteAppointmentState.AwaitingConfirmation
+    }
+
+    /** User confirmed the dialog — execute the delete. */
+    fun confirmDeleteAppointment() {
+        val id = pendingDeleteAppointmentId ?: return
+        _deleteAppointmentState.value = AppointmentViewState.DeleteAppointmentState.InProgress
+        viewModelScope.launch {
+            try {
+                deleteAppointmentUseCase?.execute(id)
+                _deleteAppointmentState.value = AppointmentViewState.DeleteAppointmentState.Success
+                pendingDeleteAppointmentId = null
+            } catch (e: Exception) {
+                _deleteAppointmentState.value = AppointmentViewState.DeleteAppointmentState.Error(
+                    e.message ?: "Erro ao excluir consulta"
+                )
+            }
+        }
+    }
+
+    /** Cancel or reset the delete flow. */
+    fun cancelDeleteAppointment() {
+        pendingDeleteAppointmentId = null
+        _deleteAppointmentState.value = AppointmentViewState.DeleteAppointmentState.Idle
     }
 }

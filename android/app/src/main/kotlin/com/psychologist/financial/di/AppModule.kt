@@ -309,7 +309,8 @@ object AppModule {
         getPatientAppointmentsUseCase = getPatientAppointmentsUseCase,
         createAppointmentUseCase = createAppointmentUseCase,
         updateAppointmentUseCase = updateAppointmentUseCase,
-        getAllAppointmentsUseCase = getAllAppointmentsUseCase
+        getAllAppointmentsUseCase = getAllAppointmentsUseCase,
+        deleteAppointmentUseCase = deleteAppointmentUseCase
     )
 
     fun providePaymentViewModel(): PaymentViewModel = PaymentViewModel(
@@ -317,7 +318,8 @@ object AppModule {
         getUnpaidAppointmentsUseCase = getUnpaidAppointmentsUseCase,
         repository = paymentRepository,
         getPatientPaymentsUseCase = getPatientPaymentsUseCase,
-        getAllPaymentsUseCase = getAllPaymentsUseCase
+        getAllPaymentsUseCase = getAllPaymentsUseCase,
+        deletePaymentUseCase = deletePaymentUseCase
     )
 
     fun provideDashboardViewModel(): DashboardViewModel = DashboardViewModel(
