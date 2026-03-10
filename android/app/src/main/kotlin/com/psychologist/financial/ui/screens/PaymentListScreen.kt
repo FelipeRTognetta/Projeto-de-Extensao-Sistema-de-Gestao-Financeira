@@ -28,6 +28,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.psychologist.financial.data.repositories.PaymentWithDetails
@@ -79,6 +83,7 @@ fun PaymentListScreen(
     viewModel: PaymentViewModel,
     patientId: Long,
     patientName: String = "",
+    isPatientActive: Boolean = true,
     onBack: () -> Unit,
     onAddPayment: () -> Unit,
     onSelectPayment: (Long) -> Unit = { }
@@ -90,6 +95,7 @@ fun PaymentListScreen(
             viewModel = viewModel,
             patientId = patientId,
             patientName = patientName,
+            isPatientActive = isPatientActive,
             onBack = onBack,
             onAddPayment = onAddPayment,
             onSelectPayment = onSelectPayment
@@ -196,6 +202,7 @@ private fun PatientPaymentListScreen(
     viewModel: PaymentViewModel,
     patientId: Long,
     patientName: String,
+    isPatientActive: Boolean,
     onBack: () -> Unit,
     onAddPayment: () -> Unit,
     onSelectPayment: (Long) -> Unit
@@ -234,8 +241,19 @@ private fun PatientPaymentListScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = onAddPayment,
-                containerColor = MaterialTheme.colorScheme.primary
+                onClick = { if (isPatientActive) onAddPayment() },
+                containerColor = if (isPatientActive)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                modifier = Modifier
+                    .testTag("fab_add_payment")
+                    .then(
+                        if (!isPatientActive) Modifier
+                            .alpha(0.38f)
+                            .semantics { disabled() }
+                        else Modifier
+                    )
             ) {
                 Icon(Icons.Default.Add, "Adicionar Pagamento")
             }
@@ -256,7 +274,7 @@ private fun PatientPaymentListScreen(
                 is PaymentViewState.ListState.Success -> {
                     PaymentListContent(
                         payments = listState.payments,
-                        onSelectPayment = onSelectPayment
+                        onSelectPayment = if (isPatientActive) onSelectPayment else { _ -> }
                     )
                 }
 

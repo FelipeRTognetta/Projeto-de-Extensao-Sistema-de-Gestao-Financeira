@@ -35,6 +35,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.psychologist.financial.domain.models.AppointmentWithPaymentStatus
@@ -84,6 +88,7 @@ fun AppointmentListScreen(
     viewModel: AppointmentViewModel,
     patientId: Long,
     patientName: String = "",
+    isPatientActive: Boolean = true,
     onBack: () -> Unit,
     onAddAppointment: () -> Unit,
     onSelectAppointment: (Long) -> Unit = { }
@@ -100,6 +105,7 @@ fun AppointmentListScreen(
             viewModel = viewModel,
             patientId = patientId,
             patientName = patientName,
+            isPatientActive = isPatientActive,
             onBack = onBack,
             onAddAppointment = onAddAppointment,
             onSelectAppointment = onSelectAppointment
@@ -257,6 +263,7 @@ private fun PatientAppointmentListScreen(
     viewModel: AppointmentViewModel,
     patientId: Long,
     patientName: String,
+    isPatientActive: Boolean,
     onBack: () -> Unit,
     onAddAppointment: () -> Unit,
     onSelectAppointment: (Long) -> Unit
@@ -296,8 +303,19 @@ private fun PatientAppointmentListScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = onAddAppointment,
-                containerColor = MaterialTheme.colorScheme.primary
+                onClick = { if (isPatientActive) onAddAppointment() },
+                containerColor = if (isPatientActive)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                modifier = Modifier
+                    .testTag("fab_add_appointment")
+                    .then(
+                        if (!isPatientActive) Modifier
+                            .alpha(0.38f)
+                            .semantics { disabled() }
+                        else Modifier
+                    )
             ) {
                 Icon(Icons.Default.Add, "Adicionar Consulta")
             }
@@ -320,7 +338,7 @@ private fun PatientAppointmentListScreen(
                         appointments = listState.appointments,
                         showOnlyPending = showOnlyPending,
                         onFilterChange = { showOnlyPending = it },
-                        onSelectAppointment = onSelectAppointment
+                        onSelectAppointment = if (isPatientActive) onSelectAppointment else { _ -> }
                     )
                 }
 
