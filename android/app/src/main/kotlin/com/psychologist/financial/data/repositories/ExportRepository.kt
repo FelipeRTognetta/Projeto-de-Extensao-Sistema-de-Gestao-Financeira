@@ -353,6 +353,26 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
     }
 
     /**
+     * Get all payment-appointment cross-refs.
+     *
+     * Returns every record from the payment_appointments junction table.
+     * Used by the backup export to preserve payment-appointment links.
+     *
+     * @return List of all [PaymentAppointmentCrossRef]
+     */
+    suspend fun getAllPaymentCrossRefs(): List<com.psychologist.financial.data.entities.PaymentAppointmentCrossRef> {
+        return try {
+            AppLogger.d(TAG, "Querying all payment-appointment cross-refs for export...")
+            val refs = paymentDao.getAllCrossRefs()
+            AppLogger.d(TAG, "Retrieved ${refs.size} cross-refs")
+            refs
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "Error retrieving payment cross-refs", e)
+            throw e
+        }
+    }
+
+    /**
      * Get all PayerInfo records.
      *
      * Returns every record from the payer_info table.
@@ -390,7 +410,10 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
             },
             initialConsultDate = this.initialConsultDate,
             registrationDate = this.registrationDate,
-            lastAppointmentDate = this.lastAppointmentDate
+            lastAppointmentDate = this.lastAppointmentDate,
+            cpf = this.cpf,
+            endereco = this.endereco,
+            naoPagante = this.naoPagante
         )
     }
 

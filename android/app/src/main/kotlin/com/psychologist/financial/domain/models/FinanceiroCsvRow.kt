@@ -6,7 +6,7 @@ package com.psychologist.financial.domain.models
  * One [FinanceiroCsvRow] is generated per payment. If a patient has two payments
  * in the selected month, two rows are produced.
  *
- * Payer columns (nomeResponsavel … enderecoResponsavel) are populated only when
+ * Pagante columns (nomeResponsavel … enderecoResponsavel) are populated only when
  * the patient's [Patient.naoPagante] flag is true and a [PayerInfo] record exists;
  * otherwise they are empty strings (never null or omitted).
  *

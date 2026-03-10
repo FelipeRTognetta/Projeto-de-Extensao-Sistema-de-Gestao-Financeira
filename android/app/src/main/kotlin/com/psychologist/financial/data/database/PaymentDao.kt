@@ -466,6 +466,12 @@ interface PaymentDao {
     suspend fun deleteAppointmentLinksByPayment(paymentId: Long)
 
     /**
+     * Get all payment-appointment cross-refs (for backup export).
+     */
+    @Query("SELECT * FROM payment_appointments")
+    suspend fun getAllCrossRefs(): List<PaymentAppointmentCrossRef>
+
+    /**
      * Delete all payment-appointment cross-refs (for full backup restore).
      */
     @Query("DELETE FROM payment_appointments")

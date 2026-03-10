@@ -348,7 +348,12 @@ class ExportDataUseCase(
             val patientById = patients.associateBy { it.id }
             val payerInfoByPatientId = payerInfos.associateBy { it.patientId }
 
-            val rows = payments.mapNotNull { payment ->
+            val rows = payments
+                .sortedWith(compareBy(
+                    { patientById[it.patientId]?.name?.lowercase() ?: "" },
+                    { it.paymentDate }
+                ))
+                .mapNotNull { payment ->
                 val patient = patientById[payment.patientId] ?: return@mapNotNull null
                 val payerInfo = payerInfoByPatientId[payment.patientId]
                 FinanceiroCsvRow(

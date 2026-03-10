@@ -1,6 +1,5 @@
 package com.psychologist.financial.domain.usecases
 
-import com.psychologist.financial.data.entities.PaymentAppointmentCrossRef
 import com.psychologist.financial.data.repositories.ExportRepository
 import com.psychologist.financial.domain.models.BackupResult
 import com.psychologist.financial.services.BackupExportService
@@ -76,13 +75,7 @@ class ExportBackupUseCase(
                 val appointments = repository.getAllAppointments()
                 val payments = repository.getAllPayments()
                 val payerInfos = repository.getAllPayerInfos()
-
-                // Derive cross-refs from payment.appointmentIds
-                val crossRefs = payments.flatMap { payment ->
-                    payment.appointmentIds.map { appointmentId ->
-                        PaymentAppointmentCrossRef(payment.id, appointmentId)
-                    }
-                }
+                val crossRefs = repository.getAllPaymentCrossRefs()
 
                 AppLogger.d(TAG, "Loaded: ${patients.size} patients, ${appointments.size} appointments, " +
                     "${payments.size} payments, ${payerInfos.size} payerInfos, ${crossRefs.size} crossRefs")

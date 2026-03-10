@@ -123,6 +123,19 @@ class CsvExportService {
     }
 
     /**
+     * Wrap a numeric-looking string so Excel/LibreOffice treats it as text.
+     *
+     * Fields like phone numbers and CPF consist entirely of digits and are
+     * auto-converted to numbers by spreadsheet apps, causing scientific notation
+     * for long values (e.g. +134578945612 → 1.34579E+11) and stripping leading
+     * zeros. The ="value" notation forces the cell to be treated as a text formula
+     * in both Excel and LibreOffice Calc.
+     *
+     * Empty strings are returned as-is (no wrapper added for blank cells).
+     */
+    private fun String.asTextCell(): String = if (isEmpty()) this else "=\"$this\""
+
+    /**
      * Escape CSV special characters
      *
      * Handles quotes, commas, and newlines according to CSV specification.
@@ -160,10 +173,10 @@ class CsvExportService {
             .setDelimiter(';')
             .setRecordSeparator('\n')
             .setHeader(
-                "Nome Paciente", "CPF Paciente", "Email Paciente",
-                "Telefone Paciente", "Endereço Paciente",
-                "Nome Responsável", "CPF Responsável", "Email Responsável",
-                "Telefone Responsável", "Endereço Responsável",
+                "Nome", "CPF", "Email",
+                "Telefone", "Endereço",
+                "Nome Pagante", "CPF Pagante", "Email Pagante",
+                "Telefone Pagante", "Endereço Pagante",
                 "Valor Pagamento", "Data Pagamento"
             )
             .build()
@@ -172,11 +185,11 @@ class CsvExportService {
             CSVPrinter(writer, format).use { printer ->
                 rows.forEach { row ->
                     printer.printRecord(
-                        row.nomePaciente, row.cpfPaciente, row.emailPaciente,
-                        row.telefonePaciente, row.enderecoPaciente,
-                        row.nomeResponsavel, row.cpfResponsavel, row.emailResponsavel,
-                        row.telefoneResponsavel, row.enderecoResponsavel,
-                        row.valorPagamento, row.dataPagamento
+                        row.nomePaciente, row.cpfPaciente.asTextCell(), row.emailPaciente,
+                        row.telefonePaciente.asTextCell(), row.enderecoPaciente,
+                        row.nomeResponsavel, row.cpfResponsavel.asTextCell(), row.emailResponsavel,
+                        row.telefoneResponsavel.asTextCell(), row.enderecoResponsavel,
+                        row.valorPagamento, row.dataPagamento.asTextCell()
                     )
                 }
             }
