@@ -6,12 +6,15 @@ import com.psychologist.financial.data.repositories.AppointmentRepository
 import com.psychologist.financial.domain.models.Appointment
 import com.psychologist.financial.domain.models.AppointmentWithPaymentStatus
 import com.psychologist.financial.domain.models.BillableHoursSummary
+import com.psychologist.financial.domain.models.PageLoadStatus
+import com.psychologist.financial.domain.models.PaginationState
 import com.psychologist.financial.domain.usecases.CreateAppointmentUseCase
 import com.psychologist.financial.domain.usecases.DeleteAppointmentUseCase
 import com.psychologist.financial.domain.usecases.GetAllAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.UpdateAppointmentUseCase
 import com.psychologist.financial.services.BillableHoursCalculator
+import com.psychologist.financial.utils.Constants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -91,6 +94,52 @@ class AppointmentViewModel(
     private var activeAppointmentFilter: AppointmentViewState.AppointmentFilter = AppointmentViewState.AppointmentFilter.ALL
     private var appointmentNameFilter: String = ""
 
+    // ========================================
+    // Global List Pagination State
+    // ========================================
+
+    private val _globalPaginationState = MutableStateFlow(PaginationState<AppointmentWithPaymentStatus>())
+    val globalPaginationState: StateFlow<PaginationState<AppointmentWithPaymentStatus>> = _globalPaginationState.asStateFlow()
+
+    /** Reset global list to page 0 and load first page. Called on screen entry and filter change. */
+    fun resetGlobalList() {
+        _globalPaginationState.value = PaginationState()
+        loadNextGlobalPage()
+    }
+
+    /** Load the next page of the global appointment list. No-op while loading or when fully loaded. */
+    fun loadNextGlobalPage() {
+        val current = _globalPaginationState.value
+        if (current.isLoading || !current.hasMore) return
+        viewModelScope.launch {
+            _globalPaginationState.value = current.copy(status = PageLoadStatus.Loading)
+            try {
+                val searchTerm = if (appointmentNameFilter.isBlank()) "%" else "%$appointmentNameFilter%"
+                val statusFilter = when (activeAppointmentFilter) {
+                    AppointmentViewState.AppointmentFilter.ALL -> "ALL"
+                    AppointmentViewState.AppointmentFilter.PENDING -> "PENDING"
+                    AppointmentViewState.AppointmentFilter.PAID -> "PAID"
+                }
+                val newItems = repository.getPagedWithPaymentStatus(
+                    searchTerm = searchTerm,
+                    statusFilter = statusFilter,
+                    page = current.currentPage
+                )
+                val hasMore = newItems.size == Constants.PAGE_SIZE
+                _globalPaginationState.value = current.copy(
+                    items = current.items + newItems,
+                    currentPage = current.currentPage + 1,
+                    status = PageLoadStatus.Idle,
+                    hasMore = hasMore
+                )
+            } catch (e: Exception) {
+                _globalPaginationState.value = current.copy(
+                    status = PageLoadStatus.Error(e.message ?: "Erro ao carregar consultas")
+                )
+            }
+        }
+    }
+
     /**
      * Load all appointments from all patients (global list tab).
      * Collects from [GetAllAppointmentsUseCase] reactively.
@@ -116,24 +165,24 @@ class AppointmentViewModel(
     }
 
     /**
-     * Apply a payment-status filter to the cached global appointment list.
-     * Safe to call before [loadAllAppointments] — works on cached data.
+     * Apply a payment-status filter to the paginated global list.
+     * Resets pagination to page 0.
      *
      * @param filter [AppointmentFilter.ALL], [PENDING], or [PAID]
      */
     fun setFilter(filter: AppointmentViewState.AppointmentFilter) {
         activeAppointmentFilter = filter
-        applyGlobalFilter(filter)
+        resetGlobalList()
     }
 
     fun setNameFilter(query: String) {
         appointmentNameFilter = query
-        applyGlobalFilter(activeAppointmentFilter)
+        resetGlobalList()
     }
 
     fun resetNameFilter() {
         appointmentNameFilter = ""
-        applyGlobalFilter(activeAppointmentFilter)
+        resetGlobalList()
     }
 
     private fun applyGlobalFilter(filter: AppointmentViewState.AppointmentFilter) {

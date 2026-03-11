@@ -7,12 +7,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.psychologist.financial.ui.components.AppointmentListItem
+import com.psychologist.financial.ui.components.PaginatedLazyColumn
 import com.psychologist.financial.viewmodel.AppointmentViewModel
 import com.psychologist.financial.viewmodel.AppointmentViewState
 
@@ -47,8 +45,8 @@ import com.psychologist.financial.viewmodel.AppointmentViewState
  * - "Com pendência" — appointments without a linked payment
  * - "Sem pendência" — appointments linked to a payment
  *
- * Each item shows an "Pagamento em aberto" indicator when pending.
- * No FAB — appointments are created from the patient detail screen.
+ * Uses paginated loading via [PaginatedLazyColumn] — loads [Constants.PAGE_SIZE]
+ * items at a time as the user scrolls.
  *
  * @param viewModel AppointmentViewModel
  */
@@ -57,11 +55,12 @@ fun GlobalAppointmentListScreen(
     viewModel: AppointmentViewModel,
     onPatientClick: (Long) -> Unit = { }
 ) {
-    val state by viewModel.globalListState.collectAsState()
+    val paginationState by viewModel.globalPaginationState.collectAsState()
     var nameQuery by remember { mutableStateOf("") }
+    var activeFilter by remember { mutableStateOf(AppointmentViewState.AppointmentFilter.ALL) }
 
     LaunchedEffect(Unit) {
-        viewModel.loadAllAppointments()
+        viewModel.resetGlobalList()
     }
 
     DisposableEffect(Unit) {
@@ -84,115 +83,75 @@ fun GlobalAppointmentListScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Search field — always visible (not gated by state)
-            if (state !is AppointmentViewState.GlobalListState.Error) {
-                OutlinedTextField(
-                    value = nameQuery,
-                    onValueChange = { nameQuery = it; viewModel.setNameFilter(it) },
-                    placeholder = { Text("Buscar por nome do paciente") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    singleLine = true,
-                    trailingIcon = {
-                        if (nameQuery.isNotEmpty()) {
-                            IconButton(onClick = { nameQuery = ""; viewModel.resetNameFilter() }) {
-                                Icon(Icons.Default.Close, contentDescription = "Limpar busca")
-                            }
+            OutlinedTextField(
+                value = nameQuery,
+                onValueChange = { nameQuery = it; viewModel.setNameFilter(it) },
+                placeholder = { Text("Buscar por nome do paciente") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                singleLine = true,
+                trailingIcon = {
+                    if (nameQuery.isNotEmpty()) {
+                        IconButton(onClick = { nameQuery = ""; viewModel.resetNameFilter() }) {
+                            Icon(Icons.Default.Close, contentDescription = "Limpar busca")
                         }
                     }
-                )
-            }
+                }
+            )
+
+            FilterRow(
+                activeFilter = activeFilter,
+                onFilterSelected = {
+                    activeFilter = it
+                    viewModel.setFilter(it)
+                }
+            )
 
             Box(modifier = Modifier.weight(1f)) {
-                when (val s = state) {
-                    is AppointmentViewState.GlobalListState.Loading -> {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                when {
+                    paginationState.items.isEmpty() && paginationState.isLoading -> {
+                        // initial load — PaginatedLazyColumn handles the spinner
                     }
 
-                    is AppointmentViewState.GlobalListState.Success -> {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            FilterRow(
-                                activeFilter = s.activeFilter,
-                                onFilterSelected = { viewModel.setFilter(it) }
-                            )
-
-                            if (s.filteredAppointments.isEmpty()) {
-                                val emptyMsg = when {
-                                    nameQuery.isNotEmpty() -> "Nenhuma consulta encontrada para \"$nameQuery\""
-                                    s.activeFilter == AppointmentViewState.AppointmentFilter.PENDING ->
-                                        "Nenhuma consulta com pagamento pendente"
-                                    s.activeFilter == AppointmentViewState.AppointmentFilter.PAID ->
-                                        "Nenhuma consulta com pagamento registrado"
-                                    else -> "Nenhuma consulta registrada"
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(24.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = emptyMsg,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                            } else {
-                                LazyColumn(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    items(
-                                        items = s.filteredAppointments,
-                                        key = { it.appointment.id }
-                                    ) { appointmentWithStatus ->
-                                        AppointmentListItem(
-                                            appointmentWithStatus = appointmentWithStatus,
-                                            onClick = { onPatientClick(appointmentWithStatus.appointment.patientId) }
-                                        )
-                                    }
-                                }
-                            }
+                    paginationState.items.isEmpty() && !paginationState.isLoading -> {
+                        val emptyMsg = when {
+                            nameQuery.isNotEmpty() -> "Nenhuma consulta encontrada para \"$nameQuery\""
+                            activeFilter == AppointmentViewState.AppointmentFilter.PENDING ->
+                                "Nenhuma consulta com pagamento pendente"
+                            activeFilter == AppointmentViewState.AppointmentFilter.PAID ->
+                                "Nenhuma consulta com pagamento registrado"
+                            else -> "Nenhuma consulta registrada"
                         }
-                    }
-
-                    is AppointmentViewState.GlobalListState.Empty -> {
-                        Column(
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp)
-                                .align(Alignment.Center),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                .fillMaxSize()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Nenhuma consulta registrada",
-                                style = MaterialTheme.typography.titleMedium,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = "As consultas aparecerão aqui após serem registradas na tela do paciente.",
+                                text = emptyMsg,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
                             )
                         }
                     }
+                }
 
-                    is AppointmentViewState.GlobalListState.Error -> {
-                        Text(
-                            text = s.message,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(24.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                PaginatedLazyColumn(
+                    items = paginationState.items,
+                    isLoading = paginationState.isLoading,
+                    isError = paginationState.isError,
+                    allLoaded = !paginationState.hasMore,
+                    onLoadMore = { viewModel.loadNextGlobalPage() },
+                    modifier = Modifier.fillMaxSize(),
+                    key = { it.appointment.id }
+                ) { appointmentWithStatus ->
+                    AppointmentListItem(
+                        appointmentWithStatus = appointmentWithStatus,
+                        onClick = { onPatientClick(appointmentWithStatus.appointment.patientId) }
+                    )
                 }
             }
         }

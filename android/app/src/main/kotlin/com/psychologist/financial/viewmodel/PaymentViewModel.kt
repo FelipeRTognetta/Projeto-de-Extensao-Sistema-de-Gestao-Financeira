@@ -4,12 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.psychologist.financial.data.repositories.PaymentRepository
 import com.psychologist.financial.data.repositories.PaymentWithDetails
+import com.psychologist.financial.domain.models.PageLoadStatus
+import com.psychologist.financial.domain.models.PaginationState
 import com.psychologist.financial.domain.models.Payment
 import com.psychologist.financial.domain.usecases.CreatePaymentUseCase
 import com.psychologist.financial.domain.usecases.DeletePaymentUseCase
 import com.psychologist.financial.domain.usecases.GetAllPaymentsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientPaymentsUseCase
 import com.psychologist.financial.domain.usecases.GetUnpaidAppointmentsUseCase
+import com.psychologist.financial.utils.Constants
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -229,6 +232,46 @@ class PaymentViewModel(
     private var cachedAllPayments: List<PaymentWithDetails> = emptyList()
     private var paymentNameFilter: String = ""
 
+    // ========================================
+    // Global Payment List Pagination State
+    // ========================================
+
+    private val _globalPaginationState = MutableStateFlow(PaginationState<PaymentWithDetails>())
+    val globalPaginationState: StateFlow<PaginationState<PaymentWithDetails>> = _globalPaginationState.asStateFlow()
+
+    /** Reset global payment list to page 0 and load first page. Called on screen entry and filter change. */
+    fun resetGlobalPaymentList() {
+        _globalPaginationState.value = PaginationState()
+        loadNextGlobalPaymentPage()
+    }
+
+    /** Load the next page of the global payment list. No-op while loading or when fully loaded. */
+    fun loadNextGlobalPaymentPage() {
+        val current = _globalPaginationState.value
+        if (current.isLoading || !current.hasMore) return
+        viewModelScope.launch {
+            _globalPaginationState.value = current.copy(status = PageLoadStatus.Loading)
+            try {
+                val searchTerm = if (paymentNameFilter.isBlank()) "%" else "%$paymentNameFilter%"
+                val newItems = repository!!.getPagedWithPatient(
+                    searchTerm = searchTerm,
+                    page = current.currentPage
+                )
+                val hasMore = newItems.size == Constants.PAGE_SIZE
+                _globalPaginationState.value = current.copy(
+                    items = current.items + newItems,
+                    currentPage = current.currentPage + 1,
+                    status = PageLoadStatus.Idle,
+                    hasMore = hasMore
+                )
+            } catch (e: Exception) {
+                _globalPaginationState.value = current.copy(
+                    status = PageLoadStatus.Error(e.message ?: "Erro ao carregar pagamentos")
+                )
+            }
+        }
+    }
+
     /**
      * Load all payments from all patients (global list tab).
      * Collects from [GetAllPaymentsUseCase] reactively.
@@ -254,12 +297,12 @@ class PaymentViewModel(
 
     fun setNameFilter(query: String) {
         paymentNameFilter = query
-        applyPaymentNameFilter()
+        resetGlobalPaymentList()
     }
 
     fun resetNameFilter() {
         paymentNameFilter = ""
-        applyPaymentNameFilter()
+        resetGlobalPaymentList()
     }
 
     private fun applyPaymentNameFilter() {

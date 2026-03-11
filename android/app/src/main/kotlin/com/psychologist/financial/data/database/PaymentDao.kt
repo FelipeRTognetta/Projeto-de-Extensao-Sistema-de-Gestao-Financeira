@@ -569,4 +569,41 @@ interface PaymentDao {
     @Transaction
     @Query("SELECT * FROM payments WHERE id = :paymentId")
     suspend fun getByIdWithAppointments(paymentId: Long): PaymentWithAppointments?
+
+    /**
+     * Paginated global payment list with optional patient name search.
+     * Includes patient_name via JOIN for name filtering.
+     * Ordered by payment_date DESC for stable LIMIT/OFFSET pagination.
+     */
+    @Transaction
+    @Query("""
+        SELECT payments.*, pat.name AS patient_name
+        FROM payments
+        JOIN patient pat ON payments.patient_id = pat.id
+        WHERE (:searchTerm = '%' OR LOWER(pat.name) LIKE LOWER(:searchTerm))
+        ORDER BY payments.payment_date DESC, payments.created_date DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun getPagedWithPatient(
+        searchTerm: String,
+        offset: Int,
+        limit: Int
+    ): List<PaymentWithAppointmentsAndPatient>
+
+    /**
+     * Paginated per-patient payment list with linked appointments.
+     * Ordered by payment_date DESC for stable LIMIT/OFFSET pagination.
+     */
+    @Transaction
+    @Query("""
+        SELECT * FROM payments
+        WHERE patient_id = :patientId
+        ORDER BY payment_date DESC, created_date DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun getPagedByPatient(
+        patientId: Long,
+        offset: Int,
+        limit: Int
+    ): List<PaymentWithAppointments>
 }
