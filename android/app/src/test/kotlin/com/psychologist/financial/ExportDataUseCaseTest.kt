@@ -2,7 +2,6 @@ package com.psychologist.financial
 
 import android.content.Context
 import com.psychologist.financial.data.repositories.ExportRepository
-import com.psychologist.financial.domain.models.ExportResult
 import com.psychologist.financial.domain.models.Patient
 import com.psychologist.financial.domain.models.PatientStatus
 import com.psychologist.financial.domain.models.PayerInfo
