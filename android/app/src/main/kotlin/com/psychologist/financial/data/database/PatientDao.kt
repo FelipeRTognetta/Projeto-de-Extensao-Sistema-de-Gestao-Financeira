@@ -249,6 +249,35 @@ interface PatientDao {
     suspend fun searchPatientsByName(searchTerm: String): List<PatientEntity>
 
     /**
+     * Get a single page of patients with server-side name filter and status filter.
+     *
+     * Used for paginated patient list. Pass searchTerm = "%" to return all.
+     * Pass includeInactive = true to include INACTIVE patients.
+     * Results are ordered alphabetically by name for stable LIMIT/OFFSET pagination.
+     *
+     * @param searchTerm LIKE pattern for name filter (e.g. "%" or "%silva%")
+     * @param includeInactive Whether to include INACTIVE patients
+     * @param offset Row offset (page * PAGE_SIZE)
+     * @param limit Max rows to return (PAGE_SIZE)
+     * @return List of matching PatientEntity for this page
+     */
+    @Query(
+        """
+        SELECT * FROM patient
+        WHERE LOWER(name) LIKE LOWER(:searchTerm)
+          AND (:includeInactive = 1 OR status = 'ACTIVE')
+        ORDER BY name ASC
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    suspend fun getPagedPatients(
+        searchTerm: String,
+        includeInactive: Boolean,
+        offset: Int,
+        limit: Int
+    ): List<PatientEntity>
+
+    /**
      * Get patient by phone number
      *
      * Phone is unique, so returns 0 or 1 patient.

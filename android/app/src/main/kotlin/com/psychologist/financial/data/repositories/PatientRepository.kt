@@ -7,6 +7,7 @@ import com.psychologist.financial.domain.models.Patient
 import com.psychologist.financial.domain.models.PatientStatus
 import com.psychologist.financial.domain.models.PayerInfo
 import com.psychologist.financial.utils.AppLogger
+import com.psychologist.financial.utils.Constants
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
@@ -276,6 +277,32 @@ class PatientRepository(database: AppDatabase) : BaseRepository(database) {
         return withRead {
             val pattern = "%$searchTerm%"
             patientDao.searchPatientsByName(pattern).map { it.toPatient() }
+        }
+    }
+
+    /**
+     * Get a single page of patients with optional name filter and status filter.
+     *
+     * Used for paginated patient list. Pass searchTerm = "%" to return all patients.
+     * A page returning fewer than PAGE_SIZE items signals the end of data (hasMore = false).
+     *
+     * @param searchTerm LIKE pattern for name filter ("%" = all, "%silva%" = filtered)
+     * @param includeInactive Whether to include INACTIVE patients
+     * @param page Zero-based page number
+     * @return List of Patient for this page (at most PAGE_SIZE items)
+     */
+    suspend fun getPagedPatients(
+        searchTerm: String,
+        includeInactive: Boolean,
+        page: Int
+    ): List<Patient> {
+        return withRead {
+            patientDao.getPagedPatients(
+                searchTerm = searchTerm,
+                includeInactive = includeInactive,
+                offset = page * Constants.PAGE_SIZE,
+                limit = Constants.PAGE_SIZE
+            ).map { it.toPatient() }
         }
     }
 

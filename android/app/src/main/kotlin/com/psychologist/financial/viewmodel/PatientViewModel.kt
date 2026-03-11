@@ -3,7 +3,10 @@ package com.psychologist.financial.viewmodel
 import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.psychologist.financial.data.repositories.AppointmentRepository
+import com.psychologist.financial.data.repositories.PatientRepository
 import com.psychologist.financial.data.repositories.PayerInfoRepository
+import com.psychologist.financial.domain.models.PageLoadStatus
+import com.psychologist.financial.domain.models.PaginationState
 import com.psychologist.financial.domain.models.Patient
 import com.psychologist.financial.domain.usecases.CreatePatientUseCase
 import com.psychologist.financial.domain.usecases.GetAllPatientsUseCase
@@ -11,6 +14,7 @@ import com.psychologist.financial.domain.usecases.MarkPatientInactiveUseCase
 import com.psychologist.financial.domain.usecases.ReactivatePatientUseCase
 import com.psychologist.financial.domain.usecases.UpdatePatientUseCase
 import com.psychologist.financial.domain.validation.PayerInfoValidator
+import com.psychologist.financial.utils.Constants
 import com.psychologist.financial.viewmodel.PatientViewState.CreatePatientState
 import com.psychologist.financial.viewmodel.PatientViewState.DetailState
 import com.psychologist.financial.viewmodel.PatientViewState.ListState
@@ -88,7 +92,8 @@ class PatientViewModel(
     private val updatePatientUseCase: UpdatePatientUseCase,
     private val payerInfoRepository: PayerInfoRepository? = null,
     private val payerInfoValidator: PayerInfoValidator = PayerInfoValidator(),
-    private val appointmentRepository: AppointmentRepository? = null
+    private val appointmentRepository: AppointmentRepository? = null,
+    private val patientRepository: PatientRepository? = null
 ) : BaseViewModel() {
 
     private companion object {
@@ -138,6 +143,53 @@ class PatientViewModel(
 
     private var cachedPatients: List<Patient> = emptyList()
     private var _nameFilter: String = ""
+
+    // ========================================
+    // Pagination State
+    // ========================================
+
+    private val _paginationState = MutableStateFlow(PaginationState<Patient>())
+    val paginationState: StateFlow<PaginationState<Patient>> = _paginationState.asStateFlow()
+
+    /**
+     * Reset pagination to page 0 and load the first page.
+     * Called when the list screen opens or filters change.
+     */
+    fun resetAndLoad() {
+        _paginationState.value = PaginationState()
+        loadNextPage()
+    }
+
+    /**
+     * Load the next page and append to current items.
+     * No-op when a load is already in progress or all pages are loaded.
+     */
+    fun loadNextPage() {
+        val current = _paginationState.value
+        if (current.isLoading || !current.hasMore) return
+        launchSafe {
+            _paginationState.value = current.copy(status = PageLoadStatus.Loading)
+            try {
+                val searchTerm = if (_nameFilter.isBlank()) "%" else "%$_nameFilter%"
+                val newItems = patientRepository!!.getPagedPatients(
+                    searchTerm = searchTerm,
+                    includeInactive = _includeInactivePatients.value,
+                    page = current.currentPage
+                )
+                val hasMore = newItems.size == Constants.PAGE_SIZE
+                _paginationState.value = current.copy(
+                    items = current.items + newItems,
+                    currentPage = current.currentPage + 1,
+                    status = PageLoadStatus.Idle,
+                    hasMore = hasMore
+                )
+            } catch (e: Exception) {
+                _paginationState.value = current.copy(
+                    status = PageLoadStatus.Error(e.message ?: "Erro ao carregar pacientes")
+                )
+            }
+        }
+    }
 
     // ========================================
     // Patient Detail State
@@ -316,7 +368,7 @@ class PatientViewModel(
     fun toggleInactiveFilter() {
         _includeInactivePatients.value = !_includeInactivePatients.value
         Log.d(TAG, "Filter toggled: include_inactive=${_includeInactivePatients.value}")
-        loadPatients()
+        if (patientRepository != null) resetAndLoad() else loadPatients()
     }
 
     /**
@@ -361,7 +413,7 @@ class PatientViewModel(
     /** Filter the cached patient list by name (case-insensitive). Combined with status filter. */
     fun setNameFilter(query: String) {
         _nameFilter = query
-        applyNameFilter()
+        if (patientRepository != null) resetAndLoad() else applyNameFilter()
     }
 
     /** Clear the name filter and restore full cached list. */

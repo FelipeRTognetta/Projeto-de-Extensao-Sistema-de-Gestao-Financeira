@@ -301,7 +301,8 @@ object AppModule {
         updatePatientUseCase = updatePatientUseCase,
         payerInfoRepository = payerInfoRepository,
         payerInfoValidator = payerInfoValidator,
-        appointmentRepository = appointmentRepository
+        appointmentRepository = appointmentRepository,
+        patientRepository = patientRepository
     )
 
     fun provideAppointmentViewModel(): AppointmentViewModel = AppointmentViewModel(
