@@ -218,6 +218,40 @@ class AppointmentViewModel(
     val currentPatientId: StateFlow<Long?> = _currentPatientId.asStateFlow()
 
     // ========================================
+    // Per-Patient Pagination State
+    // ========================================
+
+    private val _perPatientPaginationState = MutableStateFlow(PaginationState<AppointmentWithPaymentStatus>())
+    val perPatientPaginationState: StateFlow<PaginationState<AppointmentWithPaymentStatus>> = _perPatientPaginationState.asStateFlow()
+
+    /** Load the next page of per-patient appointments. No-op while loading or when fully loaded. */
+    fun loadNextPatientAppointmentsPage() {
+        val patientId = _currentPatientId.value ?: return
+        val current = _perPatientPaginationState.value
+        if (current.isLoading || !current.hasMore) return
+        viewModelScope.launch {
+            _perPatientPaginationState.value = current.copy(status = PageLoadStatus.Loading)
+            try {
+                val newItems = repository.getPagedByPatientWithPaymentStatus(
+                    patientId = patientId,
+                    page = current.currentPage
+                )
+                val hasMore = newItems.size == Constants.PAGE_SIZE
+                _perPatientPaginationState.value = current.copy(
+                    items = current.items + newItems,
+                    currentPage = current.currentPage + 1,
+                    status = PageLoadStatus.Idle,
+                    hasMore = hasMore
+                )
+            } catch (e: Exception) {
+                _perPatientPaginationState.value = current.copy(
+                    status = PageLoadStatus.Error(e.message ?: "Erro ao carregar consultas")
+                )
+            }
+        }
+    }
+
+    // ========================================
     // Appointment Detail State
     // ========================================
 
@@ -264,6 +298,8 @@ class AppointmentViewModel(
     fun loadPatientAppointments(patientId: Long) {
         _currentPatientId.value = patientId
         _appointmentListState.value = AppointmentViewState.ListState.Loading
+        _perPatientPaginationState.value = PaginationState()
+        loadNextPatientAppointmentsPage()
 
         viewModelScope.launch(Dispatchers.IO) {
             try {

@@ -3,14 +3,11 @@ package com.psychologist.financial.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -46,8 +43,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.psychologist.financial.domain.models.AppointmentWithPaymentStatus
 import com.psychologist.financial.ui.components.AppointmentListItem
+import com.psychologist.financial.ui.components.PaginatedLazyColumn
 import com.psychologist.financial.viewmodel.AppointmentViewModel
-import com.psychologist.financial.viewmodel.AppointmentViewState
 
 /**
  * Appointment list screen
@@ -102,7 +99,6 @@ fun AppointmentListScreen(
     if (isGlobalView) {
         GlobalAppointmentListScreen(
             viewModel = viewModel,
-            onSelectAppointment = onSelectAppointment,
             onPatientClick = onPatientClick
         )
     } else {
@@ -119,181 +115,6 @@ fun AppointmentListScreen(
 }
 
 @Composable
-private fun GlobalAppointmentListScreen(
-    viewModel: AppointmentViewModel,
-    onSelectAppointment: (Long) -> Unit,
-    onPatientClick: (Long) -> Unit = { }
-) {
-    val globalState = viewModel.globalListState.collectAsState().value
-    var nameQuery by remember { mutableStateOf("") }
-
-    LaunchedEffect(Unit) {
-        viewModel.loadAllAppointments()
-    }
-
-    DisposableEffect(Unit) {
-        onDispose { viewModel.resetNameFilter() }
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Consultas") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            if (globalState !is AppointmentViewState.GlobalListState.Error) {
-                OutlinedTextField(
-                    value = nameQuery,
-                    onValueChange = { nameQuery = it; viewModel.setNameFilter(it) },
-                    placeholder = { Text("Buscar por nome do paciente") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    singleLine = true,
-                    trailingIcon = {
-                        if (nameQuery.isNotEmpty()) {
-                            IconButton(onClick = { nameQuery = ""; viewModel.resetNameFilter() }) {
-                                Icon(Icons.Default.Close, contentDescription = "Limpar busca")
-                            }
-                        }
-                    }
-                )
-            }
-
-            Box(modifier = Modifier.weight(1f)) {
-                when (globalState) {
-                    is AppointmentViewState.GlobalListState.Loading -> {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
-                    }
-
-                    is AppointmentViewState.GlobalListState.Success -> {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            LazyRow(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                item {
-                                    FilterChip(
-                                        selected = globalState.activeFilter == AppointmentViewState.AppointmentFilter.ALL,
-                                        onClick = { viewModel.setFilter(AppointmentViewState.AppointmentFilter.ALL) },
-                                        label = { Text("Todas") }
-                                    )
-                                }
-                                item {
-                                    FilterChip(
-                                        selected = globalState.activeFilter == AppointmentViewState.AppointmentFilter.PENDING,
-                                        onClick = { viewModel.setFilter(AppointmentViewState.AppointmentFilter.PENDING) },
-                                        label = { Text("Com pendência") }
-                                    )
-                                }
-                                item {
-                                    FilterChip(
-                                        selected = globalState.activeFilter == AppointmentViewState.AppointmentFilter.PAID,
-                                        onClick = { viewModel.setFilter(AppointmentViewState.AppointmentFilter.PAID) },
-                                        label = { Text("Sem pendência") }
-                                    )
-                                }
-                            }
-
-                            if (globalState.filteredAppointments.isEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(24.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = if (nameQuery.isNotEmpty())
-                                            "Nenhuma consulta encontrada para \"$nameQuery\""
-                                        else
-                                            "Nenhuma consulta encontrada para este filtro.",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                            } else {
-                                LazyColumn(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(1f),
-                                    contentPadding = PaddingValues(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    items(
-                                        items = globalState.filteredAppointments,
-                                        key = { it.appointment.id }
-                                    ) { appointmentWithStatus ->
-                                        AppointmentListItem(
-                                            appointmentWithStatus = appointmentWithStatus,
-                                            onClick = { onPatientClick(appointmentWithStatus.appointment.patientId) }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    is AppointmentViewState.GlobalListState.Empty -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "Nenhuma Consulta",
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = "Para registrar uma consulta, acesse o perfil do paciente.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
-
-                is AppointmentViewState.GlobalListState.Error -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = globalState.message,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-}
-
-@Composable
 private fun PatientAppointmentListScreen(
     viewModel: AppointmentViewModel,
     patientId: Long,
@@ -303,7 +124,7 @@ private fun PatientAppointmentListScreen(
     onAddAppointment: () -> Unit,
     onSelectAppointment: (Long) -> Unit
 ) {
-    val listState = viewModel.appointmentListState.collectAsState().value
+    val paginationState by viewModel.perPatientPaginationState.collectAsState()
     var showOnlyPending by remember { mutableStateOf(false) }
 
     LaunchedEffect(patientId) {
@@ -361,111 +182,90 @@ private fun PatientAppointmentListScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            when (listState) {
-                is AppointmentViewState.ListState.Loading -> {
+            val filtered = if (showOnlyPending)
+                paginationState.items.filter { it.hasPendingPayment }
+            else
+                paginationState.items
+
+            when {
+                paginationState.items.isEmpty() && paginationState.isLoading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
                 }
 
-                is AppointmentViewState.ListState.Success -> {
-                    AppointmentListContent(
-                        appointments = listState.appointments,
-                        showOnlyPending = showOnlyPending,
-                        onFilterChange = { showOnlyPending = it },
-                        onSelectAppointment = if (isPatientActive) onSelectAppointment else { _ -> }
-                    )
-                }
-
-                is AppointmentViewState.ListState.Empty -> {
+                paginationState.items.isEmpty() && !paginationState.isLoading -> {
                     EmptyAppointmentsContent(
                         onAddAppointment = onAddAppointment,
                         isGlobalView = false
                     )
                 }
 
-                is AppointmentViewState.ListState.Error -> {
-                    ErrorAppointmentsContent(
-                        message = listState.message,
-                        onBack = onBack
-                    )
+                else -> {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        LazyRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            item {
+                                FilterChip(
+                                    selected = !showOnlyPending,
+                                    onClick = { showOnlyPending = false },
+                                    label = { Text("Todos") }
+                                )
+                            }
+                            item {
+                                FilterChip(
+                                    selected = showOnlyPending,
+                                    onClick = { showOnlyPending = true },
+                                    label = { Text("Pagamento em aberto") }
+                                )
+                            }
+                        }
+
+                        if (filtered.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Nenhuma consulta com pagamento pendente.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        } else {
+                            PaginatedLazyColumn(
+                                items = filtered,
+                                isLoading = paginationState.isLoading,
+                                isError = paginationState.isError,
+                                allLoaded = !paginationState.hasMore,
+                                onLoadMore = { viewModel.loadNextPatientAppointmentsPage() },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                key = { it.appointment.id }
+                            ) { appointmentWithStatus ->
+                                AppointmentListItem(
+                                    appointmentWithStatus = appointmentWithStatus,
+                                    onClick = {
+                                        if (isPatientActive) onSelectAppointment(appointmentWithStatus.appointment.id)
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-/**
- * Appointment list content with filter chips
- */
-@Composable
-private fun AppointmentListContent(
-    appointments: List<AppointmentWithPaymentStatus>,
-    showOnlyPending: Boolean,
-    onFilterChange: (Boolean) -> Unit,
-    onSelectAppointment: (Long) -> Unit
-) {
-    val filtered = if (showOnlyPending) appointments.filter { it.hasPendingPayment } else appointments
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Filter chips
-        LazyRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            item {
-                FilterChip(
-                    selected = !showOnlyPending,
-                    onClick = { onFilterChange(false) },
-                    label = { Text("Todos") }
-                )
-            }
-            item {
-                FilterChip(
-                    selected = showOnlyPending,
-                    onClick = { onFilterChange(true) },
-                    label = { Text("Pagamento em aberto") }
-                )
-            }
-        }
-
-        if (filtered.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Nenhuma consulta com pagamento pendente.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(
-                    items = filtered,
-                    key = { it.appointment.id }
-                ) { appointmentWithStatus ->
-                    AppointmentListItem(
-                        appointmentWithStatus = appointmentWithStatus,
-                        onClick = { onSelectAppointment(appointmentWithStatus.appointment.id) }
-                    )
-                }
-            }
-        }
-    }
-}
 
 /**
  * Empty appointments content
