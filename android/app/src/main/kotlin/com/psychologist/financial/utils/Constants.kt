@@ -80,6 +80,12 @@ object Constants {
     const val CSV_EXPORT_TIMEOUT_SECONDS = 30
 
     // ================================
+    // Pagination Constants
+    // ================================
+    const val PAGE_SIZE = 25
+    const val PAGINATION_TRIGGER_THRESHOLD = 5
+
+    // ================================
     // Performance Constants
     // ================================
     const val APP_STARTUP_TARGET_MILLIS = 2000 // 2 seconds

@@ -9,7 +9,7 @@ An Android mobile application for financial management built with Kotlin, design
 **Architecture**: MVVM with Clean Architecture layers  
 **Database**: Room ORM + SQLCipher (encrypted local storage)  
 **UI Framework**: Jetpack Compose + Material 3  
-**Status**: In Development (Phase 1.1-1.2 Complete)  
+**Status**: In Development (Phase 1.1-1.2 Complete)
 
 ### Key Features
 
@@ -24,18 +24,18 @@ An Android mobile application for financial management built with Kotlin, design
 
 ## Technical Stack
 
-| Component | Technology | Version |
-|-----------|-----------|---------|
-| Language | Kotlin | 1.9.22 |
-| Min SDK | Android 11 (API 30) | |
-| Target SDK | Android 15 (API 35) | Latest |
-| UI Framework | Jetpack Compose | 2024.02.00 |
-| Database | Room ORM | 2.6.1 |
-| Database Encryption | SQLCipher | 4.5.4 |
-| Security | BiometricPrompt, Tink, Android Keystore | androidx, 1.10.0 |
-| Build System | Gradle | 8.3.0 |
-| Testing | JUnit, Mockito, Espresso | 4.13.2, 5.7.0, 3.5.1 |
-| Code Quality | JaCoCo | 0.8.10 |
+| Component           | Technology                              | Version              |
+| ------------------- | --------------------------------------- | -------------------- |
+| Language            | Kotlin                                  | 1.9.22               |
+| Min SDK             | Android 11 (API 30)                     |                      |
+| Target SDK          | Android 15 (API 35)                     | Latest               |
+| UI Framework        | Jetpack Compose                         | 2024.02.00           |
+| Database            | Room ORM                                | 2.6.1                |
+| Database Encryption | SQLCipher                               | 4.5.4                |
+| Security            | BiometricPrompt, Tink, Android Keystore | androidx, 1.10.0     |
+| Build System        | Gradle                                  | 8.3.0                |
+| Testing             | JUnit, Mockito, Espresso                | 4.13.2, 5.7.0, 3.5.1 |
+| Code Quality        | JaCoCo                                  | 0.8.10               |
 
 ## Prerequisites
 
@@ -129,48 +129,22 @@ open android/app/build/reports/jacoco/test/html/index.html
 ## Security & Privacy
 
 ### Authentication
+
 - **App-Level**: Biometric with 15-minute session timeout + PIN fallback
 - **Per-Operation**: Biometric required for payments, exports
 
 ### Encryption
+
 - **Database**: SQLCipher with AES-256-GCM encryption
 - **Keys**: Android Keystore hardware-backed storage (TEE/StrongBox)
 - **Configuration**: Tink + DataStore for sensitive keys
 
 ### Privacy
+
 - **Local-Only**: No cloud services, all data stored locally
 - **No External APIs**: No third-party integrations
 - **Single-User**: App designed for single psychologist use
 
-## Constitution Principles
-
-This project follows the **Financial Management System Constitution v1.0**:
-
-1. **Test-First Development**: TDD mandatory, 80% coverage required
-2. **Security-First Architecture**: Encryption, validation, no hardcoded secrets
-3. **Clean Code & Simplicity**: YAGNI, single responsibility, self-documenting
-4. **Code Review & Documentation**: Peer review, clear commits, API docs
-
-All pull requests must verify compliance with these principles.
-
-## Next Steps
-
-- **Phase 1.3 (T013-T017)**: Base architecture (MainActivity, Application, setup)
-- **Phase 2 (T018-T032)**: Database setup, Room + SQLCipher integration
-- **Phase 3+ (T033-T055)**: User stories (Patient, Appointments, Payments)
-
-See `specs/001-financial-management-app/tasks.md` for complete task breakdown.
-
-## Resources
-
-- **Android Docs**: https://developer.android.com/
-- **Jetpack Compose**: https://developer.android.com/develop/ui/compose
-- **Room Database**: https://developer.android.com/training/data-storage/room
-- **Kotlin Coroutines**: https://kotlinlang.org/docs/coroutines-overview.html
-- **Testing Guide**: https://developer.android.com/training/testing/fundamentals
-
----
-
 **Last Updated**: 2026-02-25  
 **Phase**: 1.1-1.2 (Project Setup & Android Configuration)  
-**Status**: In Development  
+**Status**: In Development
