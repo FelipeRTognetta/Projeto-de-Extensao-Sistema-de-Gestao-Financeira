@@ -18,7 +18,6 @@ import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.whenever
 import java.io.File
-import java.time.LocalDateTime
 import java.time.YearMonth
 
 /**
@@ -39,13 +38,8 @@ class ExportViewModelTest {
 
     private val mockExportResult = ExportResult(
         success = true,
-        patientFile = File("patients.csv"),
-        appointmentFile = File("appointments.csv"),
         paymentFile = File("payments.csv"),
-        patientCount = 150,
-        appointmentCount = 500,
         paymentCount = 1200,
-        exportedAt = LocalDateTime.now(),
         durationSeconds = 5
     )
 

@@ -3,6 +3,7 @@ package com.psychologist.financial
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import com.psychologist.financial.data.repositories.AppointmentRepository
 import com.psychologist.financial.domain.models.Appointment
+import com.psychologist.financial.domain.models.AppointmentWithPaymentStatus
 import com.psychologist.financial.domain.models.BillableHoursSummary
 import com.psychologist.financial.domain.usecases.CreateAppointmentUseCase
 import com.psychologist.financial.domain.usecases.GetPatientAppointmentsUseCase
@@ -97,6 +98,10 @@ class AppointmentViewModelTest {
         )
     )
 
+    private val mockAppointmentsWithStatus = mockAppointments.map {
+        AppointmentWithPaymentStatus(it, hasPendingPayment = false)
+    }
+
     private val mockEmptySummary = BillableHoursSummary(
         totalSessions = 0,
         totalBillableHours = 0.0,
@@ -142,8 +147,8 @@ class AppointmentViewModelTest {
     fun loadPatientAppointments_onSuccess_updatesState() = runTest {
         // Arrange
         val patientId = 1L
-        whenever(mockGetPatientAppointmentsUseCase.execute(patientId))
-            .thenReturn(mockAppointments)
+        whenever(mockRepository.getByPatientWithPaymentStatus(patientId))
+            .thenReturn(mockAppointmentsWithStatus)
 
         // Act
         viewModel.loadPatientAppointments(patientId)
@@ -159,7 +164,7 @@ class AppointmentViewModelTest {
     fun loadPatientAppointments_onEmpty_updatesStateToEmpty() = runTest {
         // Arrange
         val patientId = 1L
-        whenever(mockGetPatientAppointmentsUseCase.execute(patientId))
+        whenever(mockRepository.getByPatientWithPaymentStatus(patientId))
             .thenReturn(emptyList())
 
         // Act
@@ -176,7 +181,7 @@ class AppointmentViewModelTest {
         // Arrange
         val patientId = 1L
         val errorMessage = "Database error"
-        whenever(mockGetPatientAppointmentsUseCase.execute(patientId))
+        whenever(mockRepository.getByPatientWithPaymentStatus(patientId))
             .thenThrow(RuntimeException(errorMessage))
 
         // Act
@@ -193,8 +198,8 @@ class AppointmentViewModelTest {
     fun loadPatientAppointments_setCurrentPatientId() = runTest {
         // Arrange
         val patientId = 42L
-        whenever(mockGetPatientAppointmentsUseCase.execute(patientId))
-            .thenReturn(mockAppointments)
+        whenever(mockRepository.getByPatientWithPaymentStatus(patientId))
+            .thenReturn(mockAppointmentsWithStatus)
 
         // Act
         viewModel.loadPatientAppointments(patientId)
@@ -208,8 +213,8 @@ class AppointmentViewModelTest {
     fun loadPatientAppointments_calculatesBillableHours() = runTest {
         // Arrange
         val patientId = 1L
-        whenever(mockGetPatientAppointmentsUseCase.execute(patientId))
-            .thenReturn(mockAppointments)
+        whenever(mockRepository.getByPatientWithPaymentStatus(patientId))
+            .thenReturn(mockAppointmentsWithStatus)
 
         // Act
         viewModel.loadPatientAppointments(patientId)
@@ -226,8 +231,8 @@ class AppointmentViewModelTest {
     fun loadPatientAppointments_initialState_isLoading() = runTest {
         // Arrange
         val patientId = 1L
-        whenever(mockGetPatientAppointmentsUseCase.execute(patientId))
-            .thenReturn(mockAppointments)
+        whenever(mockRepository.getByPatientWithPaymentStatus(patientId))
+            .thenReturn(mockAppointmentsWithStatus)
 
         // Act
         viewModel.loadPatientAppointments(patientId)
@@ -241,8 +246,8 @@ class AppointmentViewModelTest {
     fun refreshPatientAppointments_reloadsCurrent() = runTest {
         // Arrange
         val patientId = 1L
-        whenever(mockGetPatientAppointmentsUseCase.execute(patientId))
-            .thenReturn(mockAppointments)
+        whenever(mockRepository.getByPatientWithPaymentStatus(patientId))
+            .thenReturn(mockAppointmentsWithStatus)
 
         // Act
         viewModel.loadPatientAppointments(patientId)
@@ -251,8 +256,8 @@ class AppointmentViewModelTest {
         val firstLoadState = viewModel.appointmentListState.value
 
         // Set up for refresh
-        whenever(mockGetPatientAppointmentsUseCase.execute(patientId))
-            .thenReturn(mockAppointments.take(1))
+        whenever(mockRepository.getByPatientWithPaymentStatus(patientId))
+            .thenReturn(mockAppointmentsWithStatus.take(1))
 
         viewModel.refreshPatientAppointments()
         testDispatcher.scheduler.advanceUntilIdle()
@@ -530,6 +535,8 @@ class AppointmentViewModelTest {
             durationMinutes = 60,
             notes = "Test appointment"
         )).thenReturn(CreateAppointmentUseCase.CreateAppointmentResult.Success(newAppointmentId))
+        whenever(mockRepository.getByPatientWithPaymentStatus(patientId))
+            .thenReturn(mockAppointmentsWithStatus)
 
         // Act
         viewModel.submitCreateAppointmentForm(patientId)
@@ -574,6 +581,8 @@ class AppointmentViewModelTest {
             durationMinutes = 60,
             notes = ""
         )).thenReturn(CreateAppointmentUseCase.CreateAppointmentResult.Success(1L))
+        whenever(mockRepository.getByPatientWithPaymentStatus(patientId))
+            .thenReturn(emptyList())
 
         viewModel.submitCreateAppointmentForm(patientId)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -604,8 +613,8 @@ class AppointmentViewModelTest {
                 createdDate = LocalDateTime.now()
             )
         }
-        whenever(mockGetPatientAppointmentsUseCase.execute(patientId))
-            .thenReturn(manyAppointments)
+        whenever(mockRepository.getByPatientWithPaymentStatus(patientId))
+            .thenReturn(manyAppointments.map { AppointmentWithPaymentStatus(it, hasPendingPayment = false) })
 
         // Act
         viewModel.loadPatientAppointments(patientId)
@@ -623,10 +632,10 @@ class AppointmentViewModelTest {
         val patientId1 = 1L
         val patientId2 = 2L
 
-        whenever(mockGetPatientAppointmentsUseCase.execute(patientId1))
-            .thenReturn(listOf(mockAppointments[0]))
-        whenever(mockGetPatientAppointmentsUseCase.execute(patientId2))
-            .thenReturn(mockAppointments)
+        whenever(mockRepository.getByPatientWithPaymentStatus(patientId1))
+            .thenReturn(listOf(mockAppointmentsWithStatus[0]))
+        whenever(mockRepository.getByPatientWithPaymentStatus(patientId2))
+            .thenReturn(mockAppointmentsWithStatus)
 
         // Act
         viewModel.loadPatientAppointments(patientId1)

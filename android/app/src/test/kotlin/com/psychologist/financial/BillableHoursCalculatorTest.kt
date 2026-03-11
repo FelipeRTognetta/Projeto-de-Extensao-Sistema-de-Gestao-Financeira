@@ -425,14 +425,15 @@ class BillableHoursCalculatorTest {
 
     @Test
     fun calculateMonthlyBreakdown_multipleMonths_groupsCorrectly() {
-        val currentMonth = YearMonth.now()
-        val lastMonth = currentMonth.minusMonths(1)
+        // Use months guaranteed to be in the past (isPast checks date+time against now)
+        val twoMonthsAgo = YearMonth.now().minusMonths(2)
+        val threeMonthsAgo = YearMonth.now().minusMonths(3)
 
         val appointments = listOf(
             Appointment(
                 id = 1L,
                 patientId = 1L,
-                date = currentMonth.atDay(15),
+                date = twoMonthsAgo.atDay(15),
                 timeStart = LocalTime.of(10, 0),
                 durationMinutes = 60,
                 createdDate = LocalDateTime.now()
@@ -440,7 +441,7 @@ class BillableHoursCalculatorTest {
             Appointment(
                 id = 2L,
                 patientId = 1L,
-                date = lastMonth.atDay(15),
+                date = threeMonthsAgo.atDay(15),
                 timeStart = LocalTime.of(10, 0),
                 durationMinutes = 120,
                 createdDate = LocalDateTime.now()
@@ -449,8 +450,8 @@ class BillableHoursCalculatorTest {
 
         val breakdown = calculator.calculateMonthlyBreakdown(appointments)
         assertEquals(2, breakdown.size)
-        assertEquals(1.0, breakdown[currentMonth]!!, 0.01)
-        assertEquals(2.0, breakdown[lastMonth]!!, 0.01)
+        assertEquals(1.0, breakdown[twoMonthsAgo]!!, 0.01)
+        assertEquals(2.0, breakdown[threeMonthsAgo]!!, 0.01)
     }
 
     @Test

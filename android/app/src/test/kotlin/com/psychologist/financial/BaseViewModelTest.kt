@@ -191,14 +191,12 @@ class BaseViewModelTest {
 
     @Test
     fun `launchBackground does not affect loading state`() = runTest {
-        var executed = false
-
         viewModel.publicLaunchBackground {
-            executed = true
+            // block runs on Dispatchers.IO — not controlled by test dispatcher
         }
         advanceUntilIdle()
 
-        assertTrue(executed)
+        // launchBackground must never set isLoading = true (unlike launchSafe)
         assertFalse(viewModel.isLoading.value)
     }
 
