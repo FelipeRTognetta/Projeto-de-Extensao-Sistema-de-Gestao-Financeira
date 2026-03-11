@@ -22,7 +22,6 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -158,79 +157,6 @@ class ExportRepositoryUnitTest {
 
         assertEquals(2, result.size)
         assertEquals(BigDecimal("150.00"), result[0].amount)
-    }
-
-    // ========================================
-    // Count Tests
-    // ========================================
-
-    @Test
-    fun `countAllPatients delegates to DAO`() = runTest {
-        whenever(mockPatientDao.countAllPatients()).thenReturn(5)
-
-        val count = repository.countAllPatients()
-
-        assertEquals(5, count)
-    }
-
-    @Test
-    fun `countAllAppointments delegates to DAO`() = runTest {
-        whenever(mockAppointmentDao.count()).thenReturn(20)
-
-        val count = repository.countAllAppointments()
-
-        assertEquals(20, count)
-    }
-
-    @Test
-    fun `countAllPayments delegates to DAO`() = runTest {
-        whenever(mockPaymentDao.count()).thenReturn(35)
-
-        val count = repository.countAllPayments()
-
-        assertEquals(35, count)
-    }
-
-    // ========================================
-    // hasDataToExport() Tests
-    // ========================================
-
-    @Test
-    fun `hasDataToExport returns true when patients exist`() = runTest {
-        whenever(mockPatientDao.countAllPatients()).thenReturn(3)
-        // hasDataToExport short-circuits after first truthy count — no need to stub others
-
-        val hasData = repository.hasDataToExport()
-
-        assertTrue(hasData)
-    }
-
-    @Test
-    fun `hasDataToExport returns false when all counts zero`() = runTest {
-        whenever(mockPatientDao.countAllPatients()).thenReturn(0)
-        whenever(mockAppointmentDao.count()).thenReturn(0)
-        whenever(mockPaymentDao.count()).thenReturn(0)
-
-        val hasData = repository.hasDataToExport()
-
-        assertFalse(hasData)
-    }
-
-    // ========================================
-    // getExportStatistics() Tests
-    // ========================================
-
-    @Test
-    fun `getExportStatistics returns complete stats map`() = runTest {
-        whenever(mockPatientDao.countAllPatients()).thenReturn(10)
-        whenever(mockAppointmentDao.count()).thenReturn(50)
-        whenever(mockPaymentDao.count()).thenReturn(75)
-
-        val stats = repository.getExportStatistics()
-
-        assertEquals(10, stats["patients"])
-        assertEquals(50, stats["appointments"])
-        assertEquals(75, stats["payments"])
     }
 
     // ========================================

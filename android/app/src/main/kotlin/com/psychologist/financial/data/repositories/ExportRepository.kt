@@ -17,42 +17,13 @@ import java.time.YearMonth
  * Export Repository
  *
  * Provides data access for export operations.
- * Queries all patients, appointments, and payment records for export.
  *
- * Responsibilities:
- * - Retrieve all patients (active and inactive)
- * - Retrieve all appointments
- * - Retrieve all payments
- * - Count records by type
- * - Map database entities to domain models
- * - Handle data transformations for export
- *
- * Architecture:
- * - Extends BaseRepository for transaction management
- * - Uses DAOs for database access
- * - Converts entities to domain models
- * - No filtering (exports all data for backup purposes)
- *
- * Queries:
- * - getAllPatients(): List<Patient> - All patients (active + inactive)
- * - getAllAppointments(): List<Appointment> - All appointments
- * - getAllPayments(): List<Payment> - All payments
- * - countAllPatients(): Int - Patient count
- * - countAllAppointments(): Int - Appointment count
- * - countAllPayments(): Int - Payment count
- *
- * Usage:
- * ```kotlin
- * val repository = ExportRepository(database)
- *
- * // Get all data for export
- * val patients = repository.getAllPatients()
- * val appointments = repository.getAllAppointments()
- * val payments = repository.getAllPayments()
- *
- * // Check counts
- * val patientCount = repository.countAllPatients()
- * ```
+ * Public API:
+ * - [getAllPatients]: All patients for export statistics and financial CSV
+ * - [getAllAppointments]: All appointments for export statistics
+ * - [getAllPayments]: All payments for export statistics
+ * - [getPaymentsByMonth]: Payments in a given month for financial CSV export
+ * - [getAllPayerInfos]: All payer info records for financial CSV export
  *
  * @property database AppDatabase instance
  */
@@ -72,10 +43,9 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
     // ========================================
 
     /**
-     * Get all patients (active and inactive)
+     * Get all patients (active and inactive).
      *
-     * Retrieves complete patient list including inactive patients.
-     * Used for full data backup and export.
+     * Used for export statistics and financial CSV patient resolution.
      *
      * @return List of all patients
      */
@@ -91,66 +61,14 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
         }
     }
 
-    /**
-     * Count all patients
-     *
-     * @return Total number of patients
-     */
-    suspend fun countAllPatients(): Int {
-        return try {
-            patientDao.countAllPatients()
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "Error counting patients", e)
-            0
-        }
-    }
-
-    /**
-     * Get only active patients
-     *
-     * Retrieves patients with ACTIVE status.
-     * Useful for filtered exports.
-     *
-     * @return List of active patients
-     */
-    suspend fun getActivePatients(): List<Patient> {
-        return try {
-            AppLogger.d(TAG, "Querying active patients...")
-            val entities = patientDao.getAllActivePatients()
-            entities.map { it.toPatient() }
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "Error retrieving active patients", e)
-            emptyList()
-        }
-    }
-
-    /**
-     * Get only inactive patients
-     *
-     * Retrieves patients with INACTIVE status.
-     *
-     * @return List of inactive patients
-     */
-    suspend fun getInactivePatients(): List<Patient> {
-        return try {
-            AppLogger.d(TAG, "Querying inactive patients...")
-            val entities = patientDao.getAllInactivePatients()
-            entities.map { it.toPatient() }
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "Error retrieving inactive patients", e)
-            emptyList()
-        }
-    }
-
     // ========================================
     // Appointment Queries
     // ========================================
 
     /**
-     * Get all appointments
+     * Get all appointments.
      *
-     * Retrieves complete appointment list regardless of patient status.
-     * Used for full data export and backup.
+     * Used for export statistics.
      *
      * @return List of all appointments
      */
@@ -166,52 +84,14 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
         }
     }
 
-    /**
-     * Count all appointments
-     *
-     * @return Total number of appointments
-     */
-    suspend fun countAllAppointments(): Int {
-        return try {
-            appointmentDao.count()
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "Error counting appointments", e)
-            0
-        }
-    }
-
-    /**
-     * Get appointments by date range
-     *
-     * Useful for time-based exports and filtering.
-     *
-     * @param startDate Start date for range
-     * @param endDate End date for range
-     * @return Appointments in date range
-     */
-    suspend fun getAppointmentsByDateRange(
-        startDate: java.time.LocalDate,
-        endDate: java.time.LocalDate
-    ): List<Appointment> {
-        return try {
-            AppLogger.d(TAG, "Querying appointments from $startDate to $endDate...")
-            val entities = appointmentDao.getByDateRange(startDate, endDate)
-            entities.map { it.toAppointment() }
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "Error retrieving appointments by date range", e)
-            emptyList()
-        }
-    }
-
     // ========================================
     // Payment Queries
     // ========================================
 
     /**
-     * Get all payments
+     * Get all payments.
      *
-     * Retrieves complete payment list including pending and paid.
-     * Used for full financial data export and backup.
+     * Used for export statistics.
      *
      * @return List of all payments
      */
@@ -224,104 +104,6 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error retrieving payments", e)
             throw e
-        }
-    }
-
-    /**
-     * Count all payments
-     *
-     * @return Total number of payments
-     */
-    suspend fun countAllPayments(): Int {
-        return try {
-            paymentDao.count()
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "Error counting payments", e)
-            0
-        }
-    }
-
-    /**
-     * Get payments by status
-     *
-     * Retrieves PAID or PENDING payments.
-     * Useful for financial reconciliation exports.
-     *
-     * @param status Payment status (PAID or PENDING)
-     * @return Payments with specified status
-     */
-    suspend fun getPaymentsByStatus(status: String): List<Payment> {
-        return try {
-            AppLogger.d(TAG, "Querying payments (status filter removed — all payments are PAID)...")
-            val entities = paymentDao.getAll()
-            entities.map { it.toPayment() }
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "Error retrieving payments by status", e)
-            emptyList()
-        }
-    }
-
-    /**
-     * Get payments by date range
-     *
-     * @param startDate Start date for range
-     * @param endDate End date for range
-     * @return Payments in date range
-     */
-    suspend fun getPaymentsByDateRange(
-        startDate: java.time.LocalDate,
-        endDate: java.time.LocalDate
-    ): List<Payment> {
-        return try {
-            AppLogger.d(TAG, "Querying payments from $startDate to $endDate...")
-            val entities = paymentDao.getByDateRange(startDate, endDate)
-            entities.map { it.toPayment() }
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "Error retrieving payments by date range", e)
-            emptyList()
-        }
-    }
-
-    // ========================================
-    // Aggregate Queries
-    // ========================================
-
-    /**
-     * Get export statistics
-     *
-     * Returns counts of all data types for summary display.
-     *
-     * @return Map with statistics
-     */
-    suspend fun getExportStatistics(): Map<String, Int> {
-        return try {
-            mapOf(
-                "patients" to countAllPatients(),
-                "appointments" to countAllAppointments(),
-                "payments" to countAllPayments(),
-                "active_patients" to (getActivePatients().size),
-                "inactive_patients" to (getInactivePatients().size)
-            )
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "Error retrieving statistics", e)
-            emptyMap()
-        }
-    }
-
-    /**
-     * Validate data for export
-     *
-     * Checks if sufficient data exists to export.
-     *
-     * @return true if there is data to export
-     */
-    suspend fun hasDataToExport(): Boolean {
-        return try {
-            countAllPatients() > 0 ||
-            countAllAppointments() > 0 ||
-            countAllPayments() > 0
-        } catch (e: Exception) {
-            false
         }
     }
 
@@ -355,7 +137,6 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
     /**
      * Get all payment-appointment cross-refs.
      *
-     * Returns every record from the payment_appointments junction table.
      * Used by the backup export to preserve payment-appointment links.
      *
      * @return List of all [PaymentAppointmentCrossRef]
@@ -375,9 +156,8 @@ class ExportRepository(database: AppDatabase) : BaseRepository(database) {
     /**
      * Get all PayerInfo records.
      *
-     * Returns every record from the payer_info table.
-     * Used by the financial CSV and backup export to resolve
-     * responsible-payer data for non-paying patients.
+     * Used by the financial CSV export to resolve responsible-payer data
+     * for non-paying patients.
      *
      * @return List of all [PayerInfo] records
      */

@@ -11,6 +11,7 @@ import org.mockito.Mock
 import org.mockito.Mockito.verify
 import org.mockito.junit.MockitoJUnitRunner
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.never
 import org.mockito.kotlin.whenever
 import java.time.LocalDate
@@ -58,7 +59,7 @@ class CreateAppointmentUseCaseTest {
     @Test
     fun `execute with valid data returns Success`() = runTest {
         whenever(mockRepository.getByPatient(1L)).thenReturn(emptyList())
-        whenever(mockRepository.insert(any(), any(), any(), any(), any())).thenReturn(42L)
+        whenever(mockRepository.insert(any(), any(), any(), any(), anyOrNull())).thenReturn(42L)
 
         val result = useCase.execute(
             patientId = 1L,
@@ -74,7 +75,7 @@ class CreateAppointmentUseCaseTest {
     @Test
     fun `execute with notes returns Success`() = runTest {
         whenever(mockRepository.getByPatient(1L)).thenReturn(emptyList())
-        whenever(mockRepository.insert(any(), any(), any(), any(), any())).thenReturn(10L)
+        whenever(mockRepository.insert(any(), any(), any(), any(), anyOrNull())).thenReturn(10L)
 
         val result = useCase.execute(
             patientId = 1L,
@@ -97,7 +98,7 @@ class CreateAppointmentUseCaseTest {
     @Test
     fun `execute with minimum duration 5 minutes returns Success`() = runTest {
         whenever(mockRepository.getByPatient(1L)).thenReturn(emptyList())
-        whenever(mockRepository.insert(any(), any(), any(), any(), any())).thenReturn(1L)
+        whenever(mockRepository.insert(any(), any(), any(), any(), anyOrNull())).thenReturn(1L)
 
         val result = useCase.execute(
             patientId = 1L,
@@ -112,7 +113,7 @@ class CreateAppointmentUseCaseTest {
     @Test
     fun `execute with maximum duration 480 minutes returns Success`() = runTest {
         whenever(mockRepository.getByPatient(1L)).thenReturn(emptyList())
-        whenever(mockRepository.insert(any(), any(), any(), any(), any())).thenReturn(1L)
+        whenever(mockRepository.insert(any(), any(), any(), any(), anyOrNull())).thenReturn(1L)
 
         val result = useCase.execute(
             patientId = 1L,
@@ -139,7 +140,7 @@ class CreateAppointmentUseCaseTest {
 
         assertIs<CreateAppointmentUseCase.CreateAppointmentResult.ValidationError>(result)
         assertTrue(result.hasFieldError("patientId"))
-        never().also { verify(mockRepository, it).insert(any(), any(), any(), any(), any()) }
+        never().also { verify(mockRepository, it).insert(any(), any(), any(), any(), anyOrNull()) }
     }
 
     @Test
@@ -175,7 +176,7 @@ class CreateAppointmentUseCaseTest {
     @Test
     fun `execute with today date is valid`() = runTest {
         whenever(mockRepository.getByPatient(1L)).thenReturn(emptyList())
-        whenever(mockRepository.insert(any(), any(), any(), any(), any())).thenReturn(1L)
+        whenever(mockRepository.insert(any(), any(), any(), any(), anyOrNull())).thenReturn(1L)
 
         val result = useCase.execute(
             patientId = 1L,
@@ -269,7 +270,7 @@ class CreateAppointmentUseCaseTest {
             durationMinutes = 60
         )
         whenever(mockRepository.getByPatient(1L)).thenReturn(listOf(existingAppointment))
-        whenever(mockRepository.insert(any(), any(), any(), any(), any())).thenReturn(2L)
+        whenever(mockRepository.insert(any(), any(), any(), any(), anyOrNull())).thenReturn(2L)
 
         val result = useCase.execute(
             patientId = 1L,
@@ -288,7 +289,7 @@ class CreateAppointmentUseCaseTest {
     @Test
     fun `execute when repository throws returns Error`() = runTest {
         whenever(mockRepository.getByPatient(1L)).thenReturn(emptyList())
-        whenever(mockRepository.insert(any(), any(), any(), any(), any()))
+        whenever(mockRepository.insert(any(), any(), any(), any(), anyOrNull()))
             .thenThrow(RuntimeException("Database error"))
 
         val result = useCase.execute(
