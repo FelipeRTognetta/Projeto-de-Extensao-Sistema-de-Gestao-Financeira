@@ -230,10 +230,7 @@ abstract class AppDatabase : RoomDatabase() {
                 super.onOpen(db)
                 Log.d(TAG, "Database opened")
 
-                // TODO: Perform any setup needed when database is opened
-                // Example: Enable foreign keys, set pragmas, etc.
                 try {
-                    // Enable foreign key constraints
                     db.execSQL("PRAGMA foreign_keys=ON;")
                     Log.d(TAG, "Foreign key constraints enabled")
                 } catch (e: Exception) {

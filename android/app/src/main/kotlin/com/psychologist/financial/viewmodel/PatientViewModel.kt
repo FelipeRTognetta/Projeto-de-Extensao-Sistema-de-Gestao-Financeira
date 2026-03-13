@@ -15,6 +15,7 @@ import com.psychologist.financial.domain.usecases.ReactivatePatientUseCase
 import com.psychologist.financial.domain.usecases.UpdatePatientUseCase
 import com.psychologist.financial.domain.validation.PayerInfoValidator
 import com.psychologist.financial.utils.Constants
+import com.psychologist.financial.utils.normalizeForSearch
 import com.psychologist.financial.viewmodel.PatientViewState.CreatePatientState
 import com.psychologist.financial.viewmodel.PatientViewState.DetailState
 import com.psychologist.financial.viewmodel.PatientViewState.ListState
@@ -170,7 +171,7 @@ class PatientViewModel(
         launchSafe {
             _paginationState.value = current.copy(status = PageLoadStatus.Loading)
             try {
-                val searchTerm = if (_nameFilter.isBlank()) "%" else "%$_nameFilter%"
+                val searchTerm = if (_nameFilter.isBlank()) "%" else "%${_nameFilter.normalizeForSearch()}%"
                 val newItems = patientRepository!!.getPagedPatients(
                     searchTerm = searchTerm,
                     includeInactive = _includeInactivePatients.value,
@@ -398,8 +399,9 @@ class PatientViewModel(
                 includeInactive = _includeInactivePatients.value
             )
 
+            val normalizedTerm = searchTerm.normalizeForSearch()
             val filtered = patients.filter { patient ->
-                patient.name.contains(searchTerm, ignoreCase = true)
+                patient.name.normalizeForSearch().contains(normalizedTerm)
             }
 
             if (filtered.isEmpty()) {
@@ -424,7 +426,10 @@ class PatientViewModel(
 
     private fun applyNameFilter() {
         val filtered = if (_nameFilter.isBlank()) cachedPatients
-        else cachedPatients.filter { it.name.contains(_nameFilter, ignoreCase = true) }
+        else {
+            val normalizedFilter = _nameFilter.normalizeForSearch()
+            cachedPatients.filter { it.name.normalizeForSearch().contains(normalizedFilter) }
+        }
         _patientListState.value = if (filtered.isEmpty()) ListState.Empty
         else ListState.Success(filtered)
     }
@@ -854,15 +859,16 @@ class PatientViewModel(
             when (result) {
                 is com.psychologist.financial.domain.usecases.CreatePatientResult.Success -> {
                     Log.d(TAG, "Patient created: id=${result.patientId}")
+                    val newPatientId = result.patientId
                     // Save payer info if patient is non-paying
                     if (_formNaoPagante.value && _formPayerNome.value.isNotBlank()) {
-                        savePayerInfo(result.patientId)
+                        savePayerInfo(newPatientId)
                     }
-                    _createFormState.value = _createFormState.value.copy(
-                        isSubmitting = false,
-                        submissionResult = CreatePatientState.SubmissionResult.Success(result.patientId)
-                    )
+                    // Reset form first, then set submissionResult so Compose can observe it
                     resetForm()
+                    _createFormState.value = _createFormState.value.copy(
+                        submissionResult = CreatePatientState.SubmissionResult.Success(newPatientId)
+                    )
                     loadPatients()  // Refresh list
                 }
 

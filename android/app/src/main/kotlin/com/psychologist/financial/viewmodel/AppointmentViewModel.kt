@@ -15,6 +15,7 @@ import com.psychologist.financial.domain.usecases.GetPatientAppointmentsUseCase
 import com.psychologist.financial.domain.usecases.UpdateAppointmentUseCase
 import com.psychologist.financial.services.BillableHoursCalculator
 import com.psychologist.financial.utils.Constants
+import com.psychologist.financial.utils.normalizeForSearch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -114,7 +115,7 @@ class AppointmentViewModel(
         viewModelScope.launch {
             _globalPaginationState.value = current.copy(status = PageLoadStatus.Loading)
             try {
-                val searchTerm = if (appointmentNameFilter.isBlank()) "%" else "%$appointmentNameFilter%"
+                val searchTerm = if (appointmentNameFilter.isBlank()) "%" else "%${appointmentNameFilter.normalizeForSearch()}%"
                 val statusFilter = when (activeAppointmentFilter) {
                     AppointmentViewState.AppointmentFilter.ALL -> "ALL"
                     AppointmentViewState.AppointmentFilter.PENDING -> "PENDING"

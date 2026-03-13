@@ -50,7 +50,10 @@ fun <T> PaginatedLazyColumn(
 ) {
     val listState = rememberLazyListState()
 
-    LaunchedEffect(listState) {
+    // Scroll-based trigger: fires when user scrolls near the bottom.
+    // Keyed on items.size so the effect restarts after each page load, resetting
+    // distinctUntilChanged state and allowing the next scroll to trigger normally.
+    LaunchedEffect(listState, items.size) {
         snapshotFlow {
             val layoutInfo = listState.layoutInfo
             val totalItems = layoutInfo.totalItemsCount
@@ -60,6 +63,16 @@ fun <T> PaginatedLazyColumn(
             .distinctUntilChanged()
             .filter { it }
             .collect { onLoadMore() }
+    }
+
+    // Post-load trigger: fires after each page arrives to handle the case where
+    // all loaded items still fit on screen without scrolling.
+    // Only auto-loads if the list is not yet scrollable (canScrollForward = false),
+    // so it stops once the screen is full and lets the scroll trigger take over.
+    LaunchedEffect(items.size, isLoading) {
+        if (!isLoading && !allLoaded && items.isNotEmpty() && !listState.canScrollForward) {
+            onLoadMore()
+        }
     }
 
     LazyColumn(state = listState, modifier = modifier) {
@@ -91,6 +104,32 @@ fun <T> PaginatedLazyColumn(
                         text = "Erro ao carregar. Role para tentar novamente.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                allLoaded && items.isNotEmpty() -> Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "${items.size} itens • todos carregados",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                !allLoaded && items.isNotEmpty() -> Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "${items.size} itens carregados • role para ver mais",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

@@ -580,7 +580,7 @@ interface PaymentDao {
         SELECT payments.*, pat.name AS patient_name
         FROM payments
         JOIN patient pat ON payments.patient_id = pat.id
-        WHERE (:searchTerm = '%' OR LOWER(pat.name) LIKE LOWER(:searchTerm))
+        WHERE (:searchTerm = '%' OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(pat.name),'á','a'),'Á','a'),'à','a'),'À','a'),'â','a'),'Â','a'),'ã','a'),'Ã','a'),'é','e'),'É','e'),'ê','e'),'Ê','e'),'í','i'),'Í','i'),'ó','o'),'Ó','o'),'ô','o'),'Ô','o'),'õ','o'),'Õ','o'),'ú','u'),'Ú','u'),'ü','u'),'Ü','u'),'ç','c'),'Ç','c') LIKE :searchTerm)
         ORDER BY payments.payment_date DESC, payments.created_date DESC
         LIMIT :limit OFFSET :offset
     """)

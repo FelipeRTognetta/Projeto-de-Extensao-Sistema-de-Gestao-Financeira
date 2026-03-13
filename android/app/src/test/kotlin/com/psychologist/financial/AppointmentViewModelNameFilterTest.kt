@@ -81,18 +81,16 @@ class AppointmentViewModelNameFilterTest {
 
     @Test
     fun `setNameFilter filters appointments by patient name case insensitive`() = runTest {
-        viewModel.loadAllAppointments()
-        advanceUntilIdle()
+        val filtered = allAppointments.filter { it.patientName.contains("ana", ignoreCase = true) }
+        whenever(mockRepository.getPagedWithPaymentStatus("%ana%", "ALL", 0)).thenReturn(filtered)
 
         viewModel.setNameFilter("ana")
         advanceUntilIdle()
 
-        val state = viewModel.globalListState.value
-        assertTrue(state is AppointmentViewState.GlobalListState.Success)
-        val filtered = (state as AppointmentViewState.GlobalListState.Success).filteredAppointments
+        val items = viewModel.globalPaginationState.value.items
         // "Ana Lima" and "Joana Pereira" both contain "ana"
-        assertEquals(2, filtered.size)
-        assertTrue(filtered.all { it.patientName.contains("ana", ignoreCase = true) })
+        assertEquals(2, items.size)
+        assertTrue(items.all { it.patientName.contains("ana", ignoreCase = true) })
     }
 
     @Test
@@ -113,8 +111,10 @@ class AppointmentViewModelNameFilterTest {
 
     @Test
     fun `setNameFilter combined with payment status filter applies intersection`() = runTest {
-        viewModel.loadAllAppointments()
-        advanceUntilIdle()
+        val pendingItems = allAppointments.filter { it.hasPendingPayment }
+        val pendingWithAna = pendingItems.filter { it.patientName.contains("ana", ignoreCase = true) }
+        whenever(mockRepository.getPagedWithPaymentStatus("%", "PENDING", 0)).thenReturn(pendingItems)
+        whenever(mockRepository.getPagedWithPaymentStatus("%ana%", "PENDING", 0)).thenReturn(pendingWithAna)
 
         // Apply PENDING status filter first
         viewModel.setFilter(AppointmentViewState.AppointmentFilter.PENDING)
@@ -124,16 +124,17 @@ class AppointmentViewModelNameFilterTest {
         viewModel.setNameFilter("ana")
         advanceUntilIdle()
 
-        val state = viewModel.globalListState.value
-        assertTrue(state is AppointmentViewState.GlobalListState.Success)
-        val filtered = (state as AppointmentViewState.GlobalListState.Success).filteredAppointments
-        assertTrue(filtered.all { it.hasPendingPayment && it.patientName.contains("ana", ignoreCase = true) })
+        val items = viewModel.globalPaginationState.value.items
+        assertTrue(items.all { it.hasPendingPayment && it.patientName.contains("ana", ignoreCase = true) })
     }
 
     @Test
     fun `resetNameFilter restores status-filtered list without name filter`() = runTest {
-        viewModel.loadAllAppointments()
-        advanceUntilIdle()
+        val pendingItems = allAppointments.filter { it.hasPendingPayment }
+        val pendingWithAna = pendingItems.filter { it.patientName.contains("ana", ignoreCase = true) }
+        whenever(mockRepository.getPagedWithPaymentStatus("%", "PENDING", 0)).thenReturn(pendingItems)
+        whenever(mockRepository.getPagedWithPaymentStatus("%ana%", "PENDING", 0)).thenReturn(pendingWithAna)
+
         viewModel.setFilter(AppointmentViewState.AppointmentFilter.PENDING)
         advanceUntilIdle()
         viewModel.setNameFilter("ana")
@@ -142,10 +143,8 @@ class AppointmentViewModelNameFilterTest {
         viewModel.resetNameFilter()
         advanceUntilIdle()
 
-        val state = viewModel.globalListState.value
-        assertTrue(state is AppointmentViewState.GlobalListState.Success)
-        val filtered = (state as AppointmentViewState.GlobalListState.Success).filteredAppointments
+        val items = viewModel.globalPaginationState.value.items
         // Back to all PENDING appointments
-        assertEquals(allAppointments.count { it.hasPendingPayment }, filtered.size)
+        assertEquals(allAppointments.count { it.hasPendingPayment }, items.size)
     }
 }

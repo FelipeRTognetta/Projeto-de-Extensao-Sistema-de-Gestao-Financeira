@@ -83,18 +83,16 @@ class PaymentViewModelNameFilterTest {
 
     @Test
     fun `setNameFilter filters payments by patient name case insensitive`() = runTest {
-        viewModel.loadAllPayments()
-        advanceUntilIdle()
+        val filtered = allPayments.filter { it.patientName.contains("ana", ignoreCase = true) }
+        whenever(mockRepository.getPagedWithPatient("%ana%", 0)).thenReturn(filtered)
 
         viewModel.setNameFilter("ana")
         advanceUntilIdle()
 
-        val state = viewModel.globalListState.value
-        assertTrue(state is PaymentViewState.GlobalListState.Success)
-        val filtered = (state as PaymentViewState.GlobalListState.Success).filteredPayments
+        val items = viewModel.globalPaginationState.value.items
         // "Ana Lima" and "Joana Pereira" both contain "ana"
-        assertEquals(2, filtered.size)
-        assertTrue(filtered.all { it.patientName.contains("ana", ignoreCase = true) })
+        assertEquals(2, items.size)
+        assertTrue(items.all { it.patientName.contains("ana", ignoreCase = true) })
     }
 
     @Test

@@ -571,7 +571,7 @@ interface AppointmentDao {
             p.name AS patient_name
         FROM appointments a
         JOIN patient p ON a.patient_id = p.id
-        WHERE (:searchTerm = '%' OR LOWER(p.name) LIKE LOWER(:searchTerm))
+        WHERE (:searchTerm = '%' OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(p.name),'á','a'),'Á','a'),'à','a'),'À','a'),'â','a'),'Â','a'),'ã','a'),'Ã','a'),'é','e'),'É','e'),'ê','e'),'Ê','e'),'í','i'),'Í','i'),'ó','o'),'Ó','o'),'ô','o'),'Ô','o'),'õ','o'),'Õ','o'),'ú','u'),'Ú','u'),'ü','u'),'Ü','u'),'ç','c'),'Ç','c') LIKE :searchTerm)
         AND (
             :statusFilter = 'ALL'
             OR (:statusFilter = 'PENDING' AND a.id NOT IN (SELECT appointment_id FROM payment_appointments))

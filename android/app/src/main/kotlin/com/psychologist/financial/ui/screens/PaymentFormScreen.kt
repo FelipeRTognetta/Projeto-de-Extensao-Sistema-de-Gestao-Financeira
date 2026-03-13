@@ -90,6 +90,11 @@ fun PaymentFormScreen(
         }
     }
 
+    // Navigate away after successful create/edit
+    LaunchedEffect(formState.isSubmitted) {
+        if (formState.isSubmitted) onSuccess()
+    }
+
     // Biometric auth trigger when AwaitingAuth (after user confirmed the dialog); navigate on Success
     LaunchedEffect(deleteState) {
         when (deleteState) {

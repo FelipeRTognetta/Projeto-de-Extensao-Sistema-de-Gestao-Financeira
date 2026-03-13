@@ -13,6 +13,7 @@ import com.psychologist.financial.domain.usecases.GetAllPaymentsUseCase
 import com.psychologist.financial.domain.usecases.GetPatientPaymentsUseCase
 import com.psychologist.financial.domain.usecases.GetUnpaidAppointmentsUseCase
 import com.psychologist.financial.utils.Constants
+import com.psychologist.financial.utils.normalizeForSearch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -209,7 +210,8 @@ class PaymentViewModel(
                         isLoading = false,
                         errorMessage = null,
                         amountText = "",
-                        selectedAppointmentIds = emptySet()
+                        selectedAppointmentIds = emptySet(),
+                        isSubmitted = true
                     )
                 }
             } catch (e: IllegalArgumentException) {
@@ -252,7 +254,7 @@ class PaymentViewModel(
         viewModelScope.launch {
             _globalPaginationState.value = current.copy(status = PageLoadStatus.Loading)
             try {
-                val searchTerm = if (paymentNameFilter.isBlank()) "%" else "%$paymentNameFilter%"
+                val searchTerm = if (paymentNameFilter.isBlank()) "%" else "%${paymentNameFilter.normalizeForSearch()}%"
                 val newItems = repository!!.getPagedWithPatient(
                     searchTerm = searchTerm,
                     page = current.currentPage
