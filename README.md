@@ -5,7 +5,7 @@ Aplicativo Android para gerenciamento financeiro de consultórios de psicologia.
 ## Funcionalidades
 
 - **Pacientes**: cadastro com dados de contato, status ativo/inativo, responsável financeiro
-- **Consultas**: registro de sessões com data, horário, duração e observações
+- **Consultas**: registro de sessões com data, horário e observações
 - **Pagamentos**: controle de recebimentos (pago/pendente) com vínculo opcional à consulta
 - **Dashboard**: resumo financeiro com receita, pacientes ativos e saldo pendente
 - **Exportação**: CSV com dados de pacientes, consultas e pagamentos; backup criptografado
@@ -13,14 +13,14 @@ Aplicativo Android para gerenciamento financeiro de consultórios de psicologia.
 
 ## Stack
 
-| Camada | Tecnologia |
-|--------|-----------|
-| Linguagem | Kotlin (JVM 17) |
-| UI | Jetpack Compose + Material 3 |
-| Banco de dados | Room 2.6.1 + SQLCipher 4.5.4 |
-| Segurança | Android Keystore + Tink + BiometricPrompt |
-| Build | Gradle, compileSdk 35, minSdk 30 |
-| Testes | JUnit 4, Mockito, Espresso, JaCoCo |
+| Camada         | Tecnologia                                |
+| -------------- | ----------------------------------------- |
+| Linguagem      | Kotlin (JVM 17)                           |
+| UI             | Jetpack Compose + Material 3              |
+| Banco de dados | Room 2.6.1 + SQLCipher 4.5.4              |
+| Segurança      | Android Keystore + Tink + BiometricPrompt |
+| Build          | Gradle, compileSdk 35, minSdk 30          |
+| Testes         | JUnit 4, Mockito, Espresso, JaCoCo        |
 
 ## Requisitos
 

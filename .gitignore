@@ -53,6 +53,7 @@ spec.md
 # ================================
 *.jks
 *.keystore
+keystore.properties
 
 # ================================
 # Arquivos temporários

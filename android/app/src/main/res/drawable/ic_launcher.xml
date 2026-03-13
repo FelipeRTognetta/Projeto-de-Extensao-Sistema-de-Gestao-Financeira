@@ -4,13 +4,30 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Background: lilac -->
     <path
-        android:fillColor="#1976D2"
+        android:fillColor="#6750A4"
         android:pathData="M0,0h108v108h-108z" />
+
+    <!-- Vertical center bar -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M54,28C40.7,28 30,38.7 30,52s10.7,24 24,24 24,-10.7 24,-24S67.3,28 54,28zM54,70c-9.9,0 -18,-8.1 -18,-18s8.1,-18 18,-18 18,8.1 18,18S63.9,70 54,70z" />
+        android:pathData="M50,22 L58,22 L58,90 L50,90 Z" />
+
+    <!-- Horizontal crossbar -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M51,42h6v12h8v6H51z" />
+        android:pathData="M28,58 L80,58 L80,66 L28,66 Z" />
+
+    <!-- Left thin curved arm -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M35,64 C33,52 31,38 33,26 L27,26 C19,30 18,44 20,56 C22,62 26,64 29,64 Z" />
+
+    <!-- Right thin curved arm -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M73,64 C75,52 77,38 75,26 L81,26 C89,30 90,44 88,56 C86,62 82,64 79,64 Z" />
+
 </vector>
