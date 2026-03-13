@@ -556,6 +556,56 @@ interface AppointmentDao {
 
     @Query("SELECT COUNT(*) FROM appointments WHERE id NOT IN (SELECT appointment_id FROM payment_appointments)")
     fun countUnpaidAppointmentsFlow(): Flow<Int>
+
+    /**
+     * Paginated global appointment list with optional name search and payment-status filter.
+     *
+     * statusFilter values: "ALL", "PENDING" (no linked payment), "PAID" (has linked payment).
+     * Pass searchTerm = "%" to return all patients.
+     * Ordered by date DESC for stable LIMIT/OFFSET pagination.
+     */
+    @Query("""
+        SELECT
+            a.*,
+            (a.id NOT IN (SELECT appointment_id FROM payment_appointments)) AS has_pending_payment,
+            p.name AS patient_name
+        FROM appointments a
+        JOIN patient p ON a.patient_id = p.id
+        WHERE (:searchTerm = '%' OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(p.name),'á','a'),'Á','a'),'à','a'),'À','a'),'â','a'),'Â','a'),'ã','a'),'Ã','a'),'é','e'),'É','e'),'ê','e'),'Ê','e'),'í','i'),'Í','i'),'ó','o'),'Ó','o'),'ô','o'),'Ô','o'),'õ','o'),'Õ','o'),'ú','u'),'Ú','u'),'ü','u'),'Ü','u'),'ç','c'),'Ç','c') LIKE :searchTerm)
+        AND (
+            :statusFilter = 'ALL'
+            OR (:statusFilter = 'PENDING' AND a.id NOT IN (SELECT appointment_id FROM payment_appointments))
+            OR (:statusFilter = 'PAID'    AND a.id IN     (SELECT appointment_id FROM payment_appointments))
+        )
+        ORDER BY a.date DESC, a.time_start DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun getPagedWithPaymentStatus(
+        searchTerm: String,
+        statusFilter: String,
+        offset: Int,
+        limit: Int
+    ): List<AppointmentWithStatusResult>
+
+    /**
+     * Paginated per-patient appointment list with payment status. Date DESC.
+     */
+    @Query("""
+        SELECT
+            a.*,
+            (a.id NOT IN (SELECT appointment_id FROM payment_appointments)) AS has_pending_payment,
+            p.name AS patient_name
+        FROM appointments a
+        JOIN patient p ON a.patient_id = p.id
+        WHERE a.patient_id = :patientId
+        ORDER BY a.date DESC, a.time_start DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun getPagedByPatientWithPaymentStatus(
+        patientId: Long,
+        offset: Int,
+        limit: Int
+    ): List<AppointmentWithStatusResult>
 }
 
 /**

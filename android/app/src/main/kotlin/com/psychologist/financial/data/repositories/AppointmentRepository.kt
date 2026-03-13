@@ -499,6 +499,59 @@ class AppointmentRepository(
     }
 
     /**
+     * Paginated global appointment list with optional name search and payment-status filter.
+     *
+     * @param searchTerm "%" for no filter; "%query%" for name match
+     * @param statusFilter "ALL", "PENDING", or "PAID"
+     * @param page Zero-based page number
+     */
+    suspend fun getPagedWithPaymentStatus(
+        searchTerm: String,
+        statusFilter: String,
+        page: Int
+    ): List<AppointmentWithPaymentStatus> {
+        return withRead {
+            appointmentDao.getPagedWithPaymentStatus(
+                searchTerm = searchTerm,
+                statusFilter = statusFilter,
+                offset = page * com.psychologist.financial.utils.Constants.PAGE_SIZE,
+                limit = com.psychologist.financial.utils.Constants.PAGE_SIZE
+            ).map { result ->
+                AppointmentWithPaymentStatus(
+                    appointment = result.appointment.toDomain(),
+                    hasPendingPayment = result.hasPendingPayment,
+                    patientName = result.patientName
+                )
+            }
+        }
+    }
+
+    /**
+     * Paginated per-patient appointment list with payment status.
+     *
+     * @param patientId Patient ID
+     * @param page Zero-based page number
+     */
+    suspend fun getPagedByPatientWithPaymentStatus(
+        patientId: Long,
+        page: Int
+    ): List<AppointmentWithPaymentStatus> {
+        return withRead {
+            appointmentDao.getPagedByPatientWithPaymentStatus(
+                patientId = patientId,
+                offset = page * com.psychologist.financial.utils.Constants.PAGE_SIZE,
+                limit = com.psychologist.financial.utils.Constants.PAGE_SIZE
+            ).map { result ->
+                AppointmentWithPaymentStatus(
+                    appointment = result.appointment.toDomain(),
+                    hasPendingPayment = result.hasPendingPayment,
+                    patientName = result.patientName
+                )
+            }
+        }
+    }
+
+    /**
      * Get patient IDs that have at least one unpaid appointment.
      *
      * @return Flow of patient ID set with pending payments

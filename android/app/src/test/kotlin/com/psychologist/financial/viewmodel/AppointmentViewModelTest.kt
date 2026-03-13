@@ -99,36 +99,28 @@ class AppointmentViewModelTest {
 
     @Test
     fun setFilter_PENDING_returnsOnlyAppointmentsWithHasPendingPaymentTrue() = runTest {
-        whenever(getAllAppointmentsUseCase.execute())
-            .thenReturn(flowOf(listOf(pendingWithStatus, paidWithStatus)))
-
-        viewModel.loadAllAppointments()
-        testDispatcher.scheduler.advanceUntilIdle()
+        whenever(repository.getPagedWithPaymentStatus("%", "PENDING", 0))
+            .thenReturn(listOf(pendingWithStatus))
 
         viewModel.setFilter(AppointmentViewState.AppointmentFilter.PENDING)
+        testDispatcher.scheduler.advanceUntilIdle()
 
-        val state = viewModel.globalListState.value
-        assertTrue(state is AppointmentViewState.GlobalListState.Success)
-        val success = state as AppointmentViewState.GlobalListState.Success
-        assertEquals(1, success.filteredAppointments.size)
-        assertTrue(success.filteredAppointments.first().hasPendingPayment)
+        val items = viewModel.globalPaginationState.value.items
+        assertEquals(1, items.size)
+        assertTrue(items.first().hasPendingPayment)
     }
 
     @Test
     fun setFilter_PAID_returnsOnlyAppointmentsWithHasPendingPaymentFalse() = runTest {
-        whenever(getAllAppointmentsUseCase.execute())
-            .thenReturn(flowOf(listOf(pendingWithStatus, paidWithStatus)))
-
-        viewModel.loadAllAppointments()
-        testDispatcher.scheduler.advanceUntilIdle()
+        whenever(repository.getPagedWithPaymentStatus("%", "PAID", 0))
+            .thenReturn(listOf(paidWithStatus))
 
         viewModel.setFilter(AppointmentViewState.AppointmentFilter.PAID)
+        testDispatcher.scheduler.advanceUntilIdle()
 
-        val state = viewModel.globalListState.value
-        assertTrue(state is AppointmentViewState.GlobalListState.Success)
-        val success = state as AppointmentViewState.GlobalListState.Success
-        assertEquals(1, success.filteredAppointments.size)
-        assertFalse(success.filteredAppointments.first().hasPendingPayment)
+        val items = viewModel.globalPaginationState.value.items
+        assertEquals(1, items.size)
+        assertFalse(items.first().hasPendingPayment)
     }
 
     @Test

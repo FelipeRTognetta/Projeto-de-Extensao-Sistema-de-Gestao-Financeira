@@ -242,11 +242,40 @@ interface PatientDao {
     @Query(
         """
         SELECT * FROM patient
-        WHERE status = 'ACTIVE' AND LOWER(name) LIKE LOWER(:searchTerm)
+        WHERE status = 'ACTIVE' AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(name),'á','a'),'Á','a'),'à','a'),'À','a'),'â','a'),'Â','a'),'ã','a'),'Ã','a'),'é','e'),'É','e'),'ê','e'),'Ê','e'),'í','i'),'Í','i'),'ó','o'),'Ó','o'),'ô','o'),'Ô','o'),'õ','o'),'Õ','o'),'ú','u'),'Ú','u'),'ü','u'),'Ü','u'),'ç','c'),'Ç','c') LIKE :searchTerm
         ORDER BY name ASC
         """
     )
     suspend fun searchPatientsByName(searchTerm: String): List<PatientEntity>
+
+    /**
+     * Get a single page of patients with server-side name filter and status filter.
+     *
+     * Used for paginated patient list. Pass searchTerm = "%" to return all.
+     * Pass includeInactive = true to include INACTIVE patients.
+     * Results are ordered alphabetically by name for stable LIMIT/OFFSET pagination.
+     *
+     * @param searchTerm LIKE pattern for name filter (e.g. "%" or "%silva%")
+     * @param includeInactive Whether to include INACTIVE patients
+     * @param offset Row offset (page * PAGE_SIZE)
+     * @param limit Max rows to return (PAGE_SIZE)
+     * @return List of matching PatientEntity for this page
+     */
+    @Query(
+        """
+        SELECT * FROM patient
+        WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(name),'á','a'),'Á','a'),'à','a'),'À','a'),'â','a'),'Â','a'),'ã','a'),'Ã','a'),'é','e'),'É','e'),'ê','e'),'Ê','e'),'í','i'),'Í','i'),'ó','o'),'Ó','o'),'ô','o'),'Ô','o'),'õ','o'),'Õ','o'),'ú','u'),'Ú','u'),'ü','u'),'Ü','u'),'ç','c'),'Ç','c') LIKE :searchTerm
+          AND (:includeInactive = 1 OR status = 'ACTIVE')
+        ORDER BY name ASC
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    suspend fun getPagedPatients(
+        searchTerm: String,
+        includeInactive: Boolean,
+        offset: Int,
+        limit: Int
+    ): List<PatientEntity>
 
     /**
      * Get patient by phone number

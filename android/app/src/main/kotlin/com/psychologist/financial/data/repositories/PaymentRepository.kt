@@ -294,6 +294,55 @@ class PaymentRepository(
     }
 
     /**
+     * Paginated global payment list with optional patient name search.
+     *
+     * @param searchTerm "%" for no filter; "%query%" for patient name match
+     * @param page Zero-based page number
+     */
+    suspend fun getPagedWithPatient(
+        searchTerm: String,
+        page: Int
+    ): List<PaymentWithDetails> {
+        return withRead {
+            paymentDao.getPagedWithPatient(
+                searchTerm = searchTerm,
+                offset = page * com.psychologist.financial.utils.Constants.PAGE_SIZE,
+                limit = com.psychologist.financial.utils.Constants.PAGE_SIZE
+            ).map { pa ->
+                PaymentWithDetails(
+                    payment = pa.payment.toDomain(),
+                    appointments = pa.appointments.map { it.toDomain() },
+                    patientName = pa.patientName
+                )
+            }
+        }
+    }
+
+    /**
+     * Paginated per-patient payment list with linked appointments.
+     *
+     * @param patientId Patient ID
+     * @param page Zero-based page number
+     */
+    suspend fun getPagedByPatient(
+        patientId: Long,
+        page: Int
+    ): List<PaymentWithDetails> {
+        return withRead {
+            paymentDao.getPagedByPatient(
+                patientId = patientId,
+                offset = page * com.psychologist.financial.utils.Constants.PAGE_SIZE,
+                limit = com.psychologist.financial.utils.Constants.PAGE_SIZE
+            ).map { pa ->
+                PaymentWithDetails(
+                    payment = pa.payment.toDomain(),
+                    appointments = pa.appointments.map { it.toDomain() }
+                )
+            }
+        }
+    }
+
+    /**
      * Get payments in date range
      *
      * @param startDate Start date

@@ -3,37 +3,27 @@ package com.psychologist.financial.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -42,10 +32,9 @@ import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.psychologist.financial.data.repositories.PaymentWithDetails
+import com.psychologist.financial.ui.components.PaginatedLazyColumn
 import com.psychologist.financial.ui.components.PaymentListItem
 import com.psychologist.financial.viewmodel.PaymentViewModel
-import com.psychologist.financial.viewmodel.PaymentViewState
 
 /**
  * Payment list screen
@@ -111,147 +100,6 @@ fun PaymentListScreen(
     }
 }
 
-@Composable
-private fun GlobalPaymentListScreen(
-    viewModel: PaymentViewModel,
-    onPatientClick: (Long) -> Unit = { }
-) {
-    val globalState = viewModel.globalListState.collectAsState().value
-    var nameQuery by remember { mutableStateOf("") }
-
-    LaunchedEffect(Unit) {
-        viewModel.loadAllPayments()
-    }
-
-    DisposableEffect(Unit) {
-        onDispose { viewModel.resetNameFilter() }
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Pagamentos") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            if (globalState !is PaymentViewState.GlobalListState.Error) {
-                OutlinedTextField(
-                    value = nameQuery,
-                    onValueChange = { nameQuery = it; viewModel.setNameFilter(it) },
-                    placeholder = { Text("Buscar por nome do paciente") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    singleLine = true,
-                    trailingIcon = {
-                        if (nameQuery.isNotEmpty()) {
-                            IconButton(onClick = { nameQuery = ""; viewModel.resetNameFilter() }) {
-                                Icon(Icons.Default.Close, contentDescription = "Limpar busca")
-                            }
-                        }
-                    }
-                )
-            }
-
-            Box(modifier = Modifier.weight(1f)) {
-                when (globalState) {
-                    is PaymentViewState.GlobalListState.Loading -> {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
-                    }
-
-                    is PaymentViewState.GlobalListState.Success -> {
-                        if (globalState.filteredPayments.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(24.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = if (nameQuery.isNotEmpty())
-                                        "Nenhum pagamento encontrado para \"$nameQuery\""
-                                    else
-                                        "Nenhum pagamento encontrado",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(
-                                    items = globalState.filteredPayments,
-                                    key = { it.payment.id }
-                                ) { paymentWithDetails ->
-                                    PaymentListItem(
-                                        paymentWithDetails = paymentWithDetails,
-                                        patientName = paymentWithDetails.patientName,
-                                        onClick = { onPatientClick(paymentWithDetails.payment.patientId) }
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    is PaymentViewState.GlobalListState.Empty -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "Nenhum Pagamento",
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = "Nenhum pagamento registrado ainda.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                    }
-
-                    is PaymentViewState.GlobalListState.Error -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = globalState.message,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun PatientPaymentListScreen(
@@ -263,7 +111,7 @@ private fun PatientPaymentListScreen(
     onAddPayment: () -> Unit,
     onSelectPayment: (Long) -> Unit
 ) {
-    val listState = viewModel.paymentListState.collectAsState().value
+    val paginationState by viewModel.perPatientPaginationState.collectAsState()
 
     LaunchedEffect(patientId) {
         viewModel.loadPatientPayments(patientId)
@@ -320,56 +168,36 @@ private fun PatientPaymentListScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            when (listState) {
-                is PaymentViewState.ListState.Loading -> {
+            when {
+                paginationState.items.isEmpty() && paginationState.isLoading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
                 }
 
-                is PaymentViewState.ListState.Success -> {
-                    PaymentListWithDetailsContent(
-                        payments = listState.payments,
-                        onSelectPayment = if (isPatientActive) onSelectPayment else { _ -> }
-                    )
-                }
-
-                is PaymentViewState.ListState.Empty -> {
+                paginationState.items.isEmpty() && !paginationState.isLoading -> {
                     EmptyPaymentsContent(onAddPayment = onAddPayment)
                 }
 
-                is PaymentViewState.ListState.Error -> {
-                    ErrorPaymentsContent(
-                        message = listState.message,
-                        onBack = onBack
-                    )
+                else -> {
+                    PaginatedLazyColumn(
+                        items = paginationState.items,
+                        isLoading = paginationState.isLoading,
+                        isError = paginationState.isError,
+                        allLoaded = !paginationState.hasMore,
+                        onLoadMore = { viewModel.loadNextPatientPaymentsPage() },
+                        modifier = Modifier.fillMaxSize(),
+                        key = { it.payment.id }
+                    ) { paymentWithDetails ->
+                        PaymentListItem(
+                            paymentWithDetails = paymentWithDetails,
+                            onClick = {
+                                if (isPatientActive) onSelectPayment(paymentWithDetails.payment.id)
+                            }
+                        )
+                    }
                 }
             }
-        }
-    }
-}
-
-/**
- * Payment list content with linked appointments (patient-scoped view).
- */
-@Composable
-private fun PaymentListWithDetailsContent(
-    payments: List<PaymentWithDetails>,
-    onSelectPayment: (Long) -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(
-            items = payments,
-            key = { it.payment.id }
-        ) { paymentWithDetails ->
-            PaymentListItem(
-                paymentWithDetails = paymentWithDetails,
-                onClick = { onSelectPayment(paymentWithDetails.payment.id) }
-            )
         }
     }
 }
